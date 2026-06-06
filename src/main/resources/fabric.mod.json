@@ -16,6 +16,9 @@
 	"entrypoints": {
 		"client": [
 			"fastui.yure.client.FastMasaConfigClient"
+		],
+		"modmenu": [
+			"fastui.yure.client.compat.modmenu.FastMasaModMenuImpl"
 		]
 	},
 	"depends": {

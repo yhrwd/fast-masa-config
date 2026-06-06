@@ -9,16 +9,21 @@ import fi.dy.masa.malilib.gui.GuiConfigsBase;
 import fi.dy.masa.malilib.gui.interfaces.IConfigGui;
 import fi.dy.masa.malilib.hotkeys.IHotkey;
 import fi.dy.masa.malilib.registry.Registry;
+import fi.dy.masa.malilib.util.StringUtils;
 import fi.dy.masa.malilib.util.data.ModInfo;
 import fastui.yure.FastMasaConfig;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -30,7 +35,7 @@ import java.util.Set;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
 
 public final class MasaConfigProbe {
-    private static final String[] KNOWN_CONFIG_CLASS_NAMES = {
+    private static final String[] FALLBACK_CONFIG_CLASS_NAMES = {
             "fi.dy.masa.tweakeroo.config.Configs",
             "fi.dy.masa.tweakeroo.config.Hotkeys",
             "fi.dy.masa.tweakeroo.config.FeatureToggle",
@@ -50,70 +55,195 @@ public final class MasaConfigProbe {
     private static void registerCommands(CommandDispatcher<FabricClientCommandSource> dispatcher) {
         dispatcher.register(literal("fastmasaconfig")
                 .then(literal("scan")
-                        .executes(MasaConfigProbe::scan)));
+                        .executes(MasaConfigProbe::scanRegistered)
+                        .then(literal("csv")
+                                .executes(MasaConfigProbe::exportRegisteredCsv))
+                        .then(literal("fallback")
+                                .executes(MasaConfigProbe::scanFallback)
+                                .then(literal("csv")
+                                        .executes(MasaConfigProbe::exportFallbackCsv)))));
     }
 
-    private static int scan(CommandContext<FabricClientCommandSource> context) {
-        Map<String, List<ConfigEntry>> guiEntries = scanRegisteredConfigScreens();
-        Map<String, List<ConfigEntry>> reflectedEntries = scanKnownConfigClasses();
+    private static int scanRegistered(CommandContext<FabricClientCommandSource> context) {
+        List<ModConfigScan> registeredScans = scanRegisteredConfigScreens();
 
-        FastMasaConfig.LOGGER.info("==== Fast Masa Config probe: registered config screens ====");
-        logEntries(guiEntries);
+        FastMasaConfig.LOGGER.info("==== Fast Masa Config probe: registered MaLiLib config screens ====");
+        logRegisteredScans(registeredScans);
 
-        FastMasaConfig.LOGGER.info("==== Fast Masa Config probe: reflected config classes ====");
-        logEntries(reflectedEntries);
+        int registeredCount = registeredScans.stream()
+                .flatMap(scan -> scan.groups().stream())
+                .mapToInt(group -> group.entries().size())
+                .sum();
 
-        int guiCount = guiEntries.values().stream().mapToInt(List::size).sum();
-        int reflectedCount = reflectedEntries.values().stream().mapToInt(List::size).sum();
-
-        context.getSource().sendFeedback(Text.literal("Fast Masa Config scan complete. GUI entries: " + guiCount + ", reflected entries: " + reflectedCount + ". See client log."));
+        context.getSource().sendFeedback(Text.literal("Fast Masa Config scan complete. Registered entries: " + registeredCount + ". Use /fastmasaconfig scan fallback for fallback reflection."));
         return 1;
     }
 
-    private static Map<String, List<ConfigEntry>> scanRegisteredConfigScreens() {
-        Map<String, List<ConfigEntry>> result = new LinkedHashMap<>();
+    private static int scanFallback(CommandContext<FabricClientCommandSource> context) {
+        Map<String, List<ConfigEntry>> fallbackEntries = scanFallbackConfigClasses();
+
+        FastMasaConfig.LOGGER.info("==== Fast Masa Config probe: fallback reflected config classes ====");
+        logFallbackEntries(fallbackEntries);
+
+        int fallbackCount = fallbackEntries.values().stream().mapToInt(List::size).sum();
+
+        context.getSource().sendFeedback(Text.literal("Fast Masa Config fallback scan complete. Fallback entries: " + fallbackCount + ". See client log."));
+        return 1;
+    }
+
+    private static int exportRegisteredCsv(CommandContext<FabricClientCommandSource> context) {
+        try {
+            Path outputPath = exportRegisteredCsvFile();
+            context.getSource().sendFeedback(Text.literal("Fast Masa Config CSV exported: " + outputPath.toAbsolutePath()));
+            return 1;
+        } catch (Exception e) {
+            FastMasaConfig.LOGGER.error("Failed to export registered config CSV", e);
+            context.getSource().sendError(Text.literal("Fast Masa Config CSV export failed. See client log."));
+            return 0;
+        }
+    }
+
+    public static Path exportRegisteredCsvFile() throws Exception {
+        List<ModConfigScan> registeredScans = scanRegisteredConfigScreens();
+        Path outputPath = getRunDirectory().resolve("fast-masa-config-scan.csv");
+        writeRegisteredCsv(outputPath, registeredScans);
+        return outputPath;
+    }
+
+    private static int exportFallbackCsv(CommandContext<FabricClientCommandSource> context) {
+        Map<String, List<ConfigEntry>> fallbackEntries = scanFallbackConfigClasses();
+        Path outputPath = getRunDirectory().resolve("fast-masa-config-fallback-scan.csv");
+
+        try {
+            writeFallbackCsv(outputPath, fallbackEntries);
+            context.getSource().sendFeedback(Text.literal("Fast Masa Config fallback CSV exported: " + outputPath.toAbsolutePath()));
+            return 1;
+        } catch (Exception e) {
+            FastMasaConfig.LOGGER.error("Failed to export fallback config CSV", e);
+            context.getSource().sendError(Text.literal("Fast Masa Config fallback CSV export failed. See client log."));
+            return 0;
+        }
+    }
+
+    private static List<ModConfigScan> scanRegisteredConfigScreens() {
+        List<ModConfigScan> result = new ArrayList<>();
 
         for (ModInfo modInfo : Registry.CONFIG_SCREEN.getAllModsWithConfigScreens()) {
-            List<ConfigEntry> entries = new ArrayList<>();
-
             try {
                 GuiBase screen = modInfo.getConfigScreenSupplier() == null ? null : modInfo.getConfigScreenSupplier().get();
 
                 if (screen instanceof IConfigGui configGui) {
-                    for (GuiConfigsBase.ConfigOptionWrapper wrapper : configGui.getConfigs()) {
-                        IConfigBase config = wrapper.getConfig();
-
-                        if (config != null) {
-                            entries.add(ConfigEntry.from(config, "gui:" + screen.getClass().getName()));
-                        }
-                    }
+                    result.add(new ModConfigScan(modInfo.getModId(), modInfo.getModName(), collectGroups(screen, configGui)));
                 }
             } catch (Exception e) {
                 FastMasaConfig.LOGGER.warn("Failed to scan config screen for mod [{}]", modInfo.getModId(), e);
             }
-
-            result.put(modInfo.getModId(), entries);
         }
 
         return result;
     }
 
-    private static Map<String, List<ConfigEntry>> scanKnownConfigClasses() {
+    private static List<ConfigGroup> collectGroups(GuiBase screen, IConfigGui configGui) {
+        List<ConfigGroup> groups = collectTabGroups(screen, configGui);
+
+        if (groups.isEmpty()) {
+            groups.add(new ConfigGroup("default", "Default", collectConfigEntries(configGui.getConfigs(), "gui:" + screen.getClass().getName())));
+        }
+
+        return groups;
+    }
+
+    private static List<ConfigGroup> collectTabGroups(GuiBase screen, IConfigGui configGui) {
+        List<ConfigGroup> groups = new ArrayList<>();
+        Field tabField = findStaticTabField(screen.getClass());
+
+        if (tabField == null) {
+            return groups;
+        }
+
+        try {
+            tabField.setAccessible(true);
+            Object originalTab = tabField.get(null);
+            Object[] tabs = tabField.getType().getEnumConstants();
+
+            if (tabs == null) {
+                return groups;
+            }
+
+            for (Object tab : tabs) {
+                tabField.set(null, tab);
+                groups.add(new ConfigGroup(getTabId(tab), getTabDisplayName(tab), collectConfigEntries(configGui.getConfigs(), "gui:" + screen.getClass().getName() + ":" + getTabId(tab))));
+            }
+
+            tabField.set(null, originalTab);
+        } catch (Exception e) {
+            FastMasaConfig.LOGGER.warn("Failed to scan tab groups for config screen [{}]", screen.getClass().getName(), e);
+        }
+
+        return groups;
+    }
+
+    private static Field findStaticTabField(Class<?> screenClass) {
+        for (Field field : screenClass.getDeclaredFields()) {
+            int modifiers = field.getModifiers();
+
+            if (Modifier.isStatic(modifiers) && field.getType().isEnum() && "tab".equals(field.getName())) {
+                return field;
+            }
+        }
+
+        return null;
+    }
+
+    private static String getTabId(Object tab) {
+        return tab instanceof Enum<?> enumTab ? enumTab.name() : String.valueOf(tab);
+    }
+
+    private static String getTabDisplayName(Object tab) {
+        try {
+            Method method = tab.getClass().getMethod("getDisplayName");
+            Object value = method.invoke(tab);
+
+            if (value instanceof String stringValue && stringValue.isBlank() == false) {
+                return stringValue;
+            }
+        } catch (ReflectiveOperationException ignored) {
+            // 部分配置界面没有分组显示名方法，退回 enum 名即可。
+        }
+
+        return getTabId(tab);
+    }
+
+    private static List<ConfigEntry> collectConfigEntries(List<GuiConfigsBase.ConfigOptionWrapper> wrappers, String source) {
+        List<ConfigEntry> entries = new ArrayList<>();
+
+        for (GuiConfigsBase.ConfigOptionWrapper wrapper : wrappers) {
+            IConfigBase config = wrapper.getConfig();
+
+            if (config != null) {
+                entries.add(ConfigEntry.from(config, source));
+            }
+        }
+
+        return entries;
+    }
+
+    private static Map<String, List<ConfigEntry>> scanFallbackConfigClasses() {
         Map<String, List<ConfigEntry>> result = new LinkedHashMap<>();
 
-        for (String className : KNOWN_CONFIG_CLASS_NAMES) {
+        for (String className : FALLBACK_CONFIG_CLASS_NAMES) {
             try {
                 Class<?> clazz = Class.forName(className);
                 List<ConfigEntry> entries = new ArrayList<>();
                 collectFromClass(clazz, entries, new LinkedHashSet<>());
 
-                if (!entries.isEmpty()) {
+                if (entries.isEmpty() == false) {
                     result.put(className, entries);
                 }
             } catch (ClassNotFoundException ignored) {
-                FastMasaConfig.LOGGER.debug("Config class [{}] is not loaded because its mod is absent", className);
+                FastMasaConfig.LOGGER.debug("Fallback config class [{}] is not loaded because its mod is absent", className);
             } catch (Exception e) {
-                FastMasaConfig.LOGGER.warn("Failed to reflect config class [{}]", className, e);
+                FastMasaConfig.LOGGER.warn("Failed to reflect fallback config class [{}]", className, e);
             }
         }
 
@@ -122,13 +252,12 @@ public final class MasaConfigProbe {
 
     private static void collectFromClass(Class<?> clazz, List<ConfigEntry> entries, Set<Object> seenObjects) throws IllegalAccessException {
         for (Field field : clazz.getDeclaredFields()) {
-            if (!Modifier.isStatic(field.getModifiers())) {
+            if (Modifier.isStatic(field.getModifiers()) == false) {
                 continue;
             }
 
             field.setAccessible(true);
-            Object value = field.get(null);
-            collectFromValue(value, entries, seenObjects, clazz.getName() + "#" + field.getName());
+            collectFromValue(field.get(null), entries, seenObjects, clazz.getName() + "#" + field.getName());
         }
 
         for (Class<?> nestedClass : clazz.getDeclaredClasses()) {
@@ -147,7 +276,7 @@ public final class MasaConfigProbe {
     }
 
     private static void collectFromValue(Object value, List<ConfigEntry> entries, Set<Object> seenObjects, String source) {
-        if (value == null || !seenObjects.add(value)) {
+        if (value == null || seenObjects.add(value) == false) {
             return;
         }
 
@@ -185,27 +314,141 @@ public final class MasaConfigProbe {
             Method method = value.getClass().getMethod(methodName);
 
             if (IConfigBase.class.isAssignableFrom(method.getReturnType())) {
-                Object returnedValue = method.invoke(value);
-                collectFromValue(returnedValue, entries, seenObjects, source + "." + methodName + "()");
+                collectFromValue(method.invoke(value), entries, seenObjects, source + "." + methodName + "()");
             }
         } catch (ReflectiveOperationException ignored) {
-            // 不是所有枚举都会暴露派生配置对象，这里只探测常见 MaLiLib 写法。
+            // 不是所有枚举都会暴露派生配置对象，这里只作为降级探测。
         }
     }
 
-    private static void logEntries(Map<String, List<ConfigEntry>> groupedEntries) {
-        for (Map.Entry<String, List<ConfigEntry>> group : groupedEntries.entrySet()) {
-            FastMasaConfig.LOGGER.info("{}: {} config entries", group.getKey(), group.getValue().size());
+    private static void logRegisteredScans(List<ModConfigScan> scans) {
+        for (ModConfigScan scan : scans) {
+            int count = scan.groups().stream().mapToInt(group -> group.entries().size()).sum();
+            FastMasaConfig.LOGGER.info("{} ({})：{} config entries", scan.modName(), scan.modId(), count);
 
-            for (ConfigEntry entry : group.getValue()) {
-                FastMasaConfig.LOGGER.info("  [{}] {} = {} ({})", entry.type(), entry.name(), entry.value(), entry.source());
+            for (ConfigGroup group : scan.groups()) {
+                FastMasaConfig.LOGGER.info("  [{}] {}：{} entries", group.id(), group.displayName(), group.entries().size());
+
+                for (ConfigEntry entry : group.entries()) {
+                    FastMasaConfig.LOGGER.info("    [{}] {} -> {} = {}", entry.type(), entry.name(), entry.displayName(), entry.value());
+                }
             }
         }
     }
 
-    private record ConfigEntry(String name, String type, String value, String source) {
+    private static void logFallbackEntries(Map<String, List<ConfigEntry>> groupedEntries) {
+        for (Map.Entry<String, List<ConfigEntry>> group : groupedEntries.entrySet()) {
+            FastMasaConfig.LOGGER.info("{}：{} config entries", group.getKey(), group.getValue().size());
+
+            for (ConfigEntry entry : group.getValue()) {
+                FastMasaConfig.LOGGER.info("  [{}] {} -> {} = {} ({})", entry.type(), entry.name(), entry.displayName(), entry.value(), entry.source());
+            }
+        }
+    }
+
+    private static void writeRegisteredCsv(Path outputPath, List<ModConfigScan> scans) throws Exception {
+        List<String> lines = new ArrayList<>();
+        lines.add("kind,mod_id,mod_name,group_id,group_name,type,name,display_name,value,source");
+
+        for (ModConfigScan scan : scans) {
+            for (ConfigGroup group : scan.groups()) {
+                for (ConfigEntry entry : group.entries()) {
+                    lines.add(toCsvLine(
+                            "registered",
+                            scan.modId(),
+                            scan.modName(),
+                            group.id(),
+                            group.displayName(),
+                            entry.type(),
+                            entry.name(),
+                            entry.displayName(),
+                            entry.value(),
+                            entry.source()
+                    ));
+                }
+            }
+        }
+
+        Files.write(outputPath, lines, StandardCharsets.UTF_8);
+    }
+
+    private static void writeFallbackCsv(Path outputPath, Map<String, List<ConfigEntry>> groupedEntries) throws Exception {
+        List<String> lines = new ArrayList<>();
+        lines.add("kind,mod_id,mod_name,group_id,group_name,type,name,display_name,value,source");
+
+        for (Map.Entry<String, List<ConfigEntry>> group : groupedEntries.entrySet()) {
+            for (ConfigEntry entry : group.getValue()) {
+                lines.add(toCsvLine(
+                        "fallback",
+                        "",
+                        "",
+                        group.getKey(),
+                        group.getKey(),
+                        entry.type(),
+                        entry.name(),
+                        entry.displayName(),
+                        entry.value(),
+                        entry.source()
+                ));
+            }
+        }
+
+        Files.write(outputPath, lines, StandardCharsets.UTF_8);
+    }
+
+    private static Path getRunDirectory() {
+        return MinecraftClient.getInstance().runDirectory.toPath();
+    }
+
+    private static String toCsvLine(String... values) {
+        List<String> escapedValues = new ArrayList<>(values.length);
+
+        for (String value : values) {
+            escapedValues.add(escapeCsv(value));
+        }
+
+        return String.join(",", escapedValues);
+    }
+
+    private static String escapeCsv(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        String escapedValue = value.replace("\"", "\"\"");
+
+        if (escapedValue.contains(",") || escapedValue.contains("\"") || escapedValue.contains("\n") || escapedValue.contains("\r")) {
+            return "\"" + escapedValue + "\"";
+        }
+
+        return escapedValue;
+    }
+
+    private record ModConfigScan(String modId, String modName, List<ConfigGroup> groups) {
+    }
+
+    private record ConfigGroup(String id, String displayName, List<ConfigEntry> entries) {
+    }
+
+    private record ConfigEntry(String name, String displayName, String type, String value, String source) {
         static ConfigEntry from(IConfigBase config, String source) {
-            return new ConfigEntry(config.getName(), config.getType().name(), getValue(config), source);
+            return new ConfigEntry(config.getName(), getDisplayName(config), config.getType().name(), getValue(config), source);
+        }
+
+        private static String getDisplayName(IConfigBase config) {
+            String displayName = config.getConfigGuiDisplayName();
+
+            if (displayName != null && displayName.isBlank() == false && displayName.equals(config.getName()) == false) {
+                return displayName;
+            }
+
+            String translatedName = config.getTranslatedName();
+
+            if (translatedName != null && translatedName.isBlank() == false && translatedName.equals(config.getName()) == false) {
+                return translatedName;
+            }
+
+            return StringUtils.getTranslatedOrFallback(config.getName(), config.getName());
         }
 
         private static String getValue(IConfigBase config) {

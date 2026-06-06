@@ -8,6 +8,7 @@ group = project.maven_group
 
 repositories {
 	maven { url = 'https://masa.dy.fi/maven' }
+	maven { url = 'https://maven.terraformersmc.com/releases/' }
 	maven { url = 'https://jitpack.io' }
 	flatDir { dirs 'libs' }
 }
@@ -33,11 +34,16 @@ dependencies {
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 	modImplementation name: "malilib-fabric-${project.malilib_version}"
+	modCompileOnly "com.terraformersmc:modmenu:${project.mod_menu_version}"
 
-	// 仅用于本地运行探针命令，正式发布不把这些可选目标声明为强依赖。
-	modRuntimeOnly name: "tweakeroo-fabric-${project.tweakeroo_version}"
-	modRuntimeOnly name: "minihud-fabric-${project.minihud_version}"
+	testImplementation platform("org.junit:junit-bom:5.10.2")
+	testImplementation "org.junit.jupiter:junit-jupiter"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 	
+}
+
+test {
+	useJUnitPlatform()
 }
 
 processResources {
