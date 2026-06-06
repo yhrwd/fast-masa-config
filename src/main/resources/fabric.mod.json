@@ -1,0 +1,28 @@
+{
+	"schemaVersion": 1,
+	"id": "fast-masa-config",
+	"version": "${version}",
+	"name": "Fast Masa Config",
+	"description": "A fast configuration helper for MaLiLib-based client mods.",
+	"authors": [
+		"Yure"
+	],
+	"contact": {
+		"sources": ""
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/fast-masa-config/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"fastui.yure.client.FastMasaConfigClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~1.21.7",
+		"java": ">=21",
+		"fabric-api": "*",
+		"malilib": ">=0.25.2- <0.26.0-"
+	}
+}
