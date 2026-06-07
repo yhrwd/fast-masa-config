@@ -29,7 +29,7 @@ public final class FastMasaConfigs {
                 "快捷配置面板最大高度。超过该高度后列表滚动显示。", "Panel Max Height").apply(GENERIC_KEY);
         public static final ConfigDouble PANEL_SCALE = new ConfigDouble("panelScale", 1.0, 0.5, 2.5,
                 "快捷配置面板缩放。", "Panel Scale").apply(GENERIC_KEY);
-        public static final ConfigDouble PANEL_OPACITY = new ConfigDouble("panelOpacity", 0.72, 0.2, 1.0,
+        public static final ConfigDouble PANEL_OPACITY = new ConfigDouble("panelOpacity", 0.58, 0.2, 1.0,
                 "快捷配置面板背景透明度。", "Panel Opacity").apply(GENERIC_KEY);
         public static final ConfigBoolean SHOW_SCAN_SUMMARY = new ConfigBoolean("showScanSummary", true,
                 "是否在快捷面板中显示配置扫描摘要。", "Show Scan Summary").apply(GENERIC_KEY);

@@ -19,7 +19,7 @@ public record QuickPanelLayout(
     private static final int MIN_HEIGHT = 54;
     private static final int MIN_CELL_WIDTH = 162;
     public static final int HEADER_HEIGHT = 25;
-    public static final int ROW_HEIGHT = 19;
+    public static final int ROW_HEIGHT = 25;
     public static final int GAP = 2;
     public static final int LIST_TOP_GAP = 4;
     public static final int PANEL_PADDING = 7;

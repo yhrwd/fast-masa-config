@@ -13,17 +13,22 @@ class QuickPanelLayoutTest {
         assertEquals(260, layout.width());
         assertEquals(240, layout.height());
         assertEquals(1, layout.columns());
-        assertEquals(10, layout.visibleRows());
-        assertEquals(10, layout.maxScrollOffset());
+        assertEquals(7, layout.visibleRows());
+        assertEquals(13, layout.maxScrollOffset());
     }
 
     @Test
     void usesContentHeightWhenBelowMaxHeight() {
         QuickPanelLayout layout = QuickPanelLayout.calculate(800, 600, 260, 240, 1.0, 3);
 
-        assertEquals(93, layout.height());
+        assertEquals(115, layout.height());
         assertEquals(3, layout.visibleRows());
         assertEquals(0, layout.maxScrollOffset());
+    }
+
+    @Test
+    void rowHeightAllowsTwoLinesWithoutOverlap() {
+        assertTrue(QuickPanelLayout.ROW_HEIGHT >= 25);
     }
 
     @Test
@@ -32,8 +37,8 @@ class QuickPanelLayoutTest {
         QuickPanelLayout threeColumns = QuickPanelLayout.calculate(1200, 700, 520, 240, 1.0, 20);
 
         assertEquals(2, twoColumns.columns());
-        assertEquals(20, twoColumns.visibleItemCount());
-        assertEquals(0, twoColumns.maxScrollOffset());
+        assertEquals(14, twoColumns.visibleItemCount());
+        assertEquals(6, twoColumns.maxScrollOffset());
         assertEquals(3, threeColumns.columns());
         assertEquals(20, threeColumns.visibleItemCount());
         assertEquals(0, threeColumns.maxScrollOffset());
@@ -45,7 +50,7 @@ class QuickPanelLayoutTest {
 
         assertEquals(0, layout.clampScrollOffset(-5));
         assertEquals(7, layout.clampScrollOffset(7));
-        assertEquals(10, layout.clampScrollOffset(99));
+        assertEquals(13, layout.clampScrollOffset(99));
     }
 
     @Test

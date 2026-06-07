@@ -17,18 +17,30 @@ public final class ShortcutConfigStore {
         return Collections.unmodifiableList(ENTRIES);
     }
 
-    public static void add(ShortcutEntry entry) {
+    public static boolean add(ShortcutEntry entry) {
         if (containsTarget(entry.modId(), entry.groupId(), entry.configName())) {
-            return;
+            return false;
         }
 
         ENTRIES.add(entry);
+        return true;
     }
 
     public static void remove(int index) {
         if (index >= 0 && index < ENTRIES.size()) {
             ENTRIES.remove(index);
         }
+    }
+
+    public static boolean move(int index, int offset) {
+        int target = index + offset;
+
+        if (index >= 0 && index < ENTRIES.size() && target >= 0 && target < ENTRIES.size()) {
+            Collections.swap(ENTRIES, index, target);
+            return true;
+        }
+
+        return false;
     }
 
     public static boolean containsTarget(String modId, String groupId, String configName) {

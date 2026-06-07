@@ -80,7 +80,7 @@ class ShortcutConfigStoreTest {
     void ignoresDuplicateTargetsWhenAddingOrReplacing() {
         ShortcutConfigStore.clear();
         ShortcutEntry first = new ShortcutEntry("tweakeroo", "Generic", "fastBlockPlacement", "First", ShortcutControlType.TOGGLE, 1.0, null, null);
-        ShortcutEntry duplicate = new ShortcutEntry("tweakeroo", "Generic", "fastBlockPlacement", "Duplicate", ShortcutControlType.SLIDER, 0.05, null, null);
+        ShortcutEntry duplicate = new ShortcutEntry("tweakeroo", "Hotkeys", "fastBlockPlacement", "Duplicate", ShortcutControlType.SLIDER, 0.05, null, null);
 
         ShortcutConfigStore.add(first);
         ShortcutConfigStore.add(duplicate);
@@ -90,6 +90,17 @@ class ShortcutConfigStoreTest {
 
         ShortcutConfigStore.replaceWithManualIds(List.of("minihud:fontScale", "minihud:fontScale", "minihud/Renderer/fontScale"));
 
-        assertEquals(List.of("minihud:fontScale", "minihud/Renderer/fontScale"), ShortcutConfigStore.toManualIds());
+        assertEquals(List.of("minihud:fontScale"), ShortcutConfigStore.toManualIds());
+    }
+
+    @Test
+    void movesShortcutsWithinCurrentOrder() {
+        ShortcutConfigStore.clear();
+        ShortcutConfigStore.add(new ShortcutEntry("tweakeroo", "Generic", "fastBlockPlacement", "", ShortcutControlType.TOGGLE, 1.0, null, null));
+        ShortcutConfigStore.add(new ShortcutEntry("minihud", "Renderer", "overlayLightLevel", "", ShortcutControlType.SLIDER, 0.05, null, null));
+
+        ShortcutConfigStore.move(1, -1);
+
+        assertEquals(List.of("minihud/Renderer/overlayLightLevel", "tweakeroo/Generic/fastBlockPlacement"), ShortcutConfigStore.toManualIds());
     }
 }

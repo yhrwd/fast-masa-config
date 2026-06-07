@@ -36,7 +36,7 @@ public record ShortcutEntry(
     }
 
     public boolean isSameTarget(String modId, String groupId, String configName) {
-        return this.modId.equals(modId) && this.groupId.equals(groupId) && this.configName.equals(configName);
+        return this.modId.equals(modId) && this.configName.equals(configName);
     }
 
     public String manualId() {

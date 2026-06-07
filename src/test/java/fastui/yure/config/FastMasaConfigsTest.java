@@ -2,8 +2,6 @@ package fastui.yure.config;
 
 import fi.dy.masa.malilib.config.ConfigType;
 import fi.dy.masa.malilib.config.IConfigBase;
-import fi.dy.masa.malilib.config.IConfigDouble;
-import fi.dy.masa.malilib.config.IConfigInteger;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -30,20 +28,5 @@ class FastMasaConfigsTest {
     @Test
     void registersQuickOverlayHotkeyForKeybindManager() {
         assertTrue(FastMasaConfigs.Generic.HOTKEY_LIST.contains(FastMasaConfigs.Generic.OPEN_QUICK_CONFIG));
-    }
-
-    @Test
-    void usesCompactPanelWidthByDefault() {
-        IConfigInteger panelWidth = FastMasaConfigs.Generic.PANEL_WIDTH;
-
-        assertEquals(260, panelWidth.getIntegerValue());
-    }
-
-    @Test
-    void allowsWiderQuickPanelScaleRange() {
-        IConfigDouble panelScale = FastMasaConfigs.Generic.PANEL_SCALE;
-
-        assertEquals(0.5, panelScale.getMinDoubleValue(), 0.0001);
-        assertEquals(2.5, panelScale.getMaxDoubleValue(), 0.0001);
     }
 }

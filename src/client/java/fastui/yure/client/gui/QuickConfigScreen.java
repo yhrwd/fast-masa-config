@@ -1,6 +1,7 @@
 package fastui.yure.client.gui;
 
 import fastui.yure.client.input.BoundKeyReader;
+import fastui.yure.client.index.ConfigIndexService;
 import fastui.yure.client.shortcut.ResolvedShortcut;
 import fastui.yure.client.shortcut.ShortcutControl;
 import fastui.yure.client.shortcut.ShortcutResolver;
@@ -8,6 +9,8 @@ import fastui.yure.config.FastMasaConfigs;
 import fastui.yure.config.MovementKeyPassthrough;
 import fastui.yure.config.ShortcutConfigStore;
 import fastui.yure.config.ShortcutControlType;
+import fi.dy.masa.malilib.config.ConfigType;
+import fi.dy.masa.malilib.config.IConfigBoolean;
 import fi.dy.masa.malilib.util.KeyCodes;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -27,10 +30,11 @@ import java.util.stream.Collectors;
 public final class QuickConfigScreen extends Screen {
     private final QuickConfigPanel panel;
     private final List<KeyBinding> movementKeys;
-    private List<ResolvedShortcut> shortcuts = List.of();
+    private List<QuickPanelItem> items = List.of();
     private MovementKeyPassthrough movementKeyPassthrough = new MovementKeyPassthrough(java.util.Set.of());
     private int activeSliderIndex = -1;
     private int scrollOffset;
+    private QuickConfigPanel.PanelMode panelMode = QuickConfigPanel.PanelMode.SHORTCUTS;
 
     /**
      * 创建快捷面板并记录需要透传的移动键。
@@ -79,7 +83,7 @@ public final class QuickConfigScreen extends Screen {
      * 所有布局计算在 QuickConfigPanel 内完成，Screen 只传入当前窗口尺寸和鼠标状态。
      */
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        this.panel.render(context, this.width, this.height, mouseX, mouseY, this.shortcuts, this.scrollOffset);
+        this.panel.render(context, this.width, this.height, mouseX, mouseY, this.items, this.scrollOffset, this.panelMode);
     }
 
     @Override
@@ -106,13 +110,27 @@ public final class QuickConfigScreen extends Screen {
             return true;
         }
 
-        int index = this.panel.getShortcutIndexAt(x, y, this.shortcuts.size());
+        QuickConfigPanel.PanelMode mode = this.panel.getModeAt(x, y);
+
+        if (mode != null) {
+            this.panelMode = mode;
+            this.scrollOffset = 0;
+            this.refreshShortcuts();
+            return true;
+        }
+
+        int index = this.panel.getShortcutIndexAt(x, y, this.items.size());
 
         if (index >= 0) {
-            ResolvedShortcut shortcut = this.shortcuts.get(index);
+            QuickPanelItem item = this.items.get(index);
+            ResolvedShortcut shortcut = new ResolvedShortcut(item.shortcut(), item.configEntry());
 
             if (ShortcutControl.getControlType(shortcut.configEntry().config()) == ShortcutControlType.TOGGLE) {
                 ShortcutControl.toggle(shortcut);
+
+                if (this.panelMode == QuickConfigPanel.PanelMode.ENABLED_BOOLEANS) {
+                    this.refreshShortcuts();
+                }
             } else {
                 this.activeSliderIndex = index;
                 ShortcutControl.setSliderValue(shortcut, this.panel.getSliderRatioAt(x, index));
@@ -130,8 +148,9 @@ public final class QuickConfigScreen extends Screen {
      * activeSliderIndex 在鼠标按下数值快捷项时设置，释放鼠标后清空。
      */
     public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
-        if (this.activeSliderIndex >= 0 && this.activeSliderIndex < this.shortcuts.size()) {
-            ShortcutControl.setSliderValue(this.shortcuts.get(this.activeSliderIndex), this.panel.getSliderRatioAt((int) mouseX, this.activeSliderIndex));
+        if (this.activeSliderIndex >= 0 && this.activeSliderIndex < this.items.size()) {
+            QuickPanelItem item = this.items.get(this.activeSliderIndex);
+            ShortcutControl.setSliderValue(new ResolvedShortcut(item.shortcut(), item.configEntry()), this.panel.getSliderRatioAt((int) mouseX, this.activeSliderIndex));
             return true;
         }
 
@@ -170,6 +189,11 @@ public final class QuickConfigScreen extends Screen {
      * 移动键透传给游戏；背包键和 ESC 用于关闭面板，其它按键维持原 Screen 行为。
      */
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() == false && this.isOpenHotkeyPressedAgain(keyCode)) {
+            this.close();
+            return true;
+        }
+
         if (this.movementKeyPassthrough.shouldPassThrough(keyCode)) {
             this.setMovementKeyPressed(keyCode, scanCode, true);
             return false;
@@ -225,8 +249,19 @@ public final class QuickConfigScreen extends Screen {
      * 解析失败的条目会在 ShortcutResolver 中被过滤，因此面板只显示当前能操作的配置。
      */
     private void refreshShortcuts() {
-        this.shortcuts = ShortcutResolver.resolve(ShortcutConfigStore.getEntries());
-        this.scrollOffset = Math.min(this.scrollOffset, Math.max(0, this.shortcuts.size() - 1));
+        if (this.panelMode == QuickConfigPanel.PanelMode.ENABLED_BOOLEANS) {
+            this.items = ConfigIndexService.scanSupportedConfigs().stream()
+                    .filter(entry -> entry.config().getType() == ConfigType.BOOLEAN)
+                    .filter(entry -> entry.config() instanceof IConfigBoolean booleanConfig && booleanConfig.getBooleanValue())
+                    .map(QuickPanelItem::fromEnabledConfig)
+                    .toList();
+        } else {
+            this.items = ShortcutResolver.resolve(ShortcutConfigStore.getEntries()).stream()
+                    .map(QuickPanelItem::fromShortcut)
+                    .toList();
+        }
+
+        this.scrollOffset = Math.min(this.scrollOffset, Math.max(0, this.items.size() - 1));
     }
 
     /**
@@ -266,6 +301,22 @@ public final class QuickConfigScreen extends Screen {
     private boolean isOpenHotkeyPhysicallyHeld() {
         for (int keyCode : FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys()) {
             if (KeybindMulti.isKeyDown(keyCode) == false) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean isOpenHotkeyPressedAgain(int pressedKeyCode) {
+        List<Integer> keyCodes = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys();
+
+        if (keyCodes.contains(pressedKeyCode) == false) {
+            return false;
+        }
+
+        for (int keyCode : keyCodes) {
+            if (keyCode != pressedKeyCode && KeybindMulti.isKeyDown(keyCode) == false) {
                 return false;
             }
         }
