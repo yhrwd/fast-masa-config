@@ -1,10 +1,11 @@
 package fastui.yure.client.scan;
 
 import fastui.yure.FastMasaConfig;
-import fi.dy.masa.malilib.gui.GuiBase;
-import fi.dy.masa.malilib.gui.interfaces.IConfigGui;
-import fi.dy.masa.malilib.registry.Registry;
-import fi.dy.masa.malilib.util.data.ModInfo;
+import fi.dy.masa.malilib.config.IConfigBase;
+import fi.dy.masa.malilib.gui.GuiConfigsBase;
+
+import java.util.HashSet;
+import java.util.Set;
 
 public final class ConfigScanSummaryService {
     private ConfigScanSummaryService() {
@@ -14,19 +15,31 @@ public final class ConfigScanSummaryService {
         int modCount = 0;
         int configCount = 0;
 
-        for (ModInfo modInfo : Registry.CONFIG_SCREEN.getAllModsWithConfigScreens()) {
+        for (ConfigScreenSourceService.Source source : ConfigScreenSourceService.collectSources()) {
             try {
-                GuiBase screen = modInfo.getConfigScreenSupplier() == null ? null : modInfo.getConfigScreenSupplier().get();
-
-                if (screen instanceof IConfigGui configGui) {
-                    modCount++;
-                    configCount += configGui.getConfigs().size();
-                }
+                modCount++;
+                configCount += countUniqueConfigs(source);
             } catch (Exception e) {
-                FastMasaConfig.LOGGER.warn("统计配置屏失败: {}", modInfo.getModId(), e);
+                FastMasaConfig.LOGGER.warn("统计配置屏失败: {}", source.modId(), e);
             }
         }
 
         return new ConfigScanSummary(modCount, configCount);
+    }
+
+    private static int countUniqueConfigs(ConfigScreenSourceService.Source source) {
+        Set<String> configNames = new HashSet<>();
+
+        for (ConfigGuiGroupScanner.Group group : ConfigGuiGroupScanner.collectGroups(source.screen(), source.configGui())) {
+            for (GuiConfigsBase.ConfigOptionWrapper wrapper : group.configs()) {
+                IConfigBase config = wrapper.getConfig();
+
+                if (config != null) {
+                    configNames.add(config.getName());
+                }
+            }
+        }
+
+        return configNames.size();
     }
 }

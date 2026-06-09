@@ -1,17 +1,12 @@
 package fastui.yure.client.index;
 
 import fastui.yure.FastMasaConfig;
+import fastui.yure.client.scan.ConfigGuiGroupScanner;
+import fastui.yure.client.scan.ConfigScreenSourceService;
 import fi.dy.masa.malilib.config.ConfigType;
 import fi.dy.masa.malilib.config.IConfigBase;
-import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.GuiConfigsBase;
-import fi.dy.masa.malilib.gui.interfaces.IConfigGui;
-import fi.dy.masa.malilib.registry.Registry;
-import fi.dy.masa.malilib.util.data.ModInfo;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,19 +23,15 @@ public final class ConfigIndexService {
 
         List<ConfigIndexEntry> result = new ArrayList<>();
 
-        for (ModInfo modInfo : Registry.CONFIG_SCREEN.getAllModsWithConfigScreens()) {
-            if (shouldIndexMod(modInfo.getModId()) == false) {
+        for (ConfigScreenSourceService.Source source : ConfigScreenSourceService.collectSources()) {
+            if (shouldIndexMod(source.modId()) == false) {
                 continue;
             }
 
             try {
-                GuiBase screen = modInfo.getConfigScreenSupplier() == null ? null : modInfo.getConfigScreenSupplier().get();
-
-                if (screen instanceof IConfigGui configGui) {
-                    collectScreenConfigs(result, modInfo, screen, configGui);
-                }
+                collectScreenConfigs(result, source);
             } catch (Exception e) {
-                FastMasaConfig.LOGGER.warn("索引配置屏失败: {}", modInfo.getModId(), e);
+                FastMasaConfig.LOGGER.warn("索引配置屏失败: {}", source.modId(), e);
             }
         }
 
@@ -56,37 +47,18 @@ public final class ConfigIndexService {
         return FastMasaConfig.MOD_ID.equals(modId) == false;
     }
 
-    private static void collectScreenConfigs(List<ConfigIndexEntry> result, ModInfo modInfo, GuiBase screen, IConfigGui configGui) throws IllegalAccessException {
-        Field tabField = findStaticTabField(screen.getClass());
-
-        if (tabField == null) {
-            collectConfigs(result, modInfo, "default", "Default", configGui.getConfigs());
-            return;
+    private static void collectScreenConfigs(List<ConfigIndexEntry> result, ConfigScreenSourceService.Source source) {
+        for (ConfigGuiGroupScanner.Group group : ConfigGuiGroupScanner.collectGroups(source.screen(), source.configGui())) {
+            collectConfigs(result, source, group.id(), group.displayName(), group.configs());
         }
-
-        tabField.setAccessible(true);
-        Object originalTab = tabField.get(null);
-        Object[] tabs = tabField.getType().getEnumConstants();
-
-        if (tabs == null) {
-            collectConfigs(result, modInfo, "default", "Default", configGui.getConfigs());
-            return;
-        }
-
-        for (Object tab : tabs) {
-            tabField.set(null, tab);
-            collectConfigs(result, modInfo, getTabId(tab), getTabDisplayName(tab), configGui.getConfigs());
-        }
-
-        tabField.set(null, originalTab);
     }
 
-    private static void collectConfigs(List<ConfigIndexEntry> result, ModInfo modInfo, String groupId, String groupName, List<GuiConfigsBase.ConfigOptionWrapper> wrappers) {
+    private static void collectConfigs(List<ConfigIndexEntry> result, ConfigScreenSourceService.Source source, String groupId, String groupName, List<GuiConfigsBase.ConfigOptionWrapper> wrappers) {
         for (GuiConfigsBase.ConfigOptionWrapper wrapper : wrappers) {
             IConfigBase config = wrapper.getConfig();
 
-            if (config != null && isSupported(config) && containsIndexedTarget(result, modInfo.getModId(), config.getName()) == false) {
-                result.add(new ConfigIndexEntry(modInfo.getModId(), modInfo.getModName(), groupId, groupName, config.getName(), getDisplayName(config), config));
+            if (config != null && isSupported(config) && containsIndexedTarget(result, source.modId(), config.getName()) == false) {
+                result.add(new ConfigIndexEntry(source.modId(), source.modName(), groupId, groupName, config.getName(), getDisplayName(config), config));
             }
         }
     }
@@ -105,34 +77,4 @@ public final class ConfigIndexService {
         return displayName == null || displayName.isBlank() ? config.getName() : displayName;
     }
 
-    private static Field findStaticTabField(Class<?> screenClass) {
-        for (Field field : screenClass.getDeclaredFields()) {
-            int modifiers = field.getModifiers();
-
-            if (Modifier.isStatic(modifiers) && field.getType().isEnum() && "tab".equals(field.getName())) {
-                return field;
-            }
-        }
-
-        return null;
-    }
-
-    private static String getTabId(Object tab) {
-        return tab instanceof Enum<?> enumTab ? enumTab.name() : String.valueOf(tab);
-    }
-
-    private static String getTabDisplayName(Object tab) {
-        try {
-            Method method = tab.getClass().getMethod("getDisplayName");
-            Object value = method.invoke(tab);
-
-            if (value instanceof String stringValue && stringValue.isBlank() == false) {
-                return stringValue;
-            }
-        } catch (ReflectiveOperationException ignored) {
-            // 部分配置界面没有分组显示名方法，退回 enum 名即可。
-        }
-
-        return getTabId(tab);
-    }
 }

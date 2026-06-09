@@ -2,16 +2,16 @@ package fastui.yure.client;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
+import fi.dy.masa.malilib.config.ConfigType;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.IStringRepresentable;
-import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.GuiConfigsBase;
 import fi.dy.masa.malilib.gui.interfaces.IConfigGui;
 import fi.dy.masa.malilib.hotkeys.IHotkey;
-import fi.dy.masa.malilib.registry.Registry;
 import fi.dy.masa.malilib.util.StringUtils;
-import fi.dy.masa.malilib.util.data.ModInfo;
 import fastui.yure.FastMasaConfig;
+import fastui.yure.client.scan.ConfigGuiGroupScanner;
+import fastui.yure.client.scan.ConfigScreenSourceService;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
@@ -128,90 +128,26 @@ public final class MasaConfigProbe {
     private static List<ModConfigScan> scanRegisteredConfigScreens() {
         List<ModConfigScan> result = new ArrayList<>();
 
-        for (ModInfo modInfo : Registry.CONFIG_SCREEN.getAllModsWithConfigScreens()) {
+        for (ConfigScreenSourceService.Source source : ConfigScreenSourceService.collectSources()) {
             try {
-                GuiBase screen = modInfo.getConfigScreenSupplier() == null ? null : modInfo.getConfigScreenSupplier().get();
-
-                if (screen instanceof IConfigGui configGui) {
-                    result.add(new ModConfigScan(modInfo.getModId(), modInfo.getModName(), collectGroups(screen, configGui)));
-                }
+                result.add(new ModConfigScan(source.modId(), source.modName(), collectGroups(source.screen(), source.configGui())));
             } catch (Exception e) {
-                FastMasaConfig.LOGGER.warn("Failed to scan config screen for mod [{}]", modInfo.getModId(), e);
+                FastMasaConfig.LOGGER.warn("Failed to scan config screen for mod [{}]", source.modId(), e);
             }
         }
 
         return result;
     }
 
-    private static List<ConfigGroup> collectGroups(GuiBase screen, IConfigGui configGui) {
-        List<ConfigGroup> groups = collectTabGroups(screen, configGui);
-
-        if (groups.isEmpty()) {
-            groups.add(new ConfigGroup("default", "Default", collectConfigEntries(configGui.getConfigs(), "gui:" + screen.getClass().getName())));
-        }
-
-        return groups;
-    }
-
-    private static List<ConfigGroup> collectTabGroups(GuiBase screen, IConfigGui configGui) {
+    private static List<ConfigGroup> collectGroups(Object screen, IConfigGui configGui) {
         List<ConfigGroup> groups = new ArrayList<>();
-        Field tabField = findStaticTabField(screen.getClass());
+        String screenSource = "gui:" + screen.getClass().getName();
 
-        if (tabField == null) {
-            return groups;
-        }
-
-        try {
-            tabField.setAccessible(true);
-            Object originalTab = tabField.get(null);
-            Object[] tabs = tabField.getType().getEnumConstants();
-
-            if (tabs == null) {
-                return groups;
-            }
-
-            for (Object tab : tabs) {
-                tabField.set(null, tab);
-                groups.add(new ConfigGroup(getTabId(tab), getTabDisplayName(tab), collectConfigEntries(configGui.getConfigs(), "gui:" + screen.getClass().getName() + ":" + getTabId(tab))));
-            }
-
-            tabField.set(null, originalTab);
-        } catch (Exception e) {
-            FastMasaConfig.LOGGER.warn("Failed to scan tab groups for config screen [{}]", screen.getClass().getName(), e);
+        for (ConfigGuiGroupScanner.Group group : ConfigGuiGroupScanner.collectGroups(screen, configGui)) {
+            groups.add(new ConfigGroup(group.id(), group.displayName(), collectConfigEntries(group.configs(), screenSource + ":" + group.sourceId())));
         }
 
         return groups;
-    }
-
-    private static Field findStaticTabField(Class<?> screenClass) {
-        for (Field field : screenClass.getDeclaredFields()) {
-            int modifiers = field.getModifiers();
-
-            if (Modifier.isStatic(modifiers) && field.getType().isEnum() && "tab".equals(field.getName())) {
-                return field;
-            }
-        }
-
-        return null;
-    }
-
-    private static String getTabId(Object tab) {
-        return tab instanceof Enum<?> enumTab ? enumTab.name() : String.valueOf(tab);
-    }
-
-    private static String getTabDisplayName(Object tab) {
-        try {
-            Method method = tab.getClass().getMethod("getDisplayName");
-            Object value = method.invoke(tab);
-
-            if (value instanceof String stringValue && stringValue.isBlank() == false) {
-                return stringValue;
-            }
-        } catch (ReflectiveOperationException ignored) {
-            // 部分配置界面没有分组显示名方法，退回 enum 名即可。
-        }
-
-        return getTabId(tab);
     }
 
     private static List<ConfigEntry> collectConfigEntries(List<GuiConfigsBase.ConfigOptionWrapper> wrappers, String source) {
@@ -432,7 +368,8 @@ public final class MasaConfigProbe {
 
     private record ConfigEntry(String name, String displayName, String type, String value, String source) {
         static ConfigEntry from(IConfigBase config, String source) {
-            return new ConfigEntry(config.getName(), getDisplayName(config), config.getType().name(), getValue(config), source);
+            ConfigType type = config.getType();
+            return new ConfigEntry(config.getName(), getDisplayName(config), type == null ? "UNKNOWN" : type.name(), getValue(config), source);
         }
 
         private static String getDisplayName(IConfigBase config) {
