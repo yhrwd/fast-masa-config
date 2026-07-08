@@ -40,7 +40,7 @@ import fi.dy.masa.malilib.util.data.ModInfo;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
@@ -307,6 +307,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.hotkeyChangeListeners.add(listener);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void setActiveKeybindButton(@Nullable ConfigButtonKeybind button) {
         if (this.activeKeybindButton != null) {
