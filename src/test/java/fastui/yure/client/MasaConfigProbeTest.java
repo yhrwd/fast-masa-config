@@ -66,5 +66,22 @@ class MasaConfigProbeTest {
         public JsonElement getAsJsonElement() {
             return JsonNull.INSTANCE;
         }
+
+        @Override
+        public boolean isDirty() {
+            return false;
+        }
+
+        @Override
+        public void markDirty() {
+        }
+
+        @Override
+        public void markClean() {
+        }
+
+        @Override
+        public void checkIfClean() {
+        }
     }
 }

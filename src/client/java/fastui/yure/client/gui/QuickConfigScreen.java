@@ -63,16 +63,39 @@ public final class QuickConfigScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY, float delta) {
-        this.panel.render(gfx, this.width, this.height, mouseX, mouseY,
+    public void extractRenderState(net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY,
+            float delta) {
+        this.panel.render(fi.dy.masa.malilib.render.GuiContext.fromGuiGraphics(gfx), this.width, this.height, mouseX,
+                mouseY,
                 this.items, this.scrollOffset, this.panelMode);
     }
 
     @Override
-    public void extractBackground(net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY, float delta) {
+    public void extractBackground(net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY,
+            float delta) {
     }
 
-    // --- 26.x 鼠标事件不再覆写，以下供外部输入系统调用 ---
+    // --- 26.x 鼠标事件覆写 ---
+
+    @Override
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean doubleClick) {
+        return this.handleMouseClicked(click.x(), click.y(), click.input());
+    }
+
+    @Override
+    public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent click, double dragXAmount, double dragYAmount) {
+        return this.handleMouseDragged(click.x(), click.y(), click.input(), dragXAmount, dragYAmount);
+    }
+
+    @Override
+    public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent click) {
+        return this.handleMouseReleased(click.x(), click.y(), click.input());
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        return this.handleMouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
 
     public boolean handleMouseClicked(double mouseX, double mouseY, int button) {
         int x = (int) mouseX, y = (int) mouseY;
@@ -93,7 +116,8 @@ public final class QuickConfigScreen extends Screen {
             ResolvedShortcut sc = new ResolvedShortcut(item.shortcut(), item.configEntry());
             if (ShortcutControl.getControlType(sc.configEntry().config()) == ShortcutControlType.TOGGLE) {
                 ShortcutControl.toggle(sc);
-                if (this.panelMode == QuickConfigPanel.PanelMode.ENABLED_BOOLEANS) refreshShortcuts();
+                if (this.panelMode == QuickConfigPanel.PanelMode.ENABLED_BOOLEANS)
+                    refreshShortcuts();
             } else {
                 this.activeSliderIndex = index;
                 ShortcutControl.setSliderValue(sc, this.panel.getSliderRatioAt(x, index));
@@ -115,7 +139,10 @@ public final class QuickConfigScreen extends Screen {
 
     public boolean handleMouseScrolled(double mouseX, double mouseY, double h, double v) {
         int next = this.panel.scroll(this.scrollOffset, v);
-        if (next != this.scrollOffset) { this.scrollOffset = next; return true; }
+        if (next != this.scrollOffset) {
+            this.scrollOffset = next;
+            return true;
+        }
         return false;
     }
 
@@ -128,8 +155,8 @@ public final class QuickConfigScreen extends Screen {
 
     @Override
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
-        int keyCode = event.getKey().getValue();
-        int scanCode = event.getScanCode();
+        int keyCode = event.key();
+        int scanCode = event.scancode();
         Minecraft mc = Minecraft.getInstance();
 
         if (!FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue()
@@ -142,7 +169,7 @@ public final class QuickConfigScreen extends Screen {
             return false;
         }
         if (FastMasaConfigs.Generic.CLOSE_ON_INVENTORY_KEY.getBooleanValue()
-                && mc.options.keyInventory.matchesKey(keyCode, scanCode)) {
+                && mc.options.keyInventory.matches(new net.minecraft.client.input.KeyEvent(keyCode, scanCode, 0))) {
             this.onClose();
             return true;
         }
@@ -158,16 +185,20 @@ public final class QuickConfigScreen extends Screen {
         for (KeyMapping mk : this.movementKeys) {
             int code = BoundKeyReader.getBoundKeyCode(mk);
             if (this.movementKeyPassthrough.shouldPassThrough(code)) {
-                mk.setPressed(KeybindMulti.isKeyDown(code));
+                mk.setDown(KeybindMulti.isKeyDown(code));
             }
         }
     }
 
     @Override
-    public boolean isPauseScreen() { return false; }
+    public boolean isPauseScreen() {
+        return false;
+    }
 
     @Override
-    public boolean shouldCloseOnEsc() { return true; }
+    public boolean shouldCloseOnEsc() {
+        return true;
+    }
 
     // --- 内部 ---
 
@@ -185,7 +216,8 @@ public final class QuickConfigScreen extends Screen {
     }
 
     private static MovementKeyPassthrough createMovementPassthrough(Minecraft mc) {
-        if (mc == null) return new MovementKeyPassthrough(Set.of());
+        if (mc == null)
+            return new MovementKeyPassthrough(Set.of());
         return new MovementKeyPassthrough(Set.of(
                 BoundKeyReader.getBoundKeyCode(mc.options.keyUp),
                 BoundKeyReader.getBoundKeyCode(mc.options.keyDown),
@@ -198,34 +230,38 @@ public final class QuickConfigScreen extends Screen {
 
     private void syncHeldMovementKeys() {
         for (KeyMapping mk : this.movementKeys) {
-            mk.setPressed(KeybindMulti.isKeyDown(BoundKeyReader.getBoundKeyCode(mk)));
+            mk.setDown(KeybindMulti.isKeyDown(BoundKeyReader.getBoundKeyCode(mk)));
         }
     }
 
     private boolean isOpenHotkeyPhysicallyHeld() {
         for (int kc : FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys()) {
-            if (!KeybindMulti.isKeyDown(kc)) return false;
+            if (!KeybindMulti.isKeyDown(kc))
+                return false;
         }
         return true;
     }
 
     private boolean isOpenHotkeyPressedAgain(int pressedKeyCode) {
         List<Integer> keys = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys();
-        if (!keys.contains(pressedKeyCode)) return false;
+        if (!keys.contains(pressedKeyCode))
+            return false;
         for (int kc : keys) {
-            if (kc != pressedKeyCode && !KeybindMulti.isKeyDown(kc)) return false;
+            if (kc != pressedKeyCode && !KeybindMulti.isKeyDown(kc))
+                return false;
         }
         return true;
     }
 
     private static Set<Integer> getHeldOpenHotkeyCodes() {
         return FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys().stream()
-                .filter(KeybindMulti::isKeyDown).collect(Collectors.toSet());
+                .filter(code -> KeybindMulti.isKeyDown(code)).collect(Collectors.toSet());
     }
 
     private void setMovementKeyPressed(int keyCode, int scanCode, boolean pressed) {
         for (KeyMapping mk : this.movementKeys) {
-            if (mk.matchesKey(keyCode, scanCode)) mk.setPressed(pressed);
+            if (mk.matches(new net.minecraft.client.input.KeyEvent(keyCode, scanCode, 0)))
+                mk.setDown(pressed);
         }
     }
 }

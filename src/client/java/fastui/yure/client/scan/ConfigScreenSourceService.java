@@ -32,15 +32,15 @@ public final class ConfigScreenSourceService {
     private static void collectRegistrySources(List<Source> sources, Set<String> registryModIds) {
         for (ModInfo modInfo : Registry.CONFIG_SCREEN.getAllModsWithConfigScreens()) {
             try {
-                var screenSupplier = modInfo.getConfigScreenSupplier();
+                var screenSupplier = modInfo.configScreenSupplier();
                 Object screen = screenSupplier == null ? null : screenSupplier.get();
 
                 if (screen instanceof IConfigGui configGui) {
-                    sources.add(new Source(modInfo.getModId(), modInfo.getModName(), screen, configGui));
-                    registryModIds.add(modInfo.getModId());
+                    sources.add(new Source(modInfo.modId(), modInfo.modName(), screen, configGui));
+                    registryModIds.add(modInfo.modId());
                 }
             } catch (Exception e) {
-                FastMasaConfig.LOGGER.warn("Failed to create registered config screen for mod [{}]", modInfo.getModId(),
+                FastMasaConfig.LOGGER.warn("Failed to create registered config screen for mod [{}]", modInfo.modId(),
                         e);
             }
         }

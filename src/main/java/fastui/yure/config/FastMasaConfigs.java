@@ -58,7 +58,6 @@ public final class FastMasaConfigs {
                         };
                 }
 
-                @SuppressWarnings("null")
                 public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.copyOf(OPTION_ARRAY);
 
                 public static final List<IHotkey> HOTKEY_LIST = List.of(OPEN_QUICK_CONFIG);

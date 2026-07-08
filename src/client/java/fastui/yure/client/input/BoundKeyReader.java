@@ -9,6 +9,6 @@ public final class BoundKeyReader {
 
     public static int getBoundKeyCode(KeyMapping KeyMapping) {
         InputConstants.Key key = InputConstants.getKey(KeyMapping.saveString());
-        return key.getType() == InputConstants.TYPE_MOUSE ? key.getValue() - 100 : key.getValue();
+        return key.getType() == InputConstants.Type.MOUSE ? key.getValue() - 100 : key.getValue();
     }
 }

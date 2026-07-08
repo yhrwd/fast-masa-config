@@ -1,7 +1,7 @@
 package fastui.yure.config;
 
 import com.google.gson.JsonObject;
-import fi.dy.masa.malilib.util.JsonUtils;
+import fi.dy.masa.malilib.util.data.json.JsonUtils;
 
 public record ShortcutEntry(
         String modId,
@@ -11,8 +11,7 @@ public record ShortcutEntry(
         ShortcutControlType controlType,
         double sliderStep,
         Double minOverride,
-        Double maxOverride
-) {
+        Double maxOverride) {
     public static ShortcutEntry fromManualId(String rawId) {
         String value = rawId.trim();
 
@@ -40,7 +39,8 @@ public record ShortcutEntry(
     }
 
     public String manualId() {
-        return this.groupId.isBlank() ? this.modId + ":" + this.configName : this.modId + "/" + this.groupId + "/" + this.configName;
+        return this.groupId.isBlank() ? this.modId + ":" + this.configName
+                : this.modId + "/" + this.groupId + "/" + this.configName;
     }
 
     public JsonObject toJson() {
@@ -72,7 +72,6 @@ public record ShortcutEntry(
                 ShortcutControlType.fromId(JsonUtils.getStringOrDefault(object, "controlType", "toggle")),
                 JsonUtils.getDoubleOrDefault(object, "sliderStep", 1.0),
                 JsonUtils.hasDouble(object, "minOverride") ? JsonUtils.getDouble(object, "minOverride") : null,
-                JsonUtils.hasDouble(object, "maxOverride") ? JsonUtils.getDouble(object, "maxOverride") : null
-        );
+                JsonUtils.hasDouble(object, "maxOverride") ? JsonUtils.getDouble(object, "maxOverride") : null);
     }
 }

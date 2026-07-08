@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 // import static ...literal; // commented out, use qualified
 
 public final class MasaConfigProbe {
@@ -53,14 +54,14 @@ public final class MasaConfigProbe {
     }
 
     private static void registerCommands(CommandDispatcher<FabricClientCommandSource> dispatcher) {
-        dispatcher.register(ClientCommandManager.literal("fastmasaconfig")
-                .then(ClientCommandManager.literal("scan")
+        dispatcher.register(ClientCommands.literal("fastmasaconfig")
+                .then(ClientCommands.literal("scan")
                         .executes(MasaConfigProbe::scanRegistered)
-                        .then(ClientCommandManager.literal("csv")
+                        .then(ClientCommands.literal("csv")
                                 .executes(MasaConfigProbe::exportRegisteredCsv))
-                        .then(ClientCommandManager.literal("fallback")
+                        .then(ClientCommands.literal("fallback")
                                 .executes(MasaConfigProbe::scanFallback)
-                                .then(ClientCommandManager.literal("csv")
+                                .then(ClientCommands.literal("csv")
                                         .executes(MasaConfigProbe::exportFallbackCsv)))));
     }
 
@@ -124,7 +125,8 @@ public final class MasaConfigProbe {
             return 1;
         } catch (Exception e) {
             FastMasaConfig.LOGGER.error("Failed to export fallback config CSV", e);
-            context.getSource().sendError(Component.literal("Fast Masa Config fallback CSV export failed. See client log."));
+            context.getSource()
+                    .sendError(Component.literal("Fast Masa Config fallback CSV export failed. See client log."));
             return 0;
         }
     }
@@ -346,7 +348,7 @@ public final class MasaConfigProbe {
     }
 
     private static Path getRunDirectory() {
-        return Minecraft.getInstance().runDirectory.toPath();
+        return Minecraft.getInstance().gameDirectory.toPath();
     }
 
     private static String toCsvLine(String... values) {
