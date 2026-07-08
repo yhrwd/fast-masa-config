@@ -50,8 +50,7 @@ public final class QuickConfigScreen extends Screen {
                 MinecraftClient.getInstance().options.rightKey,
                 MinecraftClient.getInstance().options.jumpKey,
                 MinecraftClient.getInstance().options.sneakKey,
-                MinecraftClient.getInstance().options.sprintKey
-        );
+                MinecraftClient.getInstance().options.sprintKey);
     }
 
     @Override
@@ -83,7 +82,8 @@ public final class QuickConfigScreen extends Screen {
      * 所有布局计算在 QuickConfigPanel 内完成，Screen 只传入当前窗口尺寸和鼠标状态。
      */
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        this.panel.render(context, this.width, this.height, mouseX, mouseY, this.items, this.scrollOffset, this.panelMode);
+        this.panel.render(context, this.width, this.height, mouseX, mouseY, this.items, this.scrollOffset,
+                this.panelMode);
     }
 
     @Override
@@ -150,7 +150,8 @@ public final class QuickConfigScreen extends Screen {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
         if (this.activeSliderIndex >= 0 && this.activeSliderIndex < this.items.size()) {
             QuickPanelItem item = this.items.get(this.activeSliderIndex);
-            ShortcutControl.setSliderValue(new ResolvedShortcut(item.shortcut(), item.configEntry()), this.panel.getSliderRatioAt((int) mouseX, this.activeSliderIndex));
+            ShortcutControl.setSliderValue(new ResolvedShortcut(item.shortcut(), item.configEntry()),
+                    this.panel.getSliderRatioAt((int) mouseX, this.activeSliderIndex));
             return true;
         }
 
@@ -189,7 +190,8 @@ public final class QuickConfigScreen extends Screen {
      * 移动键透传给游戏；背包键和 ESC 用于关闭面板，其它按键维持原 Screen 行为。
      */
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() == false && this.isOpenHotkeyPressedAgain(keyCode)) {
+        if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() == false
+                && this.isOpenHotkeyPressedAgain(keyCode)) {
             this.close();
             return true;
         }
@@ -199,7 +201,8 @@ public final class QuickConfigScreen extends Screen {
             return false;
         }
 
-        if (FastMasaConfigs.Generic.CLOSE_ON_INVENTORY_KEY.getBooleanValue() && this.client.options.inventoryKey.matchesKey(keyCode, scanCode)) {
+        if (FastMasaConfigs.Generic.CLOSE_ON_INVENTORY_KEY.getBooleanValue()
+                && this.client.options.inventoryKey.matchesKey(keyCode, scanCode)) {
             this.close();
             return true;
         }
@@ -252,7 +255,8 @@ public final class QuickConfigScreen extends Screen {
         if (this.panelMode == QuickConfigPanel.PanelMode.ENABLED_BOOLEANS) {
             this.items = ConfigIndexService.scanSupportedConfigs().stream()
                     .filter(entry -> entry.config().getType() == ConfigType.BOOLEAN)
-                    .filter(entry -> entry.config() instanceof IConfigBoolean booleanConfig && booleanConfig.getBooleanValue())
+                    .filter(entry -> entry.config() instanceof IConfigBoolean booleanConfig
+                            && booleanConfig.getBooleanValue())
                     .map(QuickPanelItem::fromEnabledConfig)
                     .toList();
         } else {
@@ -280,8 +284,7 @@ public final class QuickConfigScreen extends Screen {
                 BoundKeyReader.getBoundKeyCode(client.options.rightKey),
                 BoundKeyReader.getBoundKeyCode(client.options.jumpKey),
                 BoundKeyReader.getBoundKeyCode(client.options.sneakKey),
-                BoundKeyReader.getBoundKeyCode(client.options.sprintKey)
-        ));
+                BoundKeyReader.getBoundKeyCode(client.options.sprintKey)));
     }
 
     /**
@@ -330,7 +333,7 @@ public final class QuickConfigScreen extends Screen {
      */
     private static Set<Integer> getHeldOpenHotkeyCodes() {
         return FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys().stream()
-                .filter(KeybindMulti::isKeyDown)
+                .filter(keyCode -> KeybindMulti.isKeyDown(keyCode))
                 .collect(Collectors.toSet());
     }
 

@@ -14,7 +14,7 @@ class FastMasaConfigsTest {
     @Test
     void exposesQuickOverlayOptionsForMalilibGui() {
         Map<String, IConfigBase> configs = FastMasaConfigs.Generic.OPTIONS.stream()
-                .collect(Collectors.toMap(IConfigBase::getName, config -> config));
+                .collect(Collectors.toMap(config -> config.getName(), config -> config));
 
         assertEquals(ConfigType.HOTKEY, configs.get("openQuickConfig").getType());
         assertEquals(ConfigType.INTEGER, configs.get("panelWidth").getType());

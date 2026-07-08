@@ -32,14 +32,16 @@ public final class ConfigScreenSourceService {
     private static void collectRegistrySources(List<Source> sources, Set<String> registryModIds) {
         for (ModInfo modInfo : Registry.CONFIG_SCREEN.getAllModsWithConfigScreens()) {
             try {
-                Object screen = modInfo.getConfigScreenSupplier() == null ? null : modInfo.getConfigScreenSupplier().get();
+                var screenSupplier = modInfo.getConfigScreenSupplier();
+                Object screen = screenSupplier == null ? null : screenSupplier.get();
 
                 if (screen instanceof IConfigGui configGui) {
                     sources.add(new Source(modInfo.getModId(), modInfo.getModName(), screen, configGui));
                     registryModIds.add(modInfo.getModId());
                 }
             } catch (Exception e) {
-                FastMasaConfig.LOGGER.warn("Failed to create registered config screen for mod [{}]", modInfo.getModId(), e);
+                FastMasaConfig.LOGGER.warn("Failed to create registered config screen for mod [{}]", modInfo.getModId(),
+                        e);
             }
         }
     }
@@ -51,7 +53,8 @@ public final class ConfigScreenSourceService {
 
         List<ModMenuEntrypoint> entrypoints = new ArrayList<>();
 
-        for (EntrypointContainer<Object> container : FabricLoader.getInstance().getEntrypointContainers("modmenu", Object.class)) {
+        for (EntrypointContainer<Object> container : FabricLoader.getInstance().getEntrypointContainers("modmenu",
+                Object.class)) {
             ModContainer provider = container.getProvider();
             String modId = provider.getMetadata().getId();
             String modName = provider.getMetadata().getName();
@@ -81,7 +84,8 @@ public final class ConfigScreenSourceService {
                     sources.add(new Source(entrypoint.modId(), entrypoint.modName(), screen.get(), configGui));
                 }
             } catch (Exception e) {
-                FastMasaConfig.LOGGER.warn("Failed to create ModMenu config screen for mod [{}]", entrypoint.modId(), e);
+                FastMasaConfig.LOGGER.warn("Failed to create ModMenu config screen for mod [{}]", entrypoint.modId(),
+                        e);
             }
         }
 
@@ -109,7 +113,7 @@ public final class ConfigScreenSourceService {
         }
 
         createMethod.setAccessible(true);
-        return Optional.ofNullable(createMethod.invoke(factory, new Object[]{null}));
+        return Optional.ofNullable(createMethod.invoke(factory, new Object[] { null }));
     }
 
     private static Method findNoArgMethod(Class<?> type, String methodName) {

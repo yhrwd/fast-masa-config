@@ -23,10 +23,11 @@ class ConfigGuiGroupScannerTest {
             case HOTKEYS -> wrappers(new ConfigBoolean("hotkeyOption", true));
         });
 
-        List<ConfigGuiGroupScanner.Group> groups = ConfigGuiGroupScanner.collectGroups(new DirectTabScreen(), configGui);
+        List<ConfigGuiGroupScanner.Group> groups = ConfigGuiGroupScanner.collectGroups(new DirectTabScreen(),
+                configGui);
 
         assertEquals(DirectTab.GENERIC, DirectTabScreen.tab);
-        assertEquals(List.of("GENERIC", "HOTKEYS"), groups.stream().map(ConfigGuiGroupScanner.Group::id).toList());
+        assertEquals(List.of("GENERIC", "HOTKEYS"), groups.stream().map(group -> group.id()).toList());
         assertEquals(List.of("genericOption"), configNames(groups.get(0)));
         assertEquals(List.of("hotkeyOption"), configNames(groups.get(1)));
     }
@@ -39,18 +40,18 @@ class ConfigGuiGroupScannerTest {
             case ALL -> wrappers(
                     new ConfigBoolean("featureOption", true),
                     new ConfigBoolean("mcTweakOption", true),
-                    new ConfigBoolean("settingOption", true)
-            );
+                    new ConfigBoolean("settingOption", true));
             case FEATURES -> wrappers(new ConfigBoolean("featureOption", true));
             case MC_TWEAKS -> wrappers(new ConfigBoolean("mcTweakOption", true));
             case SETTING -> wrappers(new ConfigBoolean("settingOption", true));
         });
 
-        List<ConfigGuiGroupScanner.Group> groups = ConfigGuiGroupScanner.collectGroups(new NestedSettingsScreen(), configGui);
+        List<ConfigGuiGroupScanner.Group> groups = ConfigGuiGroupScanner.collectGroups(new NestedSettingsScreen(),
+                configGui);
 
         assertEquals(Category.FEATURES, NestedSettingsScreen.SETTING.category);
         assertEquals(SortingStrategy.ALPHABET, NestedSettingsScreen.SETTING.sortingStrategy);
-        assertEquals(List.of("FEATURES", "MC_TWEAKS", "SETTING"), groups.stream().map(ConfigGuiGroupScanner.Group::id).toList());
+        assertEquals(List.of("FEATURES", "MC_TWEAKS", "SETTING"), groups.stream().map(group -> group.id()).toList());
         assertEquals(List.of("featureOption"), configNames(groups.get(0)));
         assertEquals(List.of("mcTweakOption"), configNames(groups.get(1)));
         assertEquals(List.of("settingOption"), configNames(groups.get(2)));
@@ -61,10 +62,11 @@ class ConfigGuiGroupScannerTest {
         SortingOnlyScreen.tab = SortingStrategy.ALPHABET;
         TestConfigGui configGui = new TestConfigGui(() -> wrappers(new ConfigBoolean("sameOption", true)));
 
-        List<ConfigGuiGroupScanner.Group> groups = ConfigGuiGroupScanner.collectGroups(new SortingOnlyScreen(), configGui);
+        List<ConfigGuiGroupScanner.Group> groups = ConfigGuiGroupScanner.collectGroups(new SortingOnlyScreen(),
+                configGui);
 
         assertEquals(SortingStrategy.ALPHABET, SortingOnlyScreen.tab);
-        assertEquals(List.of("default"), groups.stream().map(ConfigGuiGroupScanner.Group::id).toList());
+        assertEquals(List.of("default"), groups.stream().map(group -> group.id()).toList());
         assertEquals(List.of("sameOption"), configNames(groups.get(0)));
     }
 
@@ -82,8 +84,9 @@ class ConfigGuiGroupScannerTest {
         List<ConfigGuiGroupScanner.Group> groups = ConfigGuiGroupScanner.collectGroups(screen, configGui);
 
         assertEquals(1, screen.selectedIndex);
-        assertEquals(List.of("generic", "tools", "script"), groups.stream().map(ConfigGuiGroupScanner.Group::id).toList());
-        assertEquals(List.of("Generic", "Tools", "Scripts"), groups.stream().map(ConfigGuiGroupScanner.Group::displayName).toList());
+        assertEquals(List.of("generic", "tools", "script"), groups.stream().map(group -> group.id()).toList());
+        assertEquals(List.of("Generic", "Tools", "Scripts"),
+                groups.stream().map(group -> group.displayName()).toList());
         assertEquals(List.of("scriptOption"), configNames(groups.get(2)));
     }
 
@@ -95,17 +98,18 @@ class ConfigGuiGroupScannerTest {
             case VISUALS -> wrappers(new ConfigBoolean("visualOption", true));
         });
 
-        List<ConfigGuiGroupScanner.Group> groups = ConfigGuiGroupScanner.collectGroups(new MethodBackedScreen(), configGui);
+        List<ConfigGuiGroupScanner.Group> groups = ConfigGuiGroupScanner.collectGroups(new MethodBackedScreen(),
+                configGui);
 
         assertEquals(MethodBackedScreen.ConfigGuiTab.GENERIC, DataManager.getConfigGuiTab());
-        assertEquals(List.of("GENERIC", "VISUALS"), groups.stream().map(ConfigGuiGroupScanner.Group::id).toList());
-        assertEquals(List.of("Generic", "Visuals"), groups.stream().map(ConfigGuiGroupScanner.Group::displayName).toList());
+        assertEquals(List.of("GENERIC", "VISUALS"), groups.stream().map(group -> group.id()).toList());
+        assertEquals(List.of("Generic", "Visuals"), groups.stream().map(group -> group.displayName()).toList());
         assertEquals(List.of("visualOption"), configNames(groups.get(1)));
     }
 
     private static List<String> configNames(ConfigGuiGroupScanner.Group group) {
         return group.configs().stream()
-                .map(GuiConfigsBase.ConfigOptionWrapper::getConfig)
+                .map(wrapper -> wrapper.getConfig())
                 .map(config -> config == null ? "" : config.getName())
                 .toList();
     }
@@ -195,8 +199,7 @@ class ConfigGuiGroupScannerTest {
         private final List<TestListGroup> lists = List.of(
                 new TestListGroup("generic", "Generic"),
                 new TestListGroup("tools", "Tools"),
-                new TestListGroup("script", "Scripts")
-        );
+                new TestListGroup("script", "Scripts"));
         private int selectedIndex = 0;
     }
 

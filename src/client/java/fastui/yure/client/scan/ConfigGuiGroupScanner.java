@@ -28,11 +28,11 @@ public final class ConfigGuiGroupScanner {
     public static List<Group> collectGroups(Object screen, IConfigGui configGui) {
         List<CandidateResult> candidates = findGroupCandidates(screen).stream()
                 .map(candidate -> scanCandidate(candidate, configGui))
-                .flatMap(Optional::stream)
+                .flatMap(optional -> optional.stream())
                 .toList();
 
         return selectBestCandidate(candidates)
-                .map(CandidateResult::groups)
+                .map(candidate -> candidate.groups())
                 .orElseGet(() -> List.of(defaultGroup(configGui)));
     }
 
@@ -41,7 +41,8 @@ public final class ConfigGuiGroupScanner {
 
         for (CandidateOwner owner : collectCandidateOwners(screen)) {
             for (Field field : getAllFields(owner.value().getClass())) {
-                addEnumCandidate(candidates, field, getFieldOwner(owner.value(), field), owner.priority(), getFieldPath(owner, field));
+                addEnumCandidate(candidates, field, getFieldOwner(owner.value(), field), owner.priority(),
+                        getFieldPath(owner, field));
             }
 
             addIndexedListCandidates(candidates, owner);
@@ -67,7 +68,8 @@ public final class ConfigGuiGroupScanner {
         return owners;
     }
 
-    private static void addCandidateOwner(List<CandidateOwner> owners, Set<Object> seenOwners, Object value, String path, int priority) {
+    private static void addCandidateOwner(List<CandidateOwner> owners, Set<Object> seenOwners, Object value,
+            String path, int priority) {
         if (value != null && seenOwners.add(value)) {
             owners.add(new CandidateOwner(value, path, priority));
         }
@@ -77,7 +79,8 @@ public final class ConfigGuiGroupScanner {
         return Modifier.isStatic(field.getModifiers()) ? null : screen;
     }
 
-    private static void addEnumCandidate(List<GroupCandidate> candidates, Field field, Object owner, int priority, String path) {
+    private static void addEnumCandidate(List<GroupCandidate> candidates, Field field, Object owner, int priority,
+            String path) {
         if (field.getType().isEnum() && isMutableField(field) && isGroupFieldName(field.getName())) {
             Object[] enumValues = field.getType().getEnumConstants();
 
@@ -122,7 +125,8 @@ public final class ConfigGuiGroupScanner {
         int guiSegment = packageName.lastIndexOf(".gui");
 
         if (guiSegment >= 0) {
-            addClassIfPresent(classes, packageName.substring(0, guiSegment) + ".data.DataManager", screenClass.getClassLoader());
+            addClassIfPresent(classes, packageName.substring(0, guiSegment) + ".data.DataManager",
+                    screenClass.getClassLoader());
         }
 
         addClassIfPresent(classes, packageName + ".DataManager", screenClass.getClassLoader());
@@ -193,8 +197,7 @@ public final class ConfigGuiGroupScanner {
                                 new FieldSelectorAccess(indexField, getFieldOwner(owner.value(), indexField)),
                                 getFieldPath(owner, indexField) + ":" + getFieldPath(owner, listField),
                                 owner.priority() + 2,
-                                values
-                        )));
+                                values)));
             }
         }
     }
@@ -284,7 +287,9 @@ public final class ConfigGuiGroupScanner {
     private static boolean isGroupListField(Field field) {
         String fieldName = field.getName().toLowerCase(Locale.ROOT);
         return Collection.class.isAssignableFrom(field.getType())
-                && (fieldName.contains("list") || fieldName.contains("group") || fieldName.contains("tab") || fieldName.contains("categor") || fieldName.contains("page") || fieldName.contains("section"));
+                && (fieldName.contains("list") || fieldName.contains("group") || fieldName.contains("tab")
+                        || fieldName.contains("categor") || fieldName.contains("page")
+                        || fieldName.contains("section"));
     }
 
     private static String getFieldPath(CandidateOwner owner, Field field) {
@@ -326,7 +331,8 @@ public final class ConfigGuiGroupScanner {
         return Optional.of(new CandidateResult(candidate, toGroups(candidate, usefulGroups), uniqueConfigNames));
     }
 
-    private static List<GuiConfigsBase.ConfigOptionWrapper> copyConfigs(List<GuiConfigsBase.ConfigOptionWrapper> configs) {
+    private static List<GuiConfigsBase.ConfigOptionWrapper> copyConfigs(
+            List<GuiConfigsBase.ConfigOptionWrapper> configs) {
         return configs == null ? List.of() : List.copyOf(configs);
     }
 
@@ -376,7 +382,8 @@ public final class ConfigGuiGroupScanner {
 
     private static List<Group> toGroups(GroupCandidate candidate, List<GroupData> groups) {
         return groups.stream()
-                .map(group -> new Group(getGroupId(group.groupValue()), getGroupDisplayName(group.groupValue()), candidate.path() + ":" + getGroupId(group.groupValue()), group.configs()))
+                .map(group -> new Group(getGroupId(group.groupValue()), getGroupDisplayName(group.groupValue()),
+                        candidate.path() + ":" + getGroupId(group.groupValue()), group.configs()))
                 .toList();
     }
 
@@ -480,7 +487,8 @@ public final class ConfigGuiGroupScanner {
         return fields;
     }
 
-    public record Group(String id, String displayName, String sourceId, List<GuiConfigsBase.ConfigOptionWrapper> configs) {
+    public record Group(String id, String displayName, String sourceId,
+            List<GuiConfigsBase.ConfigOptionWrapper> configs) {
     }
 
     private record CandidateOwner(Object value, String path, int priority) {
@@ -526,7 +534,8 @@ public final class ConfigGuiGroupScanner {
     private record SelectorValue(Object selectorValue, Object groupValue) {
     }
 
-    private record GroupData(Object groupValue, List<GuiConfigsBase.ConfigOptionWrapper> configs, Set<String> configNames) {
+    private record GroupData(Object groupValue, List<GuiConfigsBase.ConfigOptionWrapper> configs,
+            Set<String> configNames) {
     }
 
     private record CandidateResult(GroupCandidate candidate, List<Group> groups, Set<String> uniqueConfigNames) {
