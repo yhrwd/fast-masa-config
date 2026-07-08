@@ -303,6 +303,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.hotkeyChangeListeners.add(listener);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void setActiveKeybindButton(@Nullable ConfigButtonKeybind button) {
         if (this.activeKeybindButton != null) {
