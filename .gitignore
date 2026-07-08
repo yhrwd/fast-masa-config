@@ -13,6 +13,11 @@ classes/
 
 .idea/
 *.iml
+
+# local
+docs/
+run/
+*.log
 *.ipr
 *.iws
 
