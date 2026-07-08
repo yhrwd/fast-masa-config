@@ -31,7 +31,7 @@ public final class MasaConfigEditor {
             case OPTION_LIST -> applyOptionList(config, rawValue);
             case HOTKEY -> applyHotkey(config, rawValue);
             case STRING_LIST -> applyStringList(config, rawValue);
-            default -> ConfigEditResult.failure(config, "暂不支持修改该配置类型: " + config.getType().asString());
+            default -> ConfigEditResult.failure(config, "暂不支持修改该配置类型: " + config.getType().getSerializedName());
         };
     }
 
@@ -80,7 +80,8 @@ public final class MasaConfigEditor {
         }
 
         if (value < integerConfig.getMinIntegerValue() || value > integerConfig.getMaxIntegerValue()) {
-            return ConfigEditResult.failure(config, "整数超出范围: " + integerConfig.getMinIntegerValue() + " ~ " + integerConfig.getMaxIntegerValue());
+            return ConfigEditResult.failure(config,
+                    "整数超出范围: " + integerConfig.getMinIntegerValue() + " ~ " + integerConfig.getMaxIntegerValue());
         }
 
         integerConfig.setIntegerValue(value);
@@ -102,7 +103,8 @@ public final class MasaConfigEditor {
         }
 
         if (value < doubleConfig.getMinDoubleValue() || value > doubleConfig.getMaxDoubleValue()) {
-            return ConfigEditResult.failure(config, "数字超出范围: " + doubleConfig.getMinDoubleValue() + " ~ " + doubleConfig.getMaxDoubleValue());
+            return ConfigEditResult.failure(config,
+                    "数字超出范围: " + doubleConfig.getMinDoubleValue() + " ~ " + doubleConfig.getMaxDoubleValue());
         }
 
         doubleConfig.setDoubleValue(value);
@@ -124,7 +126,8 @@ public final class MasaConfigEditor {
         }
 
         if (value < floatConfig.getMinFloatValue() || value > floatConfig.getMaxFloatValue()) {
-            return ConfigEditResult.failure(config, "数字超出范围: " + floatConfig.getMinFloatValue() + " ~ " + floatConfig.getMaxFloatValue());
+            return ConfigEditResult.failure(config,
+                    "数字超出范围: " + floatConfig.getMinFloatValue() + " ~ " + floatConfig.getMaxFloatValue());
         }
 
         floatConfig.setFloatValue(value);

@@ -1,10 +1,10 @@
-package fastui.yure.client.gui;
+package fastui.yure.minecraft.gui;
 
-import fastui.yure.client.input.BoundKeyReader;
-import fastui.yure.client.index.ConfigIndexService;
-import fastui.yure.client.shortcut.ResolvedShortcut;
-import fastui.yure.client.shortcut.ShortcutControl;
-import fastui.yure.client.shortcut.ShortcutResolver;
+import fastui.yure.minecraft.input.BoundKeyReader;
+import fastui.yure.minecraft.index.ConfigIndexService;
+import fastui.yure.minecraft.shortcut.ResolvedShortcut;
+import fastui.yure.minecraft.shortcut.ShortcutControl;
+import fastui.yure.minecraft.shortcut.ShortcutResolver;
 import fastui.yure.config.FastMasaConfigs;
 import fastui.yure.config.MovementKeyPassthrough;
 import fastui.yure.config.ShortcutConfigStore;
@@ -12,11 +12,11 @@ import fastui.yure.config.ShortcutControlType;
 import fi.dy.masa.malilib.config.ConfigType;
 import fi.dy.masa.malilib.config.IConfigBoolean;
 import fi.dy.masa.malilib.util.KeyCodes;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.screen.ScreenTexts;
+import net.minecraft.minecraft.Minecraft;
+import fi.dy.masa.malilib.render.GuiContext;
+import net.minecraft.minecraft.gui.screens.Screen;
+import net.minecraft.minecraft.KeyMapping;
+import net.minecraft.network.chat.CommonComponents;
 import fi.dy.masa.malilib.hotkeys.KeybindMulti;
 
 import java.util.List;
@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  */
 public final class QuickConfigScreen extends Screen {
     private final QuickConfigPanel panel;
-    private final List<KeyBinding> movementKeys;
+    private final List<KeyMapping> movementKeys;
     private List<QuickPanelItem> items = List.of();
     private MovementKeyPassthrough movementKeyPassthrough = new MovementKeyPassthrough(java.util.Set.of());
     private int activeSliderIndex = -1;
@@ -38,19 +38,19 @@ public final class QuickConfigScreen extends Screen {
 
     /**
      * 创建快捷面板并记录需要透传的移动键。
-     * 打开面板后玩家仍可能按着移动键，所以这些 KeyBinding 需要在 Screen 里继续同步状态。
+     * 打开面板后玩家仍可能按着移动键，所以这些 KeyMapping 需要在 Screen 里继续同步状态。
      */
     public QuickConfigScreen() {
-        super(ScreenTexts.EMPTY);
-        this.panel = new QuickConfigPanel(MinecraftClient.getInstance());
+        super(CommonComponents.EMPTY);
+        this.panel = new QuickConfigPanel(Minecraft.getInstance());
         this.movementKeys = List.of(
-                MinecraftClient.getInstance().options.forwardKey,
-                MinecraftClient.getInstance().options.backKey,
-                MinecraftClient.getInstance().options.leftKey,
-                MinecraftClient.getInstance().options.rightKey,
-                MinecraftClient.getInstance().options.jumpKey,
-                MinecraftClient.getInstance().options.sneakKey,
-                MinecraftClient.getInstance().options.sprintKey);
+                Minecraft.getInstance().options.forwardKey,
+                Minecraft.getInstance().options.backKey,
+                Minecraft.getInstance().options.leftKey,
+                Minecraft.getInstance().options.rightKey,
+                Minecraft.getInstance().options.jumpKey,
+                Minecraft.getInstance().options.sneakKey,
+                Minecraft.getInstance().options.sprintKey);
     }
 
     @Override
@@ -72,7 +72,7 @@ public final class QuickConfigScreen extends Screen {
     public void tick() {
         if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() &&
                 isOpenHotkeyPhysicallyHeld() == false) {
-            this.close();
+            this.onClose();
         }
     }
 
@@ -81,7 +81,7 @@ public final class QuickConfigScreen extends Screen {
      * 渲染快捷面板本体。
      * 所有布局计算在 QuickConfigPanel 内完成，Screen 只传入当前窗口尺寸和鼠标状态。
      */
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiContext context, int mouseX, int mouseY, float delta) {
         this.panel.render(context, this.width, this.height, mouseX, mouseY, this.items, this.scrollOffset,
                 this.panelMode);
     }
@@ -91,7 +91,7 @@ public final class QuickConfigScreen extends Screen {
      * 不绘制默认背景。
      * 快捷面板是游戏内叠层，保留世界画面能减少“打开菜单”的割裂感。
      */
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void extractBackground(GuiContext context, int mouseX, int mouseY, float delta) {
         // 快捷弹层不绘制背景，不触发 vanilla 菜单背景/模糊效果。
     }
 
@@ -106,7 +106,7 @@ public final class QuickConfigScreen extends Screen {
 
         if (this.panel.isSettingsButtonHovered(x, y)) {
             // 人手松开热键有延迟，进入全屏 UI 时先记录仍按住的打开键，交给全屏页吞掉首轮输入。
-            this.client.setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes()));
+            Minecraft.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes()));
             return true;
         }
 
@@ -189,10 +189,10 @@ public final class QuickConfigScreen extends Screen {
      * 处理键盘按下事件。
      * 移动键透传给游戏；背包键和 ESC 用于关闭面板，其它按键维持原 Screen 行为。
      */
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(com.mojang.blaze3d.platform.InputConstants.Key key, int scanCode, int modifiers) {
         if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() == false
                 && this.isOpenHotkeyPressedAgain(keyCode)) {
-            this.close();
+            this.onClose();
             return true;
         }
 
@@ -202,13 +202,13 @@ public final class QuickConfigScreen extends Screen {
         }
 
         if (FastMasaConfigs.Generic.CLOSE_ON_INVENTORY_KEY.getBooleanValue()
-                && this.client.options.inventoryKey.matchesKey(keyCode, scanCode)) {
-            this.close();
+                && Minecraft.getInstance().options.inventoryKey.matchesKey(keyCode, scanCode)) {
+            this.onClose();
             return true;
         }
 
         if (keyCode == KeyCodes.KEY_ESCAPE) {
-            this.close();
+            this.onClose();
             return true;
         }
 
@@ -218,7 +218,7 @@ public final class QuickConfigScreen extends Screen {
     @Override
     /**
      * 处理键盘释放事件。
-     * 移动键释放也要透传到 KeyBinding，否则关闭面板后可能出现卡键。
+     * 移动键释放也要透传到 KeyMapping，否则关闭面板后可能出现卡键。
      */
     public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
         if (this.movementKeyPassthrough.shouldPassThrough(keyCode)) {
@@ -272,7 +272,7 @@ public final class QuickConfigScreen extends Screen {
      * 构造移动键透传白名单。
      * client 为空时返回空白名单，便于测试或异常初始化路径安全退出。
      */
-    private static MovementKeyPassthrough createMovementPassthrough(MinecraftClient client) {
+    private static MovementKeyPassthrough createMovementPassthrough(Minecraft client) {
         if (client == null) {
             return new MovementKeyPassthrough(java.util.Set.of());
         }
@@ -292,7 +292,7 @@ public final class QuickConfigScreen extends Screen {
      * 没有这一步时，玩家按住前进键打开面板会突然停下。
      */
     private void syncHeldMovementKeys() {
-        for (KeyBinding keyBinding : this.movementKeys) {
+        for (KeyMapping keyBinding : this.movementKeys) {
             keyBinding.setPressed(KeybindMulti.isKeyDown(BoundKeyReader.getBoundKeyCode(keyBinding)));
         }
     }
@@ -338,11 +338,11 @@ public final class QuickConfigScreen extends Screen {
     }
 
     /**
-     * 将键盘事件同步到 Minecraft 原版移动 KeyBinding。
+     * 将键盘事件同步到 Minecraft 原版移动 KeyMapping。
      * 使用 matchesKey 同时匹配 keyCode 和 scanCode，兼容用户改键后的绑定。
      */
     private void setMovementKeyPressed(int keyCode, int scanCode, boolean pressed) {
-        for (KeyBinding movementKey : this.movementKeys) {
+        for (KeyMapping movementKey : this.movementKeys) {
             if (movementKey.matchesKey(keyCode, scanCode)) {
                 movementKey.setPressed(pressed);
             }

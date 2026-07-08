@@ -1,14 +1,14 @@
 package fastui.yure.client.input;
 
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
+import net.minecraft.client.KeyMapping;
+import com.mojang.blaze3d.platform.InputConstants;
 
 public final class BoundKeyReader {
     private BoundKeyReader() {
     }
 
-    public static int getBoundKeyCode(KeyBinding keyBinding) {
-        InputUtil.Key key = InputUtil.fromTranslationKey(keyBinding.getBoundKeyTranslationKey());
-        return key.getCategory() == InputUtil.Type.MOUSE ? key.getCode() - 100 : key.getCode();
+    public static int getBoundKeyCode(KeyMapping keyMapping) {
+        InputConstants.Key key = InputConstants.getKey(keyMapping.saveString());
+        return key.getType() == InputConstants.Type.MOUSE ? key.getValue() - 100 : key.getValue();
     }
 }

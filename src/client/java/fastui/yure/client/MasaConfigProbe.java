@@ -14,8 +14,8 @@ import fastui.yure.client.scan.ConfigGuiGroupScanner;
 import fastui.yure.client.scan.ConfigScreenSourceService;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
@@ -346,7 +346,7 @@ public final class MasaConfigProbe {
     }
 
     private static Path getRunDirectory() {
-        return MinecraftClient.getInstance().runDirectory.toPath();
+        return Minecraft.getInstance().runDirectory.toPath();
     }
 
     private static String toCsvLine(String... values) {

@@ -8,7 +8,7 @@ import fi.dy.masa.malilib.hotkeys.IKeybind;
 import fi.dy.masa.malilib.hotkeys.IKeybindManager;
 import fi.dy.masa.malilib.hotkeys.IKeybindProvider;
 import fi.dy.masa.malilib.hotkeys.KeyAction;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 import java.util.List;
 
@@ -46,7 +46,7 @@ public final class FastMasaInputHandler implements IKeybindProvider {
     private static final class QuickConfigCallback implements IHotkeyCallback {
         @Override
         public boolean onKeyAction(KeyAction action, IKeybind key) {
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
 
             if (action == KeyAction.PRESS && client.currentScreen instanceof QuickConfigScreen screen) {
                 if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() == false) {
