@@ -154,9 +154,9 @@ public final class QuickConfigPanel {
         RenderUtils.drawRect(context, this.x + 2, this.y + 2, this.width - 4, this.height - 4, HoloPanelVisuals.withAlpha(BASE, Math.max(0x24, alpha - 0x30)));
         RenderUtils.drawRect(context, this.x + 6, this.y + QuickPanelLayout.HEADER_HEIGHT - 3, this.width - 12, 2, ACCENT);
         drawCornerArrow(context, this.x + 2, this.y + 2, 1, 1, ACCENT);
-        drawCornerArrow(context, this.x + this.width - 8, this.y + 2, -1, 1, ACCENT);
-        drawCornerArrow(context, this.x + 2, this.y + this.height - 8, 1, -1, ACCENT);
-        drawCornerArrow(context, this.x + this.width - 8, this.y + this.height - 8, -1, -1, ACCENT);
+        drawCornerArrow(context, this.x + this.width - 10, this.y + 2, -1, 1, ACCENT);
+        drawCornerArrow(context, this.x + 2, this.y + this.height - 10, 1, -1, ACCENT);
+        drawCornerArrow(context, this.x + this.width - 10, this.y + this.height - 10, -1, -1, ACCENT);
     }
 
     /**
@@ -164,18 +164,13 @@ public final class QuickConfigPanel {
      * horizontalDirection/verticalDirection 决定箭头分别朝左上、右上、左下、右下四个方向。
      */
     private void drawCornerArrow(DrawContext context, int x, int y, int horizontalDirection, int verticalDirection, int color) {
-        int tipX = horizontalDirection > 0 ? x : x + 6;
-        int tipY = verticalDirection > 0 ? y : y + 6;
-        int midX = tipX - horizontalDirection * 2;
-        int midY = tipY - verticalDirection * 2;
-        int baseX = tipX - horizontalDirection * 4;
-        int baseY = tipY - verticalDirection * 4;
+        QuickCornerArrow arrow = QuickCornerArrow.calculate(x, y, horizontalDirection, verticalDirection);
 
-        RenderUtils.drawRect(context, tipX, tipY, 2, 2, color);
-        RenderUtils.drawRect(context, midX, tipY, 2, 2, color);
-        RenderUtils.drawRect(context, tipX, midY, 2, 2, color);
-        RenderUtils.drawRect(context, baseX, tipY, 2, 2, color);
-        RenderUtils.drawRect(context, tipX, baseY, 2, 2, color);
+        RenderUtils.drawRect(context, arrow.tipX(), arrow.tipY(), 2, 2, color);
+        RenderUtils.drawRect(context, arrow.midX(), arrow.tipY(), 2, 2, color);
+        RenderUtils.drawRect(context, arrow.tipX(), arrow.midY(), 2, 2, color);
+        RenderUtils.drawRect(context, arrow.baseX(), arrow.tipY(), 2, 2, color);
+        RenderUtils.drawRect(context, arrow.tipX(), arrow.baseY(), 2, 2, color);
     }
 
     /**

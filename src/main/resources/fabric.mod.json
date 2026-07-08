@@ -3,14 +3,14 @@
 	"id": "fast-masa-config",
 	"version": "${version}",
 	"name": "Fast Masa Config",
-	"description": "A fast configuration helper for MaLiLib-based client mods.",
+	"description": "给 MaLiLib 配置加一块随叫随到的快捷面板：按住热键，常用开关和滑条立刻到手边。",
 	"authors": [
-		"Yure"
+		"YureHiran"
 	],
 	"contact": {
 		"sources": ""
 	},
-	"license": "CC0-1.0",
+	"license": "GPL-3.0-or-later",
 	"icon": "assets/fast-masa-config/icon.png",
 	"environment": "client",
 	"entrypoints": {
