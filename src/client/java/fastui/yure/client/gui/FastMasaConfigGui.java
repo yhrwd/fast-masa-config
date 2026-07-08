@@ -494,7 +494,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         for (int i = this.scrollOffset; i < end; i++) {
             IConfigBase config = this.filteredGenericConfigs.get(i);
             int y = LIST_Y + (i - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP);
-            boolean hovered = isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT);
+            boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT);
             this.drawRowBase(context, x, y, width, hovered);
             this.drawString(context, fitText(config.getConfigGuiDisplayName(), controlX - x - 24), x + 8, y + 6, COLOR_TEXT);
             this.drawString(context, fitText(config.getComment() == null ? "" : config.getComment(), controlX - x - 24), x + 8, y + 18, COLOR_MUTED);
@@ -513,16 +513,12 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         if (config instanceof IConfigBoolean booleanConfig) {
             boolean enabled = booleanConfig.getBooleanValue();
             int bg = enabled ? 0xFF256D45 : 0xFF4A2A2A;
-            this.drawSmallButton(context, x, y, 64, enabled ? "ON" : "OFF", bg, isInside(mouseX, mouseY, x, y, 64, BUTTON_HEIGHT));
+            this.drawSmallButton(context, x, y, 64, enabled ? "ON" : "OFF", bg, GuiHitTest.isInside(mouseX, mouseY, x, y, 64, BUTTON_HEIGHT));
             this.drawResetButton(context, config, x + 70, y, mouseX, mouseY);
         } else if (config instanceof IConfigInteger integerConfig) {
-            this.drawValueBox(context, x, y, NUMERIC_VALUE_WIDTH, integerConfig.getStringValue());
-            this.drawNumericSlider(context, x + NUMERIC_SLIDER_X_OFFSET, y, NUMERIC_SLIDER_WIDTH, this.getIntegerRatio(integerConfig), isInside(mouseX, mouseY, x + NUMERIC_SLIDER_X_OFFSET, y, NUMERIC_SLIDER_WIDTH, BUTTON_HEIGHT));
-            this.drawResetButton(context, config, x + NUMERIC_RESET_X_OFFSET, y, mouseX, mouseY);
+            this.drawNumericControl(context, config, x, y, mouseX, mouseY, integerConfig.getStringValue(), this.getIntegerRatio(integerConfig));
         } else if (config instanceof IConfigDouble doubleConfig) {
-            this.drawValueBox(context, x, y, NUMERIC_VALUE_WIDTH, formatDouble(doubleConfig.getDoubleValue()));
-            this.drawNumericSlider(context, x + NUMERIC_SLIDER_X_OFFSET, y, NUMERIC_SLIDER_WIDTH, this.getDoubleRatio(doubleConfig), isInside(mouseX, mouseY, x + NUMERIC_SLIDER_X_OFFSET, y, NUMERIC_SLIDER_WIDTH, BUTTON_HEIGHT));
-            this.drawResetButton(context, config, x + NUMERIC_RESET_X_OFFSET, y, mouseX, mouseY);
+            this.drawNumericControl(context, config, x, y, mouseX, mouseY, formatDouble(doubleConfig.getDoubleValue()), this.getDoubleRatio(doubleConfig));
         }
     }
 
@@ -562,7 +558,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int x = MARGIN;
         int y = LIST_Y + visibleIndex * (ROW_HEIGHT + ROW_GAP);
         int width = this.width - MARGIN * 2;
-        boolean hovered = isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT);
+        boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT);
         String label = view.config == null ? view.shortcut.manualId() : view.config.displayName();
         String meta = view.config == null ? StringUtils.translate("fast-masa-config.gui.full.status.not_found") : view.config.modName() + " / " + view.config.groupName() + " / " + view.shortcut.manualId();
         int buttonsX = x + width - 102;
@@ -570,9 +566,9 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.drawRowBase(context, x, y, width, hovered);
         this.drawString(context, fitText(label, buttonsX - x - 16), x + 8, y + 6, COLOR_TEXT);
         this.drawString(context, fitText(meta, buttonsX - x - 16), x + 8, y + 18, COLOR_MUTED);
-        this.drawSmallButton(context, buttonsX, y + 5, 24, "↑", 0xFF303030, isInside(mouseX, mouseY, buttonsX, y + 5, 24, BUTTON_HEIGHT));
-        this.drawSmallButton(context, buttonsX + 28, y + 5, 24, "↓", 0xFF303030, isInside(mouseX, mouseY, buttonsX + 28, y + 5, 24, BUTTON_HEIGHT));
-        this.drawSmallButton(context, buttonsX + 56, y + 5, 42, "-", 0xFF5A2525, isInside(mouseX, mouseY, buttonsX + 56, y + 5, 42, BUTTON_HEIGHT));
+        this.drawSmallButton(context, buttonsX, y + 5, 24, "↑", 0xFF303030, GuiHitTest.isInside(mouseX, mouseY, buttonsX, y + 5, 24, BUTTON_HEIGHT));
+        this.drawSmallButton(context, buttonsX + 28, y + 5, 24, "↓", 0xFF303030, GuiHitTest.isInside(mouseX, mouseY, buttonsX + 28, y + 5, 24, BUTTON_HEIGHT));
+        this.drawSmallButton(context, buttonsX + 56, y + 5, 42, "-", 0xFF5A2525, GuiHitTest.isInside(mouseX, mouseY, buttonsX + 56, y + 5, 42, BUTTON_HEIGHT));
     }
 
     private void drawAllConfigRows(DrawContext context, int mouseX, int mouseY) {
@@ -599,13 +595,13 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int width = this.width - MARGIN * 2;
         int buttonX = x + width - 68;
         boolean selected = ShortcutConfigStore.containsTarget(entry.modId(), entry.groupId(), entry.configName());
-        boolean hovered = isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT);
+        boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT);
         String meta = entry.modName() + " / " + entry.groupName() + " / " + entry.manualId();
 
         this.drawRowBase(context, x, y, width, hovered);
         this.drawString(context, fitText(entry.displayName(), buttonX - x - 16), x + 8, y + 6, COLOR_TEXT);
         this.drawString(context, fitText(meta, buttonX - x - 16), x + 8, y + 18, COLOR_MUTED);
-        this.drawSmallButton(context, buttonX, y + 5, 64, selected ? "-" : "+", selected ? 0xFF5A2525 : 0xFF303030, isInside(mouseX, mouseY, buttonX, y + 5, 64, BUTTON_HEIGHT));
+        this.drawSmallButton(context, buttonX, y + 5, 64, selected ? "-" : "+", selected ? 0xFF5A2525 : 0xFF303030, GuiHitTest.isInside(mouseX, mouseY, buttonX, y + 5, 64, BUTTON_HEIGHT));
     }
 
     private void drawListHeader(DrawContext context, int visibleCount, int totalCount) {
@@ -672,6 +668,13 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.drawString(context, fitText(text, width - 8), x + 4, y + 6, COLOR_TEXT);
     }
 
+    private void drawNumericControl(DrawContext context, IConfigBase config, int x, int y, int mouseX, int mouseY, String valueText, double ratio) {
+        int sliderX = x + NUMERIC_SLIDER_X_OFFSET;
+        this.drawValueBox(context, x, y, NUMERIC_VALUE_WIDTH, valueText);
+        this.drawNumericSlider(context, sliderX, y, NUMERIC_SLIDER_WIDTH, ratio, GuiHitTest.isInside(mouseX, mouseY, sliderX, y, NUMERIC_SLIDER_WIDTH, BUTTON_HEIGHT));
+        this.drawResetButton(context, config, x + NUMERIC_RESET_X_OFFSET, y, mouseX, mouseY);
+    }
+
     private void drawNumericSlider(DrawContext context, int x, int y, int width, double ratio, boolean hovered) {
         int trackY = y + BUTTON_HEIGHT / 2 - 1;
         int fillWidth = (int) Math.round(width * clampRatio(ratio));
@@ -684,7 +687,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     private void drawResetButton(DrawContext context, IConfigBase config, int x, int y, int mouseX, int mouseY) {
         boolean modified = config instanceof IConfigResettable resettable && resettable.isModified();
-        this.drawSmallButton(context, x, y, 54, StringUtils.translate("malilib.gui.button.reset.caps"), modified ? 0xFF303030 : 0xFF202020, modified && isInside(mouseX, mouseY, x, y, 54, BUTTON_HEIGHT));
+        this.drawSmallButton(context, x, y, 54, StringUtils.translate("malilib.gui.button.reset.caps"), modified ? 0xFF303030 : 0xFF202020, modified && GuiHitTest.isInside(mouseX, mouseY, x, y, 54, BUTTON_HEIGHT));
     }
 
     private boolean handleGenericClick(int mouseX, int mouseY) {
@@ -700,38 +703,36 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int y = LIST_Y + (index - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP) + 5;
 
         if (config instanceof IConfigBoolean booleanConfig) {
-                if (isInside(mouseX, mouseY, controlX, y, 64, BUTTON_HEIGHT)) {
-                    booleanConfig.setBooleanValue(!booleanConfig.getBooleanValue());
-                    this.notifyOwnConfigChanged(false);
-                    return true;
-                }
+            if (GuiHitTest.isInside(mouseX, mouseY, controlX, y, 64, BUTTON_HEIGHT)) {
+                booleanConfig.setBooleanValue(!booleanConfig.getBooleanValue());
+                this.notifyOwnConfigChanged(false);
+                return true;
+            }
 
-                if (this.handleResetClick(config, mouseX, mouseY, controlX + 70, y)) {
-                    return true;
-                }
-        } else if (config instanceof IConfigInteger integerConfig) {
-                if (isInside(mouseX, mouseY, controlX + NUMERIC_SLIDER_X_OFFSET, y, NUMERIC_SLIDER_WIDTH, BUTTON_HEIGHT)) {
-                    this.activeNumericSliderConfig = config;
-                    this.applyNumericSliderValue(integerConfig, mouseX);
-                    return true;
-                }
+            if (this.handleResetClick(config, mouseX, mouseY, controlX + 70, y)) {
+                return true;
+            }
+        } else if (config instanceof IConfigInteger || config instanceof IConfigDouble) {
+            if (this.handleNumericSliderClick(config, mouseX, mouseY, controlX, y)) {
+                return true;
+            }
 
-                if (this.handleResetClick(config, mouseX, mouseY, controlX + NUMERIC_RESET_X_OFFSET, y)) {
-                    return true;
-                }
-        } else if (config instanceof IConfigDouble doubleConfig) {
-                if (isInside(mouseX, mouseY, controlX + NUMERIC_SLIDER_X_OFFSET, y, NUMERIC_SLIDER_WIDTH, BUTTON_HEIGHT)) {
-                    this.activeNumericSliderConfig = config;
-                    this.applyNumericSliderValue(doubleConfig, mouseX);
-                    return true;
-                }
-
-                if (this.handleResetClick(config, mouseX, mouseY, controlX + NUMERIC_RESET_X_OFFSET, y)) {
-                    return true;
-                }
+            if (this.handleResetClick(config, mouseX, mouseY, controlX + NUMERIC_RESET_X_OFFSET, y)) {
+                return true;
+            }
         }
 
         return false;
+    }
+
+    private boolean handleNumericSliderClick(IConfigBase config, int mouseX, int mouseY, int controlX, int y) {
+        if (GuiHitTest.isInside(mouseX, mouseY, controlX + NUMERIC_SLIDER_X_OFFSET, y, NUMERIC_SLIDER_WIDTH, BUTTON_HEIGHT) == false) {
+            return false;
+        }
+
+        this.activeNumericSliderConfig = config;
+        this.applyNumericSliderValue(config, mouseX);
+        return true;
     }
 
     private boolean handleShortcutClick(int mouseX, int mouseY) {
@@ -747,17 +748,17 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int rowY = LIST_Y + (index - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP) + 5;
         int buttonsX = x + width - 102;
 
-        if (isInside(mouseX, mouseY, buttonsX, rowY, 24, BUTTON_HEIGHT)) {
+        if (GuiHitTest.isInside(mouseX, mouseY, buttonsX, rowY, 24, BUTTON_HEIGHT)) {
             this.afterMoveShortcut(ShortcutConfigStore.move(view.storeIndex, -1));
             return true;
         }
 
-        if (isInside(mouseX, mouseY, buttonsX + 28, rowY, 24, BUTTON_HEIGHT)) {
+        if (GuiHitTest.isInside(mouseX, mouseY, buttonsX + 28, rowY, 24, BUTTON_HEIGHT)) {
             this.afterMoveShortcut(ShortcutConfigStore.move(view.storeIndex, 1));
             return true;
         }
 
-        if (isInside(mouseX, mouseY, buttonsX + 56, rowY, 42, BUTTON_HEIGHT)) {
+        if (GuiHitTest.isInside(mouseX, mouseY, buttonsX + 56, rowY, 42, BUTTON_HEIGHT)) {
             ShortcutConfigStore.removeTarget(view.shortcut.modId(), view.shortcut.groupId(), view.shortcut.configName());
             this.afterShortcutChanged("fast-masa-config.gui.full.status.removed");
             return true;
@@ -779,7 +780,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int rowY = LIST_Y + (index - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP) + 5;
         int buttonX = x + width - 68;
 
-        if (isInside(mouseX, mouseY, buttonX, rowY, 64, BUTTON_HEIGHT)) {
+        if (GuiHitTest.isInside(mouseX, mouseY, buttonX, rowY, 64, BUTTON_HEIGHT)) {
             if (ShortcutConfigStore.containsTarget(entry.modId(), entry.groupId(), entry.configName())) {
                 ShortcutConfigStore.removeTarget(entry.modId(), entry.groupId(), entry.configName());
                 this.afterShortcutChanged("fast-masa-config.gui.full.status.removed");
@@ -857,7 +858,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private boolean handleResetClick(IConfigBase config, int mouseX, int mouseY, int x, int y) {
-        if (isInside(mouseX, mouseY, x, y, 54, BUTTON_HEIGHT) && config instanceof IConfigResettable resettable && resettable.isModified()) {
+        if (GuiHitTest.isInside(mouseX, mouseY, x, y, 54, BUTTON_HEIGHT) && config instanceof IConfigResettable resettable && resettable.isModified()) {
             resettable.resetToDefault();
             this.notifyOwnConfigChanged(false);
             return true;
@@ -964,7 +965,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private boolean isInsideList(int mouseX, int mouseY) {
         int top = LIST_Y;
         int bottom = tab == ConfigGuiTab.SHORTCUTS ? this.height - 40 : this.height - 18;
-        return isInside(mouseX, mouseY, MARGIN, top, this.width - MARGIN * 2, bottom - top);
+        return GuiHitTest.isInside(mouseX, mouseY, MARGIN, top, this.width - MARGIN * 2, bottom - top);
     }
 
     private int getRowIndexAt(int mouseX, int mouseY, int rowCount) {
@@ -1144,10 +1145,6 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     private static double clampRatio(double value) {
         return Math.max(0.0, Math.min(1.0, value));
-    }
-
-    private static boolean isInside(int mouseX, int mouseY, int x, int y, int width, int height) {
-        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
     }
 
     static StatusToastPlacement getStatusToastPlacement(int screenWidth, int textWidth) {

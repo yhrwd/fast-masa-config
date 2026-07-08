@@ -339,32 +339,10 @@ public final class QuickConfigScreen extends Screen {
      * 使用 matchesKey 同时匹配 keyCode 和 scanCode，兼容用户改键后的绑定。
      */
     private void setMovementKeyPressed(int keyCode, int scanCode, boolean pressed) {
-        if (this.client.options.forwardKey.matchesKey(keyCode, scanCode)) {
-            this.client.options.forwardKey.setPressed(pressed);
-        }
-
-        if (this.client.options.backKey.matchesKey(keyCode, scanCode)) {
-            this.client.options.backKey.setPressed(pressed);
-        }
-
-        if (this.client.options.leftKey.matchesKey(keyCode, scanCode)) {
-            this.client.options.leftKey.setPressed(pressed);
-        }
-
-        if (this.client.options.rightKey.matchesKey(keyCode, scanCode)) {
-            this.client.options.rightKey.setPressed(pressed);
-        }
-
-        if (this.client.options.jumpKey.matchesKey(keyCode, scanCode)) {
-            this.client.options.jumpKey.setPressed(pressed);
-        }
-
-        if (this.client.options.sneakKey.matchesKey(keyCode, scanCode)) {
-            this.client.options.sneakKey.setPressed(pressed);
-        }
-
-        if (this.client.options.sprintKey.matchesKey(keyCode, scanCode)) {
-            this.client.options.sprintKey.setPressed(pressed);
+        for (KeyBinding movementKey : this.movementKeys) {
+            if (movementKey.matchesKey(keyCode, scanCode)) {
+                movementKey.setPressed(pressed);
+            }
         }
     }
 }

@@ -113,7 +113,7 @@ public final class QuickConfigPanel {
             int cellX = getCellX(localIndex);
             int cellY = getCellY(localIndex);
 
-            if (isInside(mouseX, mouseY, cellX, cellY, getCellWidth(), QuickPanelLayout.ROW_HEIGHT)) {
+            if (GuiHitTest.isInside(mouseX, mouseY, cellX, cellY, getCellWidth(), QuickPanelLayout.ROW_HEIGHT)) {
                 return index;
             }
         }
@@ -146,15 +146,15 @@ public final class QuickConfigPanel {
      * 按钮位置在 render() 中计算，因此调用前必须至少渲染过一帧。
      */
     public boolean isSettingsButtonHovered(int mouseX, int mouseY) {
-        return isInside(mouseX, mouseY, this.settingsButtonX, this.settingsButtonY, 16, 16);
+        return GuiHitTest.isInside(mouseX, mouseY, this.settingsButtonX, this.settingsButtonY, 16, 16);
     }
 
     public PanelMode getModeAt(int mouseX, int mouseY) {
-        if (isInside(mouseX, mouseY, this.shortcutsTabX, this.tabY, MODE_TAB_WIDTH, 14)) {
+        if (GuiHitTest.isInside(mouseX, mouseY, this.shortcutsTabX, this.tabY, MODE_TAB_WIDTH, 14)) {
             return PanelMode.SHORTCUTS;
         }
 
-        if (isInside(mouseX, mouseY, this.enabledTabX, this.tabY, MODE_TAB_WIDTH, 14)) {
+        if (GuiHitTest.isInside(mouseX, mouseY, this.enabledTabX, this.tabY, MODE_TAB_WIDTH, 14)) {
             return PanelMode.ENABLED_BOOLEANS;
         }
 
@@ -227,7 +227,7 @@ public final class QuickConfigPanel {
     }
 
     private void drawModeTab(DrawContext context, int x, int y, int width, String label, boolean active, int mouseX, int mouseY) {
-        boolean hovered = isInside(mouseX, mouseY, x, y, width, 14);
+        boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, width, 14);
         int bg = active ? HoloPanelVisuals.withAlpha(ACCENT, 0xE8) : HoloPanelVisuals.withAlpha(BASE, hovered ? 0xE0 : 0x78);
         int fg = active ? TEXT : (hovered ? TEXT : MUTED);
         RenderUtils.drawRect(context, x, y, width, 14, bg);
@@ -245,7 +245,7 @@ public final class QuickConfigPanel {
         int cellX = getCellX(index);
         int cellY = getCellY(index);
         int cellWidth = getCellWidth();
-        boolean hovered = isInside(mouseX, mouseY, cellX, cellY, cellWidth, QuickPanelLayout.ROW_HEIGHT);
+        boolean hovered = GuiHitTest.isInside(mouseX, mouseY, cellX, cellY, cellWidth, QuickPanelLayout.ROW_HEIGHT);
         int itemAlpha = getItemAlpha(hovered);
         RenderUtils.drawRect(context, cellX, cellY, cellWidth, QuickPanelLayout.ROW_HEIGHT, HoloPanelVisuals.withAlpha(hovered ? 0xFF34202A : 0xFF211820, itemAlpha));
         RenderUtils.drawRect(context, cellX, cellY, 2, QuickPanelLayout.ROW_HEIGHT, hovered ? ACCENT : 0x885A3040);
@@ -382,14 +382,6 @@ public final class QuickConfigPanel {
         }
 
         return text.substring(0, Math.max(0, end)) + ellipsis;
-    }
-
-    /**
-     * 通用矩形命中测试。
-     * 右边界和下边界使用开区间，避免相邻单元格边界重叠时同时命中两个元素。
-     */
-    private boolean isInside(int mouseX, int mouseY, int x, int y, int width, int height) {
-        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
     }
 
     public enum PanelMode {

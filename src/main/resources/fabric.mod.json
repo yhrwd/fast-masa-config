@@ -3,12 +3,12 @@
   "id": "fast-masa-config",
   "version": "${version}",
   "name": "Fast Masa Config",
-  "description": "测试版喵，给 MaLiLib 配置做个快一点的小面板 (=^･ω･^=) 可能会有小毛病，用前记得备份喵。不过你看到这备份已经来不及了喵，那就放心用吧喵！",
-  "authors": ["YHRWD"],
+  "description": "给 MaLiLib 配置加一块随叫随到的快捷面板：按住热键，常用开关和滑条立刻到手边。",
+  "authors": ["YureHiran"],
   "contact": {
     "sources": ""
   },
-  "license": "CC0-1.0",
+  "license": "GPL-3.0-or-later",
   "icon": "assets/fast-masa-config/icon.png",
   "environment": "client",
   "entrypoints": {
