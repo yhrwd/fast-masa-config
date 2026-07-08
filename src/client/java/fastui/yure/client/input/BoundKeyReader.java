@@ -7,8 +7,8 @@ public final class BoundKeyReader {
     private BoundKeyReader() {
     }
 
-    public static int getBoundKeyCode(KeyMapping keyMapping) {
-        InputConstants.Key key = InputConstants.getKey(keyMapping.saveString());
-        return key.getType() == InputConstants.Type.MOUSE ? key.getValue() - 100 : key.getValue();
+    public static int getBoundKeyCode(KeyMapping KeyMapping) {
+        InputConstants.Key key = InputConstants.getKey(KeyMapping.saveString());
+        return key.getType() == InputConstants.TYPE_MOUSE ? key.getValue() - 100 : key.getValue();
     }
 }

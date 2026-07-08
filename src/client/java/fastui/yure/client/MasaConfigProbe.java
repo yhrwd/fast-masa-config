@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
+// import static ...literal; // commented out, use qualified
 
 public final class MasaConfigProbe {
     private static final String[] FALLBACK_CONFIG_CLASS_NAMES = {
@@ -53,14 +53,14 @@ public final class MasaConfigProbe {
     }
 
     private static void registerCommands(CommandDispatcher<FabricClientCommandSource> dispatcher) {
-        dispatcher.register(literal("fastmasaconfig")
-                .then(literal("scan")
+        dispatcher.register(ClientCommandManager.literal("fastmasaconfig")
+                .then(ClientCommandManager.literal("scan")
                         .executes(MasaConfigProbe::scanRegistered)
-                        .then(literal("csv")
+                        .then(ClientCommandManager.literal("csv")
                                 .executes(MasaConfigProbe::exportRegisteredCsv))
-                        .then(literal("fallback")
+                        .then(ClientCommandManager.literal("fallback")
                                 .executes(MasaConfigProbe::scanFallback)
-                                .then(literal("csv")
+                                .then(ClientCommandManager.literal("csv")
                                         .executes(MasaConfigProbe::exportFallbackCsv)))));
     }
 
@@ -75,7 +75,7 @@ public final class MasaConfigProbe {
                 .mapToInt(group -> group.entries().size())
                 .sum();
 
-        context.getSource().sendFeedback(Text.literal("Fast Masa Config scan complete. Registered entries: "
+        context.getSource().sendFeedback(Component.literal("Fast Masa Config scan complete. Registered entries: "
                 + registeredCount + ". Use /fastmasaconfig scan fallback for fallback reflection."));
         return 1;
     }
@@ -88,7 +88,7 @@ public final class MasaConfigProbe {
 
         int fallbackCount = fallbackEntries.values().stream().mapToInt(entries -> entries.size()).sum();
 
-        context.getSource().sendFeedback(Text.literal(
+        context.getSource().sendFeedback(Component.literal(
                 "Fast Masa Config fallback scan complete. Fallback entries: " + fallbackCount + ". See client log."));
         return 1;
     }
@@ -97,11 +97,11 @@ public final class MasaConfigProbe {
         try {
             Path outputPath = exportRegisteredCsvFile();
             context.getSource()
-                    .sendFeedback(Text.literal("Fast Masa Config CSV exported: " + outputPath.toAbsolutePath()));
+                    .sendFeedback(Component.literal("Fast Masa Config CSV exported: " + outputPath.toAbsolutePath()));
             return 1;
         } catch (Exception e) {
             FastMasaConfig.LOGGER.error("Failed to export registered config CSV", e);
-            context.getSource().sendError(Text.literal("Fast Masa Config CSV export failed. See client log."));
+            context.getSource().sendError(Component.literal("Fast Masa Config CSV export failed. See client log."));
             return 0;
         }
     }
@@ -120,11 +120,11 @@ public final class MasaConfigProbe {
         try {
             writeFallbackCsv(outputPath, fallbackEntries);
             context.getSource().sendFeedback(
-                    Text.literal("Fast Masa Config fallback CSV exported: " + outputPath.toAbsolutePath()));
+                    Component.literal("Fast Masa Config fallback CSV exported: " + outputPath.toAbsolutePath()));
             return 1;
         } catch (Exception e) {
             FastMasaConfig.LOGGER.error("Failed to export fallback config CSV", e);
-            context.getSource().sendError(Text.literal("Fast Masa Config fallback CSV export failed. See client log."));
+            context.getSource().sendError(Component.literal("Fast Masa Config fallback CSV export failed. See client log."));
             return 0;
         }
     }
