@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 public final class ConfigScreenSourceService {
     private ConfigScreenSourceService() {
@@ -71,6 +72,11 @@ public final class ConfigScreenSourceService {
     }
 
     static List<Source> collectModMenuSources(List<ModMenuEntrypoint> entrypoints, Set<String> registryModIds) {
+        return collectModMenuSources(entrypoints, registryModIds, ConfigScreenSourceService::getTargetModName);
+    }
+
+    static List<Source> collectModMenuSources(List<ModMenuEntrypoint> entrypoints, Set<String> registryModIds,
+            Function<String, String> targetModNameResolver) {
         List<Source> sources = new ArrayList<>();
         Set<String> sourceModIds = new HashSet<>(registryModIds);
         List<ModMenuSource> directSources = new ArrayList<>();
@@ -80,27 +86,32 @@ public final class ConfigScreenSourceService {
             try {
                 for (ModMenuScreen screen : createModMenuScreens(entrypoint.api(), entrypoint.modId())) {
                     List<ModMenuSource> target = screen.provided() ? providedSources : directSources;
-                    target.add(new ModMenuSource(screen.modId(), entrypoint.modName(), screen.screen()));
+                    target.add(new ModMenuSource(screen.modId(), entrypoint.modName(), screen.screen(), screen.provided()));
                 }
             } catch (Exception e) {
                 FastMasaConfig.LOGGER.warn("Failed to create ModMenu config screen for mod [{}]", entrypoint.modId(), e);
             }
         }
 
-        addModMenuSources(sources, sourceModIds, directSources);
-        addModMenuSources(sources, sourceModIds, providedSources);
+        addModMenuSources(sources, sourceModIds, directSources, targetModNameResolver);
+        addModMenuSources(sources, sourceModIds, providedSources, targetModNameResolver);
         return sources;
     }
 
-    private static void addModMenuSources(List<Source> sources, Set<String> sourceModIds, List<ModMenuSource> candidates) {
+    private static void addModMenuSources(List<Source> sources, Set<String> sourceModIds, List<ModMenuSource> candidates,
+            Function<String, String> targetModNameResolver) {
         for (ModMenuSource candidate : candidates) {
-            if (sourceModIds.contains(candidate.modId()) || (candidate.screen() instanceof IConfigGui) == false) {
+            if (sourceModIds.add(candidate.modId()) == false) {
+                continue;
+            }
+
+            if ((candidate.screen() instanceof IConfigGui) == false) {
                 continue;
             }
 
             IConfigGui configGui = (IConfigGui) candidate.screen();
-            sources.add(new Source(candidate.modId(), candidate.modName(), candidate.screen(), configGui));
-            sourceModIds.add(candidate.modId());
+            String modName = candidate.provided() ? targetModNameResolver.apply(candidate.modId()) : candidate.modName();
+            sources.add(new Source(candidate.modId(), modName, candidate.screen(), configGui));
         }
     }
 
@@ -126,7 +137,10 @@ public final class ConfigScreenSourceService {
         if (factoryMethod != null) {
             factoryMethod.setAccessible(true);
             Object factory = factoryMethod.invoke(api);
-            createModMenuScreen(factory).ifPresent(screen -> screens.add(new ModMenuScreen(directModId, screen, false)));
+
+            if (factory != null) {
+                screens.add(new ModMenuScreen(directModId, createModMenuScreen(factory).orElse(null), false));
+            }
         }
 
         return screens;
@@ -165,6 +179,13 @@ public final class ConfigScreenSourceService {
         return null;
     }
 
+    private static String getTargetModName(String modId) {
+        return FabricLoader.getInstance().getModContainer(modId)
+                .map(container -> container.getMetadata().getName())
+                .filter(name -> name.isBlank() == false)
+                .orElse(modId);
+    }
+
     public record Source(String modId, String modName, Object screen, IConfigGui configGui) {
     }
 
@@ -174,6 +195,6 @@ public final class ConfigScreenSourceService {
     private record ModMenuScreen(String modId, Object screen, boolean provided) {
     }
 
-    private record ModMenuSource(String modId, String modName, Object screen) {
+    private record ModMenuSource(String modId, String modName, Object screen, boolean provided) {
     }
 }

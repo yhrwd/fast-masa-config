@@ -67,6 +67,32 @@ class ConfigScreenSourceServiceTest {
         assertEquals("own", sources.getFirst().configGui().getModId());
     }
 
+    @Test
+    void reservesAnUnscannableOwnFactoryBeforeConsideringProvidedFactories() {
+        List<ConfigScreenSourceService.Source> sources = ConfigScreenSourceService.collectModMenuSources(
+                List.of(
+                        new ConfigScreenSourceService.ModMenuEntrypoint("provider", "Provider", new CompetingProvidedFactoriesApi()),
+                        new ConfigScreenSourceService.ModMenuEntrypoint("litematica", "Litematica", new NullScreenApi())
+                ),
+                Set.of()
+        );
+
+        assertEquals(List.of(), sources);
+    }
+
+    @Test
+    void usesTheProvidedTargetModMetadataForItsDisplayName() {
+        List<ConfigScreenSourceService.Source> sources = ConfigScreenSourceService.collectModMenuSources(
+                List.of(new ConfigScreenSourceService.ModMenuEntrypoint("provider", "Provider", new MinecraftProvidedFactoriesApi())),
+                Set.of(),
+                modId -> "target-" + modId
+        );
+
+        assertEquals(1, sources.size());
+        assertEquals("minecraft", sources.getFirst().modId());
+        assertEquals("target-minecraft", sources.getFirst().modName());
+    }
+
     private record FakeModMenuApi(String modId) {
         @SuppressWarnings("unused")
         public FakeConfigScreenFactory getModConfigScreenFactory() {
@@ -78,6 +104,20 @@ class ConfigScreenSourceServiceTest {
         @SuppressWarnings("unused")
         public Object create(Object parent) {
             return new FakeConfigScreen(this.modId);
+        }
+    }
+
+    private record NullScreenApi() {
+        @SuppressWarnings("unused")
+        public NullScreenFactory getModConfigScreenFactory() {
+            return new NullScreenFactory();
+        }
+    }
+
+    private record NullScreenFactory() {
+        @SuppressWarnings("unused")
+        public Object create(Object parent) {
+            return null;
         }
     }
 
@@ -100,6 +140,15 @@ class ConfigScreenSourceServiceTest {
     }
 
     private static final class CompetingProvidedFactoriesApi implements CompetingProvidedFactories {
+    }
+
+    private interface MinecraftProvidedFactories {
+        default Map<String, FakeConfigScreenFactory> getProvidedConfigScreenFactories() {
+            return Map.of("minecraft", new FakeConfigScreenFactory("minecraft"));
+        }
+    }
+
+    private static final class MinecraftProvidedFactoriesApi implements MinecraftProvidedFactories {
     }
 
     private record FakeConfigScreen(String modId) implements IConfigGui {
