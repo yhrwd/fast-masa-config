@@ -104,6 +104,12 @@ public final class QuickConfigScreen extends Screen {
         int x = (int) mouseX;
         int y = (int) mouseY;
 
+        if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() == false
+                && isOpenHotkeyPressedAgain(button - 100)) {
+            this.close();
+            return true;
+        }
+
         if (this.panel.isSettingsButtonHovered(x, y)) {
             // 人手松开热键有延迟，进入全屏 UI 时先记录仍按住的打开键，交给全屏页吞掉首轮输入。
             this.client.setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes()));
