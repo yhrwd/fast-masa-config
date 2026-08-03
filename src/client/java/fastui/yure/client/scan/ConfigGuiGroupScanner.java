@@ -1,5 +1,6 @@
 package fastui.yure.client.scan;
 
+import fastui.yure.FastMasaConfig;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.gui.GuiConfigsBase;
 import fi.dy.masa.malilib.gui.interfaces.IConfigGui;
@@ -160,7 +161,7 @@ public final class ConfigGuiGroupScanner {
                     scanned.add(new GroupData(value.groupValue(), configs, configNames(configs)));
                 }
             } finally {
-                candidate.access().set(original);
+                restoreSelector(candidate, original);
             }
         } catch (ReflectiveOperationException | RuntimeException ignored) {
             return Optional.empty();
@@ -182,6 +183,15 @@ public final class ConfigGuiGroupScanner {
         return Optional.of(new CandidateResult(candidate.priority(), allNames.size(), groups.stream()
                 .map(group -> new Group(groupId(group.value()), groupName(group.value()), candidate.path() + ":" + groupId(group.value()), group.configs()))
                 .toList()));
+    }
+
+    private static void restoreSelector(Candidate candidate, Object original) {
+        try {
+            candidate.access().set(original);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            // 恢复失败时不能丢弃已采集的分组，日志明确说明 selector 可能仍处于临时值。
+            FastMasaConfig.LOGGER.warn("Failed to restore config group selector [{}]; selector state may have changed", candidate.path(), e);
+        }
     }
 
     private static boolean isBetter(CandidateResult candidate, CandidateResult current) {

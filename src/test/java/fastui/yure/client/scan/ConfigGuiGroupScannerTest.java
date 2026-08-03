@@ -25,6 +25,17 @@ class ConfigGuiGroupScannerTest {
         assertEquals(Tab.FIRST, FakeConfigScreen.tab);
     }
 
+    @Test
+    void keepsScannedGroupsWhenSelectorRestorationFails() {
+        RestoreFailingConfigScreen.selection = RestoreFailingConfigScreen.RestoreTab.FIRST;
+
+        List<ConfigGuiGroupScanner.Group> groups = ConfigGuiGroupScanner.collectGroups(
+                new RestoreFailingConfigScreen(), new RestoreFailingConfigScreen());
+
+        assertEquals(List.of("FIRST", "SECOND"), groups.stream().map(ConfigGuiGroupScanner.Group::id).toList());
+        assertEquals(RestoreFailingConfigScreen.RestoreTab.SECOND, RestoreFailingConfigScreen.selection);
+    }
+
     private enum Tab {
         FIRST,
         SECOND
@@ -55,6 +66,53 @@ class ConfigGuiGroupScannerTest {
         @Override
         public IConfigInfoProvider getHoverInfoProvider() {
             return null;
+        }
+    }
+
+    private static final class RestoreFailingConfigScreen implements IConfigGui {
+        private enum RestoreTab {
+            FIRST,
+            SECOND
+        }
+
+        private static RestoreTab selection = RestoreTab.FIRST;
+
+        @Override
+        public String getModId() {
+            return "test";
+        }
+
+        @Override
+        public void clearOptions() {
+        }
+
+        @Override
+        public List<GuiConfigsBase.ConfigOptionWrapper> getConfigs() {
+            return List.of(new GuiConfigsBase.ConfigOptionWrapper(new FakeConfig(selection.name())));
+        }
+
+        @Override
+        public ButtonPressDirtyListenerSimple getButtonPressListener() {
+            return null;
+        }
+
+        @Override
+        public IConfigInfoProvider getHoverInfoProvider() {
+            return null;
+        }
+
+        @SuppressWarnings("unused")
+        private static void setTab(RestoreTab value) {
+            if (value == RestoreTab.FIRST && selection == RestoreTab.SECOND) {
+                throw new IllegalStateException("restore failed");
+            }
+
+            selection = value;
+        }
+
+        @SuppressWarnings("unused")
+        private static RestoreTab getTab() {
+            return selection;
         }
     }
 

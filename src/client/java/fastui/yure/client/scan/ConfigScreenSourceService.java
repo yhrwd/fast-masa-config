@@ -13,6 +13,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -72,37 +73,66 @@ public final class ConfigScreenSourceService {
     static List<Source> collectModMenuSources(List<ModMenuEntrypoint> entrypoints, Set<String> registryModIds) {
         List<Source> sources = new ArrayList<>();
         Set<String> sourceModIds = new HashSet<>(registryModIds);
+        List<ModMenuSource> directSources = new ArrayList<>();
+        List<ModMenuSource> providedSources = new ArrayList<>();
 
         for (ModMenuEntrypoint entrypoint : entrypoints) {
-            if (sourceModIds.contains(entrypoint.modId())) {
-                continue;
-            }
-
             try {
-                Optional<Object> screen = createModMenuScreen(entrypoint.api());
-
-                if (screen.isPresent() && screen.get() instanceof IConfigGui configGui) {
-                    sources.add(new Source(entrypoint.modId(), entrypoint.modName(), screen.get(), configGui));
-                    sourceModIds.add(entrypoint.modId());
+                for (ModMenuScreen screen : createModMenuScreens(entrypoint.api(), entrypoint.modId())) {
+                    List<ModMenuSource> target = screen.provided() ? providedSources : directSources;
+                    target.add(new ModMenuSource(screen.modId(), entrypoint.modName(), screen.screen()));
                 }
             } catch (Exception e) {
                 FastMasaConfig.LOGGER.warn("Failed to create ModMenu config screen for mod [{}]", entrypoint.modId(), e);
             }
         }
 
+        addModMenuSources(sources, sourceModIds, directSources);
+        addModMenuSources(sources, sourceModIds, providedSources);
         return sources;
     }
 
-    private static Optional<Object> createModMenuScreen(Object api) throws ReflectiveOperationException {
-        Method factoryMethod = findNoArgMethod(api.getClass(), "getModConfigScreenFactory");
+    private static void addModMenuSources(List<Source> sources, Set<String> sourceModIds, List<ModMenuSource> candidates) {
+        for (ModMenuSource candidate : candidates) {
+            if (sourceModIds.contains(candidate.modId()) || (candidate.screen() instanceof IConfigGui) == false) {
+                continue;
+            }
 
-        if (factoryMethod == null) {
-            return Optional.empty();
+            IConfigGui configGui = (IConfigGui) candidate.screen();
+            sources.add(new Source(candidate.modId(), candidate.modName(), candidate.screen(), configGui));
+            sourceModIds.add(candidate.modId());
+        }
+    }
+
+    private static List<ModMenuScreen> createModMenuScreens(Object api, String directModId) throws ReflectiveOperationException {
+        List<ModMenuScreen> screens = new ArrayList<>();
+        Method providedFactoriesMethod = findNoArgMethod(api.getClass(), "getProvidedConfigScreenFactories");
+
+        if (providedFactoriesMethod != null) {
+            providedFactoriesMethod.setAccessible(true);
+            Object providedFactories = providedFactoriesMethod.invoke(api);
+
+            if (providedFactories instanceof Map<?, ?> factories) {
+                for (Map.Entry<?, ?> entry : factories.entrySet()) {
+                    if (entry.getKey() instanceof String modId && entry.getValue() != null) {
+                        createModMenuScreen(entry.getValue()).ifPresent(screen -> screens.add(new ModMenuScreen(modId, screen, true)));
+                    }
+                }
+            }
         }
 
-        factoryMethod.setAccessible(true);
-        Object factory = factoryMethod.invoke(api);
+        Method factoryMethod = findNoArgMethod(api.getClass(), "getModConfigScreenFactory");
 
+        if (factoryMethod != null) {
+            factoryMethod.setAccessible(true);
+            Object factory = factoryMethod.invoke(api);
+            createModMenuScreen(factory).ifPresent(screen -> screens.add(new ModMenuScreen(directModId, screen, false)));
+        }
+
+        return screens;
+    }
+
+    private static Optional<Object> createModMenuScreen(Object factory) throws ReflectiveOperationException {
         if (factory == null) {
             return Optional.empty();
         }
@@ -118,6 +148,12 @@ public final class ConfigScreenSourceService {
     }
 
     private static Method findNoArgMethod(Class<?> type, String name) {
+        for (Method method : type.getMethods()) {
+            if (method.getName().equals(name) && method.getParameterCount() == 0) {
+                return method;
+            }
+        }
+
         for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
             try {
                 return current.getDeclaredMethod(name);
@@ -133,5 +169,11 @@ public final class ConfigScreenSourceService {
     }
 
     record ModMenuEntrypoint(String modId, String modName, Object api) {
+    }
+
+    private record ModMenuScreen(String modId, Object screen, boolean provided) {
+    }
+
+    private record ModMenuSource(String modId, String modName, Object screen) {
     }
 }
