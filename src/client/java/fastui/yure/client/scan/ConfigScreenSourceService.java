@@ -126,7 +126,7 @@ public final class ConfigScreenSourceService {
             if (providedFactories instanceof Map<?, ?> factories) {
                 for (Map.Entry<?, ?> entry : factories.entrySet()) {
                     if (entry.getKey() instanceof String modId && entry.getValue() != null) {
-                        createModMenuScreen(entry.getValue()).ifPresent(screen -> screens.add(new ModMenuScreen(modId, screen, true)));
+                        createModMenuScreen(entry.getValue(), modId, true, screens);
                     }
                 }
             }
@@ -139,11 +139,20 @@ public final class ConfigScreenSourceService {
             Object factory = factoryMethod.invoke(api);
 
             if (factory != null) {
-                screens.add(new ModMenuScreen(directModId, createModMenuScreen(factory).orElse(null), false));
+                createModMenuScreen(factory, directModId, false, screens);
             }
         }
 
         return screens;
+    }
+
+    private static void createModMenuScreen(Object factory, String modId, boolean provided, List<ModMenuScreen> screens) {
+        try {
+            screens.add(new ModMenuScreen(modId, createModMenuScreen(factory).orElse(null), provided));
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            FastMasaConfig.LOGGER.warn("Failed to create {}ModMenu config screen for mod [{}]", provided ? "provided " : "", modId, e);
+            screens.add(new ModMenuScreen(modId, null, provided));
+        }
     }
 
     private static Optional<Object> createModMenuScreen(Object factory) throws ReflectiveOperationException {

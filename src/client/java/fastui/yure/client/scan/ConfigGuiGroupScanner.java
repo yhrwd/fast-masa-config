@@ -26,6 +26,7 @@ public final class ConfigGuiGroupScanner {
     }
 
     public static List<Group> collectGroups(Object screen, IConfigGui configGui) {
+        Group fallbackGroup = defaultGroup(configGui);
         CandidateResult best = null;
 
         for (Candidate candidate : findCandidates(screen)) {
@@ -36,7 +37,7 @@ public final class ConfigGuiGroupScanner {
             }
         }
 
-        return best == null ? List.of(defaultGroup(configGui)) : best.groups();
+        return best == null ? List.of(fallbackGroup) : best.groups();
     }
 
     private static List<Candidate> findCandidates(Object screen) {
@@ -150,6 +151,7 @@ public final class ConfigGuiGroupScanner {
 
     private static Optional<CandidateResult> scanCandidate(Candidate candidate, IConfigGui configGui) {
         List<GroupData> scanned = new ArrayList<>();
+        boolean restored = false;
 
         try {
             Object original = candidate.access().get();
@@ -161,9 +163,13 @@ public final class ConfigGuiGroupScanner {
                     scanned.add(new GroupData(value.groupValue(), configs, configNames(configs)));
                 }
             } finally {
-                restoreSelector(candidate, original);
+                restored = restoreSelector(candidate, original);
             }
         } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return Optional.empty();
+        }
+
+        if (restored == false) {
             return Optional.empty();
         }
 
@@ -185,12 +191,14 @@ public final class ConfigGuiGroupScanner {
                 .toList()));
     }
 
-    private static void restoreSelector(Candidate candidate, Object original) {
+    private static boolean restoreSelector(Candidate candidate, Object original) {
         try {
             candidate.access().set(original);
+            return true;
         } catch (ReflectiveOperationException | RuntimeException e) {
-            // 恢复失败时不能丢弃已采集的分组，日志明确说明 selector 可能仍处于临时值。
+            // selector 状态未知时必须丢弃该候选，避免返回基于污染状态的分组。
             FastMasaConfig.LOGGER.warn("Failed to restore config group selector [{}]; selector state may have changed", candidate.path(), e);
+            return false;
         }
     }
 

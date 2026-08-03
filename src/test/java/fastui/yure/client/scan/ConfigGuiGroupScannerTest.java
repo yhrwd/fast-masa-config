@@ -32,8 +32,19 @@ class ConfigGuiGroupScannerTest {
         List<ConfigGuiGroupScanner.Group> groups = ConfigGuiGroupScanner.collectGroups(
                 new RestoreFailingConfigScreen(), new RestoreFailingConfigScreen());
 
-        assertEquals(List.of("FIRST", "SECOND"), groups.stream().map(ConfigGuiGroupScanner.Group::id).toList());
+        assertEquals(List.of("default"), groups.stream().map(ConfigGuiGroupScanner.Group::id).toList());
+        assertEquals("FIRST", groups.getFirst().configs().getFirst().getConfig().getName());
         assertEquals(RestoreFailingConfigScreen.RestoreTab.SECOND, RestoreFailingConfigScreen.selection);
+    }
+
+    @Test
+    void scansNestedObjectGroupsAndRestoresTheNestedSelection() {
+        NestedConfigScreen screen = new NestedConfigScreen();
+
+        List<ConfigGuiGroupScanner.Group> groups = ConfigGuiGroupScanner.collectGroups(screen, screen);
+
+        assertEquals(List.of("FIRST", "SECOND"), groups.stream().map(ConfigGuiGroupScanner.Group::id).toList());
+        assertEquals(Tab.FIRST, screen.state.tab);
     }
 
     private enum Tab {
@@ -114,6 +125,38 @@ class ConfigGuiGroupScannerTest {
         private static RestoreTab getTab() {
             return selection;
         }
+    }
+
+    private static final class NestedConfigScreen implements IConfigGui {
+        private final NestedState state = new NestedState();
+
+        @Override
+        public String getModId() {
+            return "test";
+        }
+
+        @Override
+        public void clearOptions() {
+        }
+
+        @Override
+        public List<GuiConfigsBase.ConfigOptionWrapper> getConfigs() {
+            return List.of(new GuiConfigsBase.ConfigOptionWrapper(new FakeConfig(this.state.tab.name())));
+        }
+
+        @Override
+        public ButtonPressDirtyListenerSimple getButtonPressListener() {
+            return null;
+        }
+
+        @Override
+        public IConfigInfoProvider getHoverInfoProvider() {
+            return null;
+        }
+    }
+
+    private static final class NestedState {
+        private Tab tab = Tab.FIRST;
     }
 
     private record FakeConfig(String name) implements IConfigBase {

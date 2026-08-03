@@ -7,6 +7,7 @@ import fi.dy.masa.malilib.gui.interfaces.IConfigInfoProvider;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -93,6 +94,17 @@ class ConfigScreenSourceServiceTest {
         assertEquals("target-minecraft", sources.getFirst().modName());
     }
 
+    @Test
+    void continuesAfterOneProvidedFactoryThrows() {
+        List<ConfigScreenSourceService.Source> sources = ConfigScreenSourceService.collectModMenuSources(
+                List.of(new ConfigScreenSourceService.ModMenuEntrypoint("provider", "Provider", new FailingProvidedFactoriesApi())),
+                Set.of()
+        );
+
+        assertEquals(1, sources.size());
+        assertEquals("valid", sources.getFirst().modId());
+    }
+
     private record FakeModMenuApi(String modId) {
         @SuppressWarnings("unused")
         public FakeConfigScreenFactory getModConfigScreenFactory() {
@@ -149,6 +161,25 @@ class ConfigScreenSourceServiceTest {
     }
 
     private static final class MinecraftProvidedFactoriesApi implements MinecraftProvidedFactories {
+    }
+
+    private record ThrowingFactory() {
+        @SuppressWarnings("unused")
+        public Object create(Object parent) {
+            throw new IllegalStateException("factory failed");
+        }
+    }
+
+    private interface FailingProvidedFactories {
+        default Map<String, Object> getProvidedConfigScreenFactories() {
+            Map<String, Object> factories = new LinkedHashMap<>();
+            factories.put("broken", new ThrowingFactory());
+            factories.put("valid", new FakeConfigScreenFactory("valid"));
+            return factories;
+        }
+    }
+
+    private static final class FailingProvidedFactoriesApi implements FailingProvidedFactories {
     }
 
     private record FakeConfigScreen(String modId) implements IConfigGui {
