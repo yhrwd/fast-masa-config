@@ -16,7 +16,7 @@ import fi.dy.masa.malilib.config.ConfigType;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.IConfigStringList;
 import fi.dy.masa.malilib.config.IStringRepresentable;
-import fi.dy.masa.malilib.gui.GuiConfigsBase;
+import fi.dy.masa.malilib.event.InputEventHandler;
 import fi.dy.masa.malilib.hotkeys.IHotkey;
 import fi.dy.masa.malilib.util.StringUtils;
 import net.minecraft.client.gui.DrawContext;
@@ -31,7 +31,7 @@ import java.util.Locale;
 import java.util.Set;
 
 /** 1.21.1 的完整配置页，避免依赖 26.1 的 MaLiLib 自绘接口。 */
-public final class FastMasaConfigGui extends GuiConfigsBase {
+public final class FastMasaConfigGui extends Screen {
     private static final int MARGIN = 12;
     private static final int TAB_Y = 28;
     private static final int TOOLBAR_Y = 54;
@@ -41,6 +41,7 @@ public final class FastMasaConfigGui extends GuiConfigsBase {
     private static final int BUTTON_HEIGHT = 20;
     private static ConfigGuiTab tab = ConfigGuiTab.GENERIC;
 
+    private final Screen parent;
     private final HeldKeyInputSuppressor inputSuppressor;
     private final MasaConfigEditor editor = new MasaConfigEditor();
     private TextFieldWidget searchField;
@@ -65,21 +66,17 @@ public final class FastMasaConfigGui extends GuiConfigsBase {
     }
 
     public FastMasaConfigGui(Screen parent, Set<Integer> suppressKeys) {
-        super(10, 50, FastMasaConfig.MOD_ID, parent, "fast-masa-config.gui.title.configs");
+        super(Text.translatable("fast-masa-config.gui.title.configs"));
+        this.parent = parent;
         this.inputSuppressor = new HeldKeyInputSuppressor(suppressKeys);
     }
 
     @Override
-    public void init() {
+    protected void init() {
         this.clearChildren();
         this.createTabs();
         this.createToolbar();
         this.refreshRows();
-    }
-
-    @Override
-    public List<ConfigOptionWrapper> getConfigs() {
-        return List.of();
     }
 
     @Override
@@ -144,6 +141,11 @@ public final class FastMasaConfigGui extends GuiConfigsBase {
     public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
         this.inputSuppressor.release(keyCode);
         return super.keyReleased(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public void close() {
+        this.client.setScreen(this.parent);
     }
 
     private void createTabs() {
@@ -215,7 +217,7 @@ public final class FastMasaConfigGui extends GuiConfigsBase {
             return;
         }
 
-        int valueWidth = Math.max(100, this.width - MARGIN * 2 - 58);
+        int valueWidth = Math.max(100, this.width - MARGIN * 2 - 116);
         this.valueField = new TextFieldWidget(this.textRenderer, MARGIN, this.height - 28, valueWidth, 18,
                 Text.literal(this.selectedGenericConfig.getName()));
         this.valueField.setText(this.configValue(this.selectedGenericConfig));
@@ -223,6 +225,9 @@ public final class FastMasaConfigGui extends GuiConfigsBase {
         this.addDrawableChild(this.valueField);
         this.addDrawableChild(ButtonWidget.builder(Text.translatable("fast-masa-config.gui.full.apply"),
                 ignored -> this.applySelectedGeneric()).dimensions(MARGIN + valueWidth + 6, this.height - 28, 52,
+                        BUTTON_HEIGHT).build());
+        this.addDrawableChild(ButtonWidget.builder(Text.translatable("malilib.gui.button.reset.caps"),
+                ignored -> this.resetSelectedGeneric()).dimensions(MARGIN + valueWidth + 64, this.height - 28, 52,
                         BUTTON_HEIGHT).build());
     }
 
@@ -385,10 +390,26 @@ public final class FastMasaConfigGui extends GuiConfigsBase {
         ConfigEditResult result = this.editor.apply(this.selectedGenericConfig, this.valueField.getText());
         this.setStatus(result.message());
         if (result.success()) {
-            ConfigManager.getInstance().onConfigsChanged(FastMasaConfig.MOD_ID);
-            ConfigIndexService.invalidate();
-            this.refreshRows();
+            this.afterGenericConfigChanged();
         }
+    }
+
+    private void resetSelectedGeneric() {
+        ConfigEditResult result = this.editor.reset(this.selectedGenericConfig);
+        this.setStatus(result.message());
+        if (result.success()) {
+            this.valueField.setText(this.configValue(this.selectedGenericConfig));
+            this.afterGenericConfigChanged();
+        }
+    }
+
+    private void afterGenericConfigChanged() {
+        ConfigManager.getInstance().onConfigsChanged(FastMasaConfig.MOD_ID);
+        if (this.selectedGenericConfig instanceof IHotkey) {
+            InputEventHandler.getKeybindManager().updateUsedKeys();
+        }
+        ConfigIndexService.invalidate();
+        this.refreshRows();
     }
 
     private String configValue(IConfigBase config) {
