@@ -2,7 +2,6 @@ package fastui.yure.config;
 
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.IConfigBoolean;
-import fi.dy.masa.malilib.config.IConfigColor;
 import fi.dy.masa.malilib.config.IConfigDouble;
 import fi.dy.masa.malilib.config.IConfigFloat;
 import fi.dy.masa.malilib.config.IConfigInteger;
@@ -31,7 +30,7 @@ public final class MasaConfigEditor {
             case OPTION_LIST -> applyOptionList(config, rawValue);
             case HOTKEY -> applyHotkey(config, rawValue);
             case STRING_LIST -> applyStringList(config, rawValue);
-            default -> ConfigEditResult.failure(config, "暂不支持修改该配置类型: " + config.getType().asString());
+            default -> ConfigEditResult.failure(config, "暂不支持修改该配置类型: " + config.getType().name());
         };
     }
 
@@ -138,7 +137,7 @@ public final class MasaConfigEditor {
             return ConfigEditResult.failure(config, "颜色必须是 #RRGGBB 或 #AARRGGBB");
         }
 
-        ((IConfigColor) config).setValueFromString(value);
+        ((IStringRepresentable) config).setValueFromString(value);
         return ConfigEditResult.success(config);
     }
 

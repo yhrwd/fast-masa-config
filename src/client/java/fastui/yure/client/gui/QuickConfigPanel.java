@@ -149,10 +149,10 @@ public final class QuickConfigPanel {
      */
     private void drawPanelShell(DrawContext context, double open) {
         int alpha = getPanelAlpha(open);
-        RenderUtils.drawRect(context, this.x + 3, this.y + 3, this.width, this.height, HoloPanelVisuals.withAlpha(0xFF000000, Math.max(0x0C, alpha / 5)));
-        RenderUtils.drawRect(context, this.x, this.y, this.width, this.height, HoloPanelVisuals.withAlpha(BASE, alpha));
-        RenderUtils.drawRect(context, this.x + 2, this.y + 2, this.width - 4, this.height - 4, HoloPanelVisuals.withAlpha(BASE, Math.max(0x24, alpha - 0x30)));
-        RenderUtils.drawRect(context, this.x + 6, this.y + QuickPanelLayout.HEADER_HEIGHT - 3, this.width - 12, 2, ACCENT);
+        RenderUtils.drawRect(this.x + 3, this.y + 3, this.width, this.height, HoloPanelVisuals.withAlpha(0xFF000000, Math.max(0x0C, alpha / 5)));
+        RenderUtils.drawRect(this.x, this.y, this.width, this.height, HoloPanelVisuals.withAlpha(BASE, alpha));
+        RenderUtils.drawRect(this.x + 2, this.y + 2, this.width - 4, this.height - 4, HoloPanelVisuals.withAlpha(BASE, Math.max(0x24, alpha - 0x30)));
+        RenderUtils.drawRect(this.x + 6, this.y + QuickPanelLayout.HEADER_HEIGHT - 3, this.width - 12, 2, ACCENT);
         drawCornerArrow(context, this.x + 2, this.y + 2, 1, 1, ACCENT);
         drawCornerArrow(context, this.x + this.width - 10, this.y + 2, -1, 1, ACCENT);
         drawCornerArrow(context, this.x + 2, this.y + this.height - 10, 1, -1, ACCENT);
@@ -166,11 +166,11 @@ public final class QuickConfigPanel {
     private void drawCornerArrow(DrawContext context, int x, int y, int horizontalDirection, int verticalDirection, int color) {
         QuickCornerArrow arrow = QuickCornerArrow.calculate(x, y, horizontalDirection, verticalDirection);
 
-        RenderUtils.drawRect(context, arrow.tipX(), arrow.tipY(), 2, 2, color);
-        RenderUtils.drawRect(context, arrow.midX(), arrow.tipY(), 2, 2, color);
-        RenderUtils.drawRect(context, arrow.tipX(), arrow.midY(), 2, 2, color);
-        RenderUtils.drawRect(context, arrow.baseX(), arrow.tipY(), 2, 2, color);
-        RenderUtils.drawRect(context, arrow.tipX(), arrow.baseY(), 2, 2, color);
+        RenderUtils.drawRect(arrow.tipX(), arrow.tipY(), 2, 2, color);
+        RenderUtils.drawRect(arrow.midX(), arrow.tipY(), 2, 2, color);
+        RenderUtils.drawRect(arrow.tipX(), arrow.midY(), 2, 2, color);
+        RenderUtils.drawRect(arrow.baseX(), arrow.tipY(), 2, 2, color);
+        RenderUtils.drawRect(arrow.tipX(), arrow.baseY(), 2, 2, color);
     }
 
     /**
@@ -183,8 +183,8 @@ public final class QuickConfigPanel {
         boolean hovered = isSettingsButtonHovered(mouseX, mouseY);
         this.settingsHoverProgress = HoloPanelVisuals.approach(this.settingsHoverProgress, hovered ? 1.0 : 0.0, 0.22);
         int bgColor = HoloPanelVisuals.withAlpha(HoloPanelVisuals.mixRgb(BASE, ACCENT, this.settingsHoverProgress), hovered ? 0xE8 : 0xB8);
-        RenderUtils.drawRect(context, this.settingsButtonX, this.settingsButtonY, 16, 16, bgColor);
-        RenderUtils.drawRect(context, this.settingsButtonX, this.settingsButtonY, 16, 2, hovered ? TEXT : ACCENT);
+        RenderUtils.drawRect(this.settingsButtonX, this.settingsButtonY, 16, 16, bgColor);
+        RenderUtils.drawRect(this.settingsButtonX, this.settingsButtonY, 16, 2, hovered ? TEXT : ACCENT);
         drawSettingsIcon(context, this.settingsButtonX + 2, this.settingsButtonY + 2, hovered ? TEXT : ACCENT);
     }
 
@@ -193,14 +193,14 @@ public final class QuickConfigPanel {
      * 不依赖 png 资源，避免资源路径和纹理管线在不同 MC 版本里变化。
      */
     private void drawSettingsIcon(DrawContext context, int x, int y, int color) {
-        RenderUtils.drawRect(context, x + 5, y, 2, 12, color);
-        RenderUtils.drawRect(context, x, y + 5, 12, 2, color);
-        RenderUtils.drawRect(context, x + 2, y + 2, 8, 8, color);
-        RenderUtils.drawRect(context, x + 4, y + 4, 4, 4, BASE);
-        RenderUtils.drawRect(context, x + 1, y + 1, 2, 2, color);
-        RenderUtils.drawRect(context, x + 9, y + 1, 2, 2, color);
-        RenderUtils.drawRect(context, x + 1, y + 9, 2, 2, color);
-        RenderUtils.drawRect(context, x + 9, y + 9, 2, 2, color);
+        RenderUtils.drawRect(x + 5, y, 2, 12, color);
+        RenderUtils.drawRect(x, y + 5, 12, 2, color);
+        RenderUtils.drawRect(x + 2, y + 2, 8, 8, color);
+        RenderUtils.drawRect(x + 4, y + 4, 4, 4, BASE);
+        RenderUtils.drawRect(x + 1, y + 1, 2, 2, color);
+        RenderUtils.drawRect(x + 9, y + 1, 2, 2, color);
+        RenderUtils.drawRect(x + 1, y + 9, 2, 2, color);
+        RenderUtils.drawRect(x + 9, y + 9, 2, 2, color);
     }
 
     /**
@@ -213,9 +213,9 @@ public final class QuickConfigPanel {
         int cellWidth = getCellWidth();
         boolean hovered = isInside(mouseX, mouseY, cellX, cellY, cellWidth, QuickPanelLayout.ROW_HEIGHT);
         int itemAlpha = getItemAlpha(hovered);
-        RenderUtils.drawRect(context, cellX + 2, cellY + 2, cellWidth, QuickPanelLayout.ROW_HEIGHT - 1, HoloPanelVisuals.withAlpha(ACCENT, hovered ? Math.min(0xAA, itemAlpha) : Math.max(0x18, itemAlpha / 3)));
-        RenderUtils.drawRect(context, cellX, cellY, cellWidth, QuickPanelLayout.ROW_HEIGHT - 2, HoloPanelVisuals.withAlpha(hovered ? 0xFF2A1D25 : BASE, itemAlpha));
-        RenderUtils.drawRect(context, cellX, cellY, cellWidth, 2, hovered ? ACCENT : 0xAAE6397C);
+        RenderUtils.drawRect(cellX + 2, cellY + 2, cellWidth, QuickPanelLayout.ROW_HEIGHT - 1, HoloPanelVisuals.withAlpha(ACCENT, hovered ? Math.min(0xAA, itemAlpha) : Math.max(0x18, itemAlpha / 3)));
+        RenderUtils.drawRect(cellX, cellY, cellWidth, QuickPanelLayout.ROW_HEIGHT - 2, HoloPanelVisuals.withAlpha(hovered ? 0xFF2A1D25 : BASE, itemAlpha));
+        RenderUtils.drawRect(cellX, cellY, cellWidth, 2, hovered ? ACCENT : 0xAAE6397C);
 
         String label = shortcut.shortcut().labelOverride().isBlank() ? shortcut.configEntry().displayName() : shortcut.shortcut().labelOverride();
         int rightReserved = ShortcutControl.getControlType(shortcut.configEntry().config()) == ShortcutControlType.TOGGLE ? 42 : 82;
@@ -229,9 +229,9 @@ public final class QuickConfigPanel {
         int sliderX = getSliderX(cellX, cellWidth);
         int sliderY = cellY + 13;
         double ratio = ShortcutControl.getSliderRatio(shortcut.configEntry().config());
-        RenderUtils.drawRect(context, sliderX, sliderY, SLIDER_WIDTH, 3, 0x661A1A1D);
-        RenderUtils.drawRect(context, sliderX, sliderY, (int) Math.round(SLIDER_WIDTH * ratio), 3, ACCENT);
-        RenderUtils.drawRect(context, sliderX + (int) Math.round(SLIDER_WIDTH * ratio) - 1, sliderY - 2, 3, 7, TEXT);
+        RenderUtils.drawRect(sliderX, sliderY, SLIDER_WIDTH, 3, 0x661A1A1D);
+        RenderUtils.drawRect(sliderX, sliderY, (int) Math.round(SLIDER_WIDTH * ratio), 3, ACCENT);
+        RenderUtils.drawRect(sliderX + (int) Math.round(SLIDER_WIDTH * ratio) - 1, sliderY - 2, 3, 7, TEXT);
         context.drawText(this.textRenderer, fitText(ShortcutControl.getValueText(shortcut.configEntry().config()), 28), sliderX - 32, cellY + 5, MUTED, false);
     }
 
@@ -253,10 +253,10 @@ public final class QuickConfigPanel {
         int trackColor = HoloPanelVisuals.withAlpha(HoloPanelVisuals.mixRgb(inactiveColor, activeColor, eased), 0xE8);
         int knobX = x + 2 + (int) Math.round((TOGGLE_WIDTH - TOGGLE_HEIGHT) * eased);
 
-        RenderUtils.drawRect(context, x, y, TOGGLE_WIDTH, TOGGLE_HEIGHT, ACCENT);
-        RenderUtils.drawRect(context, x + 2, y + 2, TOGGLE_WIDTH - 4, TOGGLE_HEIGHT - 4, trackColor);
-        RenderUtils.drawRect(context, knobX, y + 2, TOGGLE_HEIGHT - 4, TOGGLE_HEIGHT - 4, TEXT);
-        RenderUtils.drawRect(context, knobX + 2, y + 4, TOGGLE_HEIGHT - 8, TOGGLE_HEIGHT - 8, enabled ? ACCENT : BASE);
+        RenderUtils.drawRect(x, y, TOGGLE_WIDTH, TOGGLE_HEIGHT, ACCENT);
+        RenderUtils.drawRect(x + 2, y + 2, TOGGLE_WIDTH - 4, TOGGLE_HEIGHT - 4, trackColor);
+        RenderUtils.drawRect(knobX, y + 2, TOGGLE_HEIGHT - 4, TOGGLE_HEIGHT - 4, TEXT);
+        RenderUtils.drawRect(knobX + 2, y + 4, TOGGLE_HEIGHT - 8, TOGGLE_HEIGHT - 8, enabled ? ACCENT : BASE);
     }
 
     /**
@@ -271,8 +271,8 @@ public final class QuickConfigPanel {
         int thumbTravel = Math.max(1, trackHeight - thumbHeight);
         int thumbY = trackY + (int) Math.round(thumbTravel * (this.scrollOffset / (double) this.maxScrollOffset));
 
-        RenderUtils.drawRect(context, trackX, trackY, 2, trackHeight, 0x661A1A1D);
-        RenderUtils.drawRect(context, trackX - 1, thumbY, 4, thumbHeight, ACCENT);
+        RenderUtils.drawRect(trackX, trackY, 2, trackHeight, 0x661A1A1D);
+        RenderUtils.drawRect(trackX - 1, thumbY, 4, thumbHeight, ACCENT);
     }
 
     /**
