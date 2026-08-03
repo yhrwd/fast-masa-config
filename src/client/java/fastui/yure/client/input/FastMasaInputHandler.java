@@ -48,6 +48,13 @@ public final class FastMasaInputHandler implements IKeybindProvider {
         public boolean onKeyAction(KeyAction action, IKeybind key) {
             MinecraftClient client = MinecraftClient.getInstance();
 
+            if (action == KeyAction.PRESS && client.currentScreen instanceof QuickConfigScreen screen) {
+                if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() == false) {
+                    screen.close();
+                    return true;
+                }
+            }
+
             if (action == KeyAction.PRESS && client.currentScreen instanceof QuickConfigScreen == false) {
                 client.setScreen(new QuickConfigScreen());
                 return true;

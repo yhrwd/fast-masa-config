@@ -1,6 +1,5 @@
 package fastui.yure.client.gui;
 
-import fastui.yure.client.shortcut.ResolvedShortcut;
 import fastui.yure.client.shortcut.ShortcutControl;
 import fastui.yure.config.FastMasaConfigs;
 import fastui.yure.config.ShortcutControlType;
@@ -24,9 +23,11 @@ public final class QuickConfigPanel {
     private static final int ACCENT = 0xFFE6397C;
     private static final int TEXT = 0xFFFFEAF2;
     private static final int MUTED = 0xFFCFA4B7;
+    private static final int TRACK = 0xFF5B3A48;
     private static final int TOGGLE_WIDTH = 30;
     private static final int TOGGLE_HEIGHT = 12;
     private static final int SLIDER_WIDTH = 48;
+    private static final int MODE_TAB_WIDTH = 54;
     private final TextRenderer textRenderer;
     private final Map<String, Double> toggleAnimation = new HashMap<>();
     private int x;
@@ -36,6 +37,9 @@ public final class QuickConfigPanel {
     private int cellWidth;
     private int settingsButtonX;
     private int settingsButtonY;
+    private int shortcutsTabX;
+    private int enabledTabX;
+    private int tabY;
     private int visibleRows = 1;
     private int columns = 1;
     private int maxScrollOffset;
@@ -54,7 +58,7 @@ public final class QuickConfigPanel {
      * 绘制快捷面板完整内容。
      * 每帧都会重新根据视窗、缩放和快捷项数量计算布局，确保窗口大小或 GUI scale 改变后不会重叠或出界。
      */
-    public void render(DrawContext context, int screenWidth, int screenHeight, int mouseX, int mouseY, List<ResolvedShortcut> shortcuts, int scrollOffset) {
+    public void render(DrawContext context, int screenWidth, int screenHeight, int mouseX, int mouseY, List<QuickPanelItem> shortcuts, int scrollOffset, PanelMode mode) {
         if (this.openedAtMillis < 0L) {
             this.openedAtMillis = System.currentTimeMillis();
         }
@@ -75,12 +79,16 @@ public final class QuickConfigPanel {
         this.y += rise;
 
         drawPanelShell(context, open);
-        context.drawText(this.textRenderer, "FAST MASA", this.x + 9, this.y + 7, TEXT, false);
-        context.drawText(this.textRenderer, "PIX", this.x + 71, this.y + 7, ACCENT, false);
+        context.drawText(this.textRenderer, "FAST", this.x + 9, this.y + 7, TEXT, false);
+        context.drawText(this.textRenderer, "UI", this.x + 35, this.y + 7, ACCENT, false);
         drawSettingsButton(context, mouseX, mouseY);
+        drawModeTabs(context, mouseX, mouseY, mode);
 
         if (shortcuts.isEmpty()) {
-            context.drawText(this.textRenderer, fitText(StringUtils.translate("fast-masa-config.gui.quick.empty"), this.width - 22), this.x + 10, this.y + 31, TEXT, false);
+            String emptyKey = mode == PanelMode.ENABLED_BOOLEANS
+                    ? "fast-masa-config.gui.quick.empty_enabled"
+                    : "fast-masa-config.gui.quick.empty";
+            context.drawText(this.textRenderer, fitText(StringUtils.translate(emptyKey), this.width - 22), this.x + 10, this.y + 31, TEXT, false);
             return;
         }
 
@@ -143,6 +151,18 @@ public final class QuickConfigPanel {
         return isInside(mouseX, mouseY, this.settingsButtonX, this.settingsButtonY, 16, 16);
     }
 
+    public PanelMode getModeAt(int mouseX, int mouseY) {
+        if (isInside(mouseX, mouseY, this.shortcutsTabX, this.tabY, MODE_TAB_WIDTH, 14)) {
+            return PanelMode.SHORTCUTS;
+        }
+
+        if (isInside(mouseX, mouseY, this.enabledTabX, this.tabY, MODE_TAB_WIDTH, 14)) {
+            return PanelMode.ENABLED_BOOLEANS;
+        }
+
+        return null;
+    }
+
     /**
      * 绘制面板外壳、半透明背景、标题分隔线和像素角标。
      * open 是打开动画进度，会同时影响透明度和外观层级。
@@ -203,11 +223,31 @@ public final class QuickConfigPanel {
         RenderUtils.drawRect(x + 9, y + 9, 2, 2, color);
     }
 
+    private void drawModeTabs(DrawContext context, int mouseX, int mouseY, PanelMode mode) {
+        this.tabY = this.y + 5;
+        this.enabledTabX = this.settingsButtonX - MODE_TAB_WIDTH - 4;
+        this.shortcutsTabX = this.enabledTabX - MODE_TAB_WIDTH - 2;
+        drawModeTab(context, this.shortcutsTabX, StringUtils.translate("fast-masa-config.gui.quick.tab.shortcuts"), mode == PanelMode.SHORTCUTS, mouseX, mouseY);
+        drawModeTab(context, this.enabledTabX, StringUtils.translate("fast-masa-config.gui.quick.tab.enabled"), mode == PanelMode.ENABLED_BOOLEANS, mouseX, mouseY);
+    }
+
+    private void drawModeTab(DrawContext context, int x, String label, boolean active, int mouseX, int mouseY) {
+        boolean hovered = isInside(mouseX, mouseY, x, this.tabY, MODE_TAB_WIDTH, 14);
+        int background = active ? HoloPanelVisuals.withAlpha(ACCENT, 0xE8)
+                : HoloPanelVisuals.withAlpha(BASE, hovered ? 0xE0 : 0x78);
+        int foreground = active || hovered ? TEXT : MUTED;
+        RenderUtils.drawRect(x, this.tabY, MODE_TAB_WIDTH, 14, background);
+        RenderUtils.drawRect(x, this.tabY, MODE_TAB_WIDTH, 1, active || hovered ? TEXT : 0x885A3040);
+        RenderUtils.drawRect(x, this.tabY + 13, MODE_TAB_WIDTH, 1, active ? ACCENT : 0x66302028);
+        String text = fitText(label, MODE_TAB_WIDTH - 6);
+        context.drawText(this.textRenderer, text, x + (MODE_TAB_WIDTH - this.textRenderer.getWidth(text)) / 2, this.tabY + 3, foreground, false);
+    }
+
     /**
      * 绘制单个快捷项。
      * 根据配置类型自动选择 toggle 或 slider，并为右侧控件预留宽度，左侧文本超出时省略。
      */
-    private void drawShortcut(DrawContext context, ResolvedShortcut shortcut, int index, int mouseX, int mouseY) {
+    private void drawShortcut(DrawContext context, QuickPanelItem shortcut, int index, int mouseX, int mouseY) {
         int cellX = getCellX(index);
         int cellY = getCellY(index);
         int cellWidth = getCellWidth();
@@ -219,27 +259,29 @@ public final class QuickConfigPanel {
 
         String label = shortcut.shortcut().labelOverride().isBlank() ? shortcut.configEntry().displayName() : shortcut.shortcut().labelOverride();
         int rightReserved = ShortcutControl.getControlType(shortcut.configEntry().config()) == ShortcutControlType.TOGGLE ? 42 : 82;
-        context.drawText(this.textRenderer, fitText(label, cellWidth - rightReserved - 12), cellX + 6, cellY + 5, hovered ? TEXT : MUTED, false);
+        String meta = shortcut.configEntry().modName() + " / " + shortcut.configEntry().groupName();
+        context.drawText(this.textRenderer, fitText(label, cellWidth - rightReserved - 12), cellX + 6, cellY + 4, hovered ? TEXT : MUTED, false);
+        context.drawText(this.textRenderer, fitText(meta, cellWidth - rightReserved - 12), cellX + 6, cellY + 15, 0xAA8F6676, false);
 
         if (ShortcutControl.getControlType(shortcut.configEntry().config()) == ShortcutControlType.TOGGLE) {
-            drawToggle(context, shortcut, cellX + cellWidth - TOGGLE_WIDTH - 6, cellY + 3, hovered);
+            drawToggle(context, shortcut, cellX + cellWidth - TOGGLE_WIDTH - 6, cellY + 7, hovered);
             return;
         }
 
         int sliderX = getSliderX(cellX, cellWidth);
-        int sliderY = cellY + 13;
+        int sliderY = cellY + QuickPanelLayout.ROW_HEIGHT / 2 + 2;
         double ratio = ShortcutControl.getSliderRatio(shortcut.configEntry().config());
-        RenderUtils.drawRect(sliderX, sliderY, SLIDER_WIDTH, 3, 0x661A1A1D);
+        RenderUtils.drawRect(sliderX, sliderY, SLIDER_WIDTH, 3, TRACK);
         RenderUtils.drawRect(sliderX, sliderY, (int) Math.round(SLIDER_WIDTH * ratio), 3, ACCENT);
         RenderUtils.drawRect(sliderX + (int) Math.round(SLIDER_WIDTH * ratio) - 1, sliderY - 2, 3, 7, TEXT);
-        context.drawText(this.textRenderer, fitText(ShortcutControl.getValueText(shortcut.configEntry().config()), 28), sliderX - 32, cellY + 5, MUTED, false);
+        context.drawText(this.textRenderer, fitText(ShortcutControl.getValueText(shortcut.configEntry().config()), 28), sliderX - 32, cellY + 9, MUTED, false);
     }
 
     /**
      * 绘制布尔配置的开关控件。
      * toggleAnimation 按快捷项 manualId 缓存动画进度，避免开关状态变化时突兀跳动。
      */
-    private void drawToggle(DrawContext context, ResolvedShortcut shortcut, int x, int y, boolean hovered) {
+    private void drawToggle(DrawContext context, QuickPanelItem shortcut, int x, int y, boolean hovered) {
         boolean enabled = ShortcutControl.getBooleanValue(shortcut.configEntry().config());
         String key = shortcut.shortcut().manualId();
         double current = this.toggleAnimation.getOrDefault(key, enabled ? 1.0 : 0.0);
@@ -353,5 +395,10 @@ public final class QuickConfigPanel {
      */
     private boolean isInside(int mouseX, int mouseY, int x, int y, int width, int height) {
         return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+    }
+
+    public enum PanelMode {
+        SHORTCUTS,
+        ENABLED_BOOLEANS
     }
 }
