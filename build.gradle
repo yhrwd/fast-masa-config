@@ -21,6 +21,12 @@ repositories {
 loom {
 	splitEnvironmentSourceSets()
 
+	runs {
+		client {
+			runDir = "run/version/1.21"
+		}
+	}
+
 	mods {
 		"fast-masa-config" {
 			sourceSet sourceSets.main
