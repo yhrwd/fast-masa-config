@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ShortcutConfigStoreTest {
@@ -91,5 +92,17 @@ class ShortcutConfigStoreTest {
         ShortcutConfigStore.replaceWithManualIds(List.of("minihud:fontScale", "minihud:fontScale", "minihud/Renderer/fontScale"));
 
         assertEquals(List.of("minihud:fontScale", "minihud/Renderer/fontScale"), ShortcutConfigStore.toManualIds());
+    }
+
+    @Test
+    void movesShortcutWithinStoreBounds() {
+        ShortcutConfigStore.clear();
+        ShortcutConfigStore.add(ShortcutEntry.fromManualId("tweakeroo:fastBlockPlacement"));
+        ShortcutConfigStore.add(ShortcutEntry.fromManualId("minihud:fontScale"));
+
+        assertTrue(ShortcutConfigStore.move(1, -1));
+        assertEquals(List.of("minihud:fontScale", "tweakeroo:fastBlockPlacement"), ShortcutConfigStore.toManualIds());
+        assertFalse(ShortcutConfigStore.move(0, -1));
+        assertFalse(ShortcutConfigStore.move(1, 1));
     }
 }

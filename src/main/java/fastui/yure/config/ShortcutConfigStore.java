@@ -31,6 +31,17 @@ public final class ShortcutConfigStore {
         }
     }
 
+    public static boolean move(int index, int offset) {
+        int targetIndex = index + offset;
+
+        if (index < 0 || index >= ENTRIES.size() || targetIndex < 0 || targetIndex >= ENTRIES.size()) {
+            return false;
+        }
+
+        Collections.swap(ENTRIES, index, targetIndex);
+        return true;
+    }
+
     public static boolean containsTarget(String modId, String groupId, String configName) {
         return ENTRIES.stream().anyMatch(entry -> entry.isSameTarget(modId, groupId, configName));
     }
