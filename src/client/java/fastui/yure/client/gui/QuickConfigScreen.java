@@ -104,6 +104,13 @@ public final class QuickConfigScreen extends Screen {
         int x = (int) mouseX;
         int y = (int) mouseY;
 
+        if (isOpeningMouseHotkeyPress(FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue(),
+                FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys(), button)
+                && this.isOpenHotkeyPressedAgain(button - 100)) {
+            this.close();
+            return true;
+        }
+
         if (this.panel.isSettingsButtonHovered(x, y)) {
             // 人手松开热键有延迟，进入全屏 UI 时先记录仍按住的打开键，交给全屏页吞掉首轮输入。
             this.client.setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes()));
@@ -325,6 +332,13 @@ public final class QuickConfigScreen extends Screen {
         }
 
         return true;
+    }
+
+    /**
+     * MaLiLib 使用 button - 100 表示鼠标按键。
+     */
+    static boolean isOpeningMouseHotkeyPress(boolean releaseToClose, List<Integer> openingHotkeyCodes, int button) {
+        return releaseToClose == false && openingHotkeyCodes.contains(button - 100);
     }
 
     /**

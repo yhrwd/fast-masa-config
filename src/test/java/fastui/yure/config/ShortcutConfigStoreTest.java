@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ShortcutConfigStoreTest {
@@ -25,6 +26,13 @@ class ShortcutConfigStoreTest {
         assertEquals("minihud", entry.modId());
         assertEquals("", entry.groupId());
         assertEquals("fontScale", entry.configName());
+    }
+
+    @Test
+    void serializesNullIdentityFieldsWithoutThrowing() {
+        ShortcutEntry entry = new ShortcutEntry(null, null, null, "", ShortcutControlType.TOGGLE, 1.0, null, null);
+
+        assertEquals(":", entry.manualId());
     }
 
     @Test
@@ -77,20 +85,28 @@ class ShortcutConfigStoreTest {
     }
 
     @Test
-    void ignoresDuplicateTargetsWhenAddingOrReplacing() {
+    void allowsSameConfigNameInDifferentGroupsAndRemovesIndependently() {
         ShortcutConfigStore.clear();
         ShortcutEntry first = new ShortcutEntry("tweakeroo", "Generic", "fastBlockPlacement", "First", ShortcutControlType.TOGGLE, 1.0, null, null);
-        ShortcutEntry duplicate = new ShortcutEntry("tweakeroo", "Hotkeys", "fastBlockPlacement", "Duplicate", ShortcutControlType.SLIDER, 0.05, null, null);
+        ShortcutEntry secondGroup = new ShortcutEntry("tweakeroo", "Hotkeys", "fastBlockPlacement", "Second", ShortcutControlType.SLIDER, 0.05, null, null);
 
-        ShortcutConfigStore.add(first);
-        ShortcutConfigStore.add(duplicate);
+        assertTrue(ShortcutConfigStore.add(first));
+        assertTrue(ShortcutConfigStore.add(secondGroup));
 
-        assertEquals(1, ShortcutConfigStore.getEntries().size());
+        assertEquals(2, ShortcutConfigStore.getEntries().size());
         assertEquals("First", ShortcutConfigStore.getEntries().getFirst().labelOverride());
+        assertTrue(ShortcutConfigStore.containsTarget("tweakeroo", "Hotkeys", "fastBlockPlacement"));
 
         ShortcutConfigStore.replaceWithManualIds(List.of("minihud:fontScale", "minihud:fontScale", "minihud/Renderer/fontScale"));
 
-        assertEquals(List.of("minihud:fontScale"), ShortcutConfigStore.toManualIds());
+        assertEquals(List.of("minihud:fontScale", "minihud/Renderer/fontScale"), ShortcutConfigStore.toManualIds());
+
+        ShortcutConfigStore.add(first);
+        ShortcutConfigStore.add(secondGroup);
+        ShortcutConfigStore.removeTarget("tweakeroo", "Generic", "fastBlockPlacement");
+
+        assertFalse(ShortcutConfigStore.containsTarget("tweakeroo", "Generic", "fastBlockPlacement"));
+        assertTrue(ShortcutConfigStore.containsTarget("tweakeroo", "Hotkeys", "fastBlockPlacement"));
     }
 
     @Test

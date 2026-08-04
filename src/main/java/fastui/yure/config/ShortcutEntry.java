@@ -3,6 +3,8 @@ package fastui.yure.config;
 import com.google.gson.JsonObject;
 import fi.dy.masa.malilib.util.JsonUtils;
 
+import java.util.Objects;
+
 public record ShortcutEntry(
         String modId,
         String groupId,
@@ -36,11 +38,16 @@ public record ShortcutEntry(
     }
 
     public boolean isSameTarget(String modId, String groupId, String configName) {
-        return this.modId.equals(modId) && this.configName.equals(configName);
+        return Objects.equals(this.modId, modId)
+                && Objects.equals(this.groupId, groupId)
+                && Objects.equals(this.configName, configName);
     }
 
     public String manualId() {
-        return this.groupId.isBlank() ? this.modId + ":" + this.configName : this.modId + "/" + this.groupId + "/" + this.configName;
+        String modId = Objects.requireNonNullElse(this.modId, "");
+        String groupId = Objects.requireNonNullElse(this.groupId, "");
+        String configName = Objects.requireNonNullElse(this.configName, "");
+        return groupId.isBlank() ? modId + ":" + configName : modId + "/" + groupId + "/" + configName;
     }
 
     public JsonObject toJson() {

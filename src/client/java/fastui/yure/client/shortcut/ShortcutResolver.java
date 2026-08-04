@@ -6,6 +6,7 @@ import fastui.yure.config.ShortcutEntry;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 public final class ShortcutResolver {
@@ -24,19 +25,17 @@ public final class ShortcutResolver {
     }
 
     public static Optional<ConfigIndexEntry> find(List<ConfigIndexEntry> index, ShortcutEntry shortcut) {
-        Optional<ConfigIndexEntry> exactGroup = index.stream()
-                .filter(entry -> entry.modId().equals(shortcut.modId()))
-                .filter(entry -> entry.groupId().equals(shortcut.groupId()))
-                .filter(entry -> entry.configName().equals(shortcut.configName()))
-                .findFirst();
-
-        if (exactGroup.isPresent()) {
-            return exactGroup;
+        if (shortcut.groupId() == null || shortcut.groupId().isBlank()) {
+            List<ConfigIndexEntry> matches = index.stream()
+                    .filter(entry -> Objects.equals(entry.modId(), shortcut.modId()))
+                    .filter(entry -> Objects.equals(entry.configName(), shortcut.configName()))
+                    .limit(2)
+                    .toList();
+            return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();
         }
 
         return index.stream()
-                .filter(entry -> entry.modId().equals(shortcut.modId()))
-                .filter(entry -> entry.configName().equals(shortcut.configName()))
+                .filter(entry -> shortcut.isSameTarget(entry.modId(), entry.groupId(), entry.configName()))
                 .findFirst();
     }
 }

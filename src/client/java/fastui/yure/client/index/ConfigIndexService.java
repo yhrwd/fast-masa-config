@@ -9,6 +9,7 @@ import fi.dy.masa.malilib.gui.GuiConfigsBase;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public final class ConfigIndexService {
     private static List<ConfigIndexEntry> cachedEntries;
@@ -57,14 +58,22 @@ public final class ConfigIndexService {
         for (GuiConfigsBase.ConfigOptionWrapper wrapper : wrappers) {
             IConfigBase config = wrapper.getConfig();
 
-            if (config != null && isSupported(config) && containsIndexedTarget(result, source.modId(), config.getName()) == false) {
+            if (config != null && isSupported(config)
+                    && containsIndexedTarget(result, source.modId(), groupId, config.getName()) == false) {
                 result.add(new ConfigIndexEntry(source.modId(), source.modName(), groupId, groupName, config.getName(), getDisplayName(config), config));
             }
         }
     }
 
-    private static boolean containsIndexedTarget(List<ConfigIndexEntry> result, String modId, String configName) {
-        return result.stream().anyMatch(entry -> entry.modId().equals(modId) && entry.configName().equals(configName));
+    private static boolean containsIndexedTarget(List<ConfigIndexEntry> result, String modId, String groupId, String configName) {
+        return result.stream().anyMatch(entry -> hasSameConfigIdentity(entry, modId, groupId, configName));
+    }
+
+    static boolean hasSameConfigIdentity(ConfigIndexEntry entry, String modId, String groupId, String configName) {
+        return entry != null
+                && Objects.equals(entry.modId(), modId)
+                && Objects.equals(entry.groupId(), groupId)
+                && Objects.equals(entry.configName(), configName);
     }
 
     public static boolean isSupported(IConfigBase config) {

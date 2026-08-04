@@ -46,6 +46,7 @@ import net.minecraft.util.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -87,6 +88,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private ConfigButtonKeybind openQuickConfigButton;
     private ButtonGeneric hotkeySettingsButton;
     private IConfigBase activeNumericSliderConfig;
+    private KeybindSettings lastObservedOpenQuickConfigSettings;
+    private String activeKeybindValueBeforeCapture;
 
     private List<IConfigBase> filteredGenericConfigs = List.of();
     private List<ConfigIndexEntry> filteredConfigs = List.of();
@@ -131,6 +134,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.createTabButtons();
         this.createTabInputs();
         this.refreshVisibleRows();
+        this.observeOpenQuickConfigSettings();
     }
 
     @Override
@@ -217,7 +221,6 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
         if (this.activeKeybindButton != null) {
             this.activeKeybindButton.onKeyPressed(keyCode);
-            this.notifyOwnConfigChanged(true);
             return true;
         }
 
@@ -243,11 +246,6 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     public void removed() {
         if (this.activeKeybindButton != null) {
             this.setActiveKeybindButton(null);
-        }
-
-        if (this.dirtyListener.isDirty()) {
-            this.notifyOwnConfigChanged(true);
-            this.dirtyListener.resetDirty();
         }
 
         super.removed();
@@ -312,13 +310,17 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     public void setActiveKeybindButton(@Nullable ConfigButtonKeybind button) {
         if (this.activeKeybindButton != null) {
             this.activeKeybindButton.onClearSelection();
-            this.updateKeybindButtons();
         }
 
+        ConfigButtonKeybind previousButton = this.activeKeybindButton;
         this.activeKeybindButton = button;
 
         if (this.activeKeybindButton != null) {
+            this.activeKeybindValueBeforeCapture = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind()
+                    .getStringValue();
             this.activeKeybindButton.onSelected();
+        } else if (previousButton != null) {
+            this.flushPendingKeybindChange();
         }
     }
 
@@ -454,9 +456,11 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             if (mouseButton == 1) {
                 FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().resetSettingsToDefaults();
                 this.notifyOwnConfigChanged(true);
+                this.lastObservedOpenQuickConfigSettings = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind()
+                        .getSettings();
             } else {
                 GuiBase.openGui(new GuiKeybindSettings(FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind(),
-                        FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getName(), null, GuiUtils.getCurrentScreen()));
+                        FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getName(), null, this));
             }
         });
     }
@@ -923,6 +927,42 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             InputEventHandler.getKeybindManager().updateUsedKeys();
             this.updateKeybindButtons();
         }
+    }
+
+    private void flushPendingKeybindChange() {
+        String currentValue = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getStringValue();
+        boolean changed = shouldCommitKeybindCapture(this.activeKeybindValueBeforeCapture, currentValue, true);
+        this.activeKeybindValueBeforeCapture = null;
+
+        if (changed) {
+            this.notifyOwnConfigChanged(true);
+        }
+
+        this.dirtyListener.resetDirty();
+    }
+
+    static boolean shouldCommitKeybindCapture(String initialValue, String currentValue, boolean captureEnded) {
+        return captureEnded && Objects.equals(initialValue, currentValue) == false;
+    }
+
+    private void observeOpenQuickConfigSettings() {
+        KeybindSettings currentSettings = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getSettings();
+        if (hasOpenQuickConfigSettingsChanged(this.lastObservedOpenQuickConfigSettings, currentSettings)) {
+            this.notifyOwnConfigChanged(true);
+        }
+        this.lastObservedOpenQuickConfigSettings = currentSettings;
+    }
+
+    static boolean hasOpenQuickConfigSettingsChanged(KeybindSettings previousSettings,
+            KeybindSettings currentSettings) {
+        return previousSettings != null && currentSettings != null
+                && (previousSettings.getContext() != currentSettings.getContext()
+                        || previousSettings.getActivateOn() != currentSettings.getActivateOn()
+                        || previousSettings.getAllowEmpty() != currentSettings.getAllowEmpty()
+                        || previousSettings.getAllowExtraKeys() != currentSettings.getAllowExtraKeys()
+                        || previousSettings.isOrderSensitive() != currentSettings.isOrderSensitive()
+                        || previousSettings.isExclusive() != currentSettings.isExclusive()
+                        || previousSettings.shouldCancel() != currentSettings.shouldCancel());
     }
 
     private void updateKeybindButtons() {
