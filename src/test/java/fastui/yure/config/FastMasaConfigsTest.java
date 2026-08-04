@@ -4,6 +4,8 @@ import fi.dy.masa.malilib.config.ConfigType;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.IConfigDouble;
 import fi.dy.masa.malilib.config.IConfigInteger;
+import fi.dy.masa.malilib.hotkeys.KeyAction;
+import fi.dy.masa.malilib.hotkeys.KeybindSettings;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -30,6 +32,16 @@ class FastMasaConfigsTest {
     @Test
     void registersQuickOverlayHotkeyForKeybindManager() {
         assertTrue(FastMasaConfigs.Generic.HOTKEY_LIST.contains(FastMasaConfigs.Generic.OPEN_QUICK_CONFIG));
+    }
+
+    @Test
+    void configuresQuickOverlayHotkeyForInGamePressesWithExtraKeysInOrder() {
+        KeybindSettings settings = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getSettings();
+
+        assertEquals(KeybindSettings.Context.INGAME, settings.getContext());
+        assertEquals(KeyAction.PRESS, settings.getActivateOn());
+        assertTrue(settings.getAllowExtraKeys());
+        assertTrue(settings.isOrderSensitive());
     }
 
     @Test

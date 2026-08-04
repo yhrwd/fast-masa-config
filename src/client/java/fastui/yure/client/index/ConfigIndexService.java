@@ -58,12 +58,16 @@ public final class ConfigIndexService {
             IConfigBase config = wrapper.getConfig();
 
             if (config != null && isSupported(config)) {
-                boolean exists = result.stream().anyMatch(entry -> entry.modId().equals(source.modId()) && entry.configName().equals(config.getName()));
+                boolean exists = result.stream().anyMatch(entry -> hasSameConfigIdentity(entry, source.modId(), groupId, config.getName()));
                 if (exists == false) {
                     result.add(new ConfigIndexEntry(source.modId(), source.modName(), groupId, groupName, config.getName(), getDisplayName(config), config));
                 }
             }
         }
+    }
+
+    static boolean hasSameConfigIdentity(ConfigIndexEntry entry, String modId, String groupId, String configName) {
+        return entry.modId().equals(modId) && entry.groupId().equals(groupId) && entry.configName().equals(configName);
     }
 
     public static boolean isSupported(IConfigBase config) {

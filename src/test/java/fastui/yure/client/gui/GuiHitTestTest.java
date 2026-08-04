@@ -13,4 +13,10 @@ class GuiHitTestTest {
         assertFalse(GuiHitTest.contains(10, 10, 20, 20, 30, 29));
         assertFalse(GuiHitTest.contains(10, 10, 20, 20, 29, 30));
     }
+
+    @Test
+    void containsIncludesLastRowPixelAndExcludesFirstPixelBelowRect() {
+        assertTrue(GuiHitTest.contains(12, 80, 300, 30, 12, 109));
+        assertFalse(GuiHitTest.contains(12, 80, 300, 30, 12, 110));
+    }
 }

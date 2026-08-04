@@ -7,7 +7,7 @@ version = project.mod_version
 group = project.maven_group
 
 base {
-	archivesName = "${project.name}-fabric-${project.minecraft_version}"
+	archivesName = "${project.name}-fabric"
 }
 
 repositories {

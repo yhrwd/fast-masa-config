@@ -14,6 +14,10 @@ import fastui.yure.config.ShortcutEntry;
 import fi.dy.masa.malilib.config.ConfigManager;
 import fi.dy.masa.malilib.config.ConfigType;
 import fi.dy.masa.malilib.config.IConfigBase;
+import fi.dy.masa.malilib.config.IConfigBoolean;
+import fi.dy.masa.malilib.config.IConfigDouble;
+import fi.dy.masa.malilib.config.IConfigInteger;
+import fi.dy.masa.malilib.config.IConfigResettable;
 import fi.dy.masa.malilib.config.IConfigStringList;
 import fi.dy.masa.malilib.config.IStringRepresentable;
 import fi.dy.masa.malilib.config.gui.ButtonPressDirtyListenerSimple;
@@ -44,7 +48,9 @@ import net.minecraft.util.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.ToIntFunction;
 
 /** 1.21.1 的完整配置页，使用 MaLiLib 0.21.10 的 GuiBase 控件生命周期。 */
 public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGui {
@@ -55,6 +61,10 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private static final int ROW_HEIGHT = 30;
     private static final int ROW_GAP = 3;
     private static final int BUTTON_HEIGHT = 20;
+    private static final int NUMERIC_VALUE_WIDTH = 50;
+    private static final int NUMERIC_SLIDER_WIDTH = 68;
+    private static final int NUMERIC_RESET_WIDTH = 54;
+    private static final int NUMERIC_CONTROL_WIDTH = NUMERIC_VALUE_WIDTH + 6 + NUMERIC_SLIDER_WIDTH + 6 + NUMERIC_RESET_WIDTH;
     private static ConfigGuiTab tab = ConfigGuiTab.GENERIC;
 
     private final HeldKeyInputSuppressor inputSuppressor;
@@ -67,6 +77,9 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private ConfigButtonKeybind openQuickConfigButton;
     private ConfigButtonKeybind activeKeybindButton;
     private ButtonGeneric hotkeySettingsButton;
+    private KeybindSettings lastObservedOpenQuickConfigSettings;
+    private String activeKeybindValueBeforeCapture;
+    private IConfigBase activeNumericSliderConfig;
     private IConfigBase selectedGenericConfig;
     private FilterMode filterMode = FilterMode.ALL;
     private String selectedModId = "";
@@ -99,6 +112,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.createTabs();
         this.createToolbar();
         this.refreshRows();
+        this.observeOpenQuickConfigSettings();
     }
 
     @Override
@@ -108,12 +122,18 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     @Override
     public boolean onMouseClicked(int mouseX, int mouseY, int button) {
-        if (super.onMouseClicked(mouseX, mouseY, button)) {
+        boolean handled = super.onMouseClicked(mouseX, mouseY, button);
+
+        if (this.activeKeybindButton != null && this.activeKeybindButton.isMouseOver(mouseX, mouseY) == false) {
+            this.finishActiveKeybindCapture();
+        }
+
+        if (handled) {
             return true;
         }
 
         if (this.activeKeybindButton != null) {
-            this.setActiveKeybindButton(null);
+            this.finishActiveKeybindCapture();
             return true;
         }
 
@@ -124,10 +144,26 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         }
 
         return switch (tab) {
-            case GENERIC -> this.selectGenericRow(rowIndex);
+            case GENERIC -> this.handleGenericClick(rowIndex, (int) mouseX, (int) mouseY);
             case SHORTCUTS -> this.handleShortcutClick(rowIndex, (int) mouseX, (int) mouseY);
             case ALL_CONFIGS -> this.handleAllConfigsClick(rowIndex, (int) mouseX, (int) mouseY);
         };
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        if (this.activeNumericSliderConfig != null) {
+            this.applyNumericSliderValue(this.activeNumericSliderConfig, (int) mouseX);
+            return true;
+        }
+
+        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        this.activeNumericSliderConfig = null;
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
@@ -156,7 +192,6 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
         if (this.activeKeybindButton != null) {
             this.activeKeybindButton.onKeyPressed(keyCode);
-            this.notifyOwnConfigChanged(true);
             return true;
         }
 
@@ -185,14 +220,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     @Override
     public void removed() {
-        if (this.activeKeybindButton != null) {
-            this.setActiveKeybindButton(null);
-        }
-
-        if (this.dirtyListener.isDirty()) {
-            this.notifyOwnConfigChanged(true);
-            this.dirtyListener.resetDirty();
-        }
+        this.finishActiveKeybindCapture();
 
         super.removed();
     }
@@ -208,6 +236,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                 tab = value;
                 this.scrollOffset = 0;
                 this.selectedGenericConfig = null;
+                this.filterMode = normalizeFilterMode(tab == ConfigGuiTab.SHORTCUTS, this.filterMode);
                 this.initGui();
             });
             x += button.getWidth() + 4;
@@ -234,7 +263,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
         int x = MARGIN + searchWidth + 6;
         this.addButton(new ButtonGeneric(x, TOOLBAR_Y, filterWidth, BUTTON_HEIGHT, this.filterLabel()), (ignored, mouseButton) -> {
-            this.filterMode = this.filterMode.next();
+            this.filterMode = nextFilterMode(tab == ConfigGuiTab.SHORTCUTS, this.filterMode);
             this.scrollOffset = 0;
             this.refreshRows();
             this.initGui();
@@ -292,7 +321,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int keybindWidth = Math.max(80, Math.min(150, this.width - controlX - MARGIN - 24));
         this.openQuickConfigButton = new ConfigButtonKeybind(controlX, -1000, keybindWidth, BUTTON_HEIGHT,
                 FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind(), this);
-        this.hotkeySettingsButton = new ButtonGeneric(controlX + keybindWidth + 4, -1000, 20, BUTTON_HEIGHT, "...");
+        this.hotkeySettingsButton = new HotkeySettingsButton(controlX + keybindWidth + 4, -1000, 20, BUTTON_HEIGHT,
+                FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind());
         this.hotkeySettingsButton.setHoverStrings("fast-masa-config.gui.full.hotkey_settings.hover");
         this.addKeybindChangeListener(this.openQuickConfigButton::updateDisplayString);
         this.addButton(this.openQuickConfigButton, this.dirtyListener);
@@ -300,6 +330,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             if (mouseButton == 1) {
                 FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().resetSettingsToDefaults();
                 this.notifyOwnConfigChanged(true);
+                this.lastObservedOpenQuickConfigSettings = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getSettings();
             } else {
                 GuiBase.openGui(new GuiKeybindSettings(FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind(),
                         FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getName(), null, this));
@@ -374,7 +405,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     @Override
     public void clearOptions() {
-        this.setActiveKeybindButton(null);
+        this.finishActiveKeybindCapture();
         this.keybindChangeListeners.clear();
     }
 
@@ -402,14 +433,39 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     public void setActiveKeybindButton(ConfigButtonKeybind button) {
         if (this.activeKeybindButton != null) {
             this.activeKeybindButton.onClearSelection();
-            this.updateKeybindButtons();
         }
 
+        ConfigButtonKeybind previousButton = this.activeKeybindButton;
         this.activeKeybindButton = button;
 
         if (this.activeKeybindButton != null) {
+            this.activeKeybindValueBeforeCapture = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getStringValue();
             this.activeKeybindButton.onSelected();
+        } else if (previousButton != null) {
+            this.flushPendingKeybindChange();
         }
+    }
+
+    private void finishActiveKeybindCapture() {
+        if (this.activeKeybindButton != null) {
+            this.setActiveKeybindButton(null);
+        }
+    }
+
+    private void flushPendingKeybindChange() {
+        String currentValue = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getStringValue();
+        boolean changed = shouldCommitKeybindCapture(this.activeKeybindValueBeforeCapture, currentValue, false, true);
+        this.activeKeybindValueBeforeCapture = null;
+
+        if (changed) {
+            this.notifyOwnConfigChanged(true);
+        }
+
+        this.dirtyListener.resetDirty();
+    }
+
+    static boolean shouldCommitKeybindCapture(String initialValue, String currentValue, boolean dirty, boolean captureEnded) {
+        return captureEnded && Objects.equals(initialValue, currentValue) == false;
     }
 
     private void notifyOwnConfigChanged(boolean updateHotkeys) {
@@ -419,6 +475,24 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             InputEventHandler.getKeybindManager().updateUsedKeys();
             this.updateKeybindButtons();
         }
+    }
+
+    private void observeOpenQuickConfigSettings() {
+        KeybindSettings currentSettings = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getSettings();
+        if (hasOpenQuickConfigSettingsChanged(this.lastObservedOpenQuickConfigSettings, currentSettings)) {
+            this.notifyOwnConfigChanged(true);
+        }
+        this.lastObservedOpenQuickConfigSettings = currentSettings;
+    }
+
+    static boolean hasOpenQuickConfigSettingsChanged(KeybindSettings previousSettings, KeybindSettings currentSettings) {
+        return previousSettings != null && (previousSettings.getContext() != currentSettings.getContext()
+                || previousSettings.getActivateOn() != currentSettings.getActivateOn()
+                || previousSettings.getAllowEmpty() != currentSettings.getAllowEmpty()
+                || previousSettings.getAllowExtraKeys() != currentSettings.getAllowExtraKeys()
+                || previousSettings.isOrderSensitive() != currentSettings.isOrderSensitive()
+                || previousSettings.isExclusive() != currentSettings.isExclusive()
+                || previousSettings.shouldCancel() != currentSettings.shouldCancel());
     }
 
     private void updateKeybindButtons() {
@@ -453,23 +527,66 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             context.fill(MARGIN, y, MARGIN + 2, y + ROW_HEIGHT, hovered ? 0xFFE6397C : 0xFF6A344B);
 
             switch (tab) {
-                case GENERIC -> this.drawGenericRow(context, this.genericRows.get(index), y);
+                case GENERIC -> this.drawGenericRow(context, this.genericRows.get(index), y, mouseX, mouseY);
                 case SHORTCUTS -> this.drawShortcutRow(context, this.shortcutRows.get(index), y, mouseX, mouseY);
                 case ALL_CONFIGS -> this.drawAllConfigRow(context, this.allConfigRows.get(index), y, mouseX, mouseY);
             }
         }
     }
 
-    private void drawGenericRow(DrawContext context, IConfigBase config, int y) {
+    private void drawGenericRow(DrawContext context, IConfigBase config, int y, int mouseX, int mouseY) {
         String name = config.getConfigGuiDisplayName();
         String value = this.configValue(config);
-        context.drawTextWithShadow(this.textRenderer, name == null ? config.getName() : name, MARGIN + 8, y + 5, 0xFFFFFF);
-        context.drawTextWithShadow(this.textRenderer, this.fit(config.getComment(), this.width - MARGIN * 2 - 16), MARGIN + 8,
-                y + 18, 0xCFA4B7);
-        if (config.getType() != ConfigType.HOTKEY) {
+        int textWidth = genericControlKind(config) == GenericControlKind.NONE && config != FastMasaConfigs.Generic.OPEN_QUICK_CONFIG
+                ? this.width - MARGIN * 2 - 16
+                : this.getGenericControlX() - MARGIN - 16;
+        context.drawTextWithShadow(this.textRenderer, this.fit(name == null ? config.getName() : name, textWidth), MARGIN + 8, y + 5,
+                0xFFFFFF);
+        context.drawTextWithShadow(this.textRenderer, this.fit(config.getComment(), textWidth), MARGIN + 8, y + 18, 0xCFA4B7);
+        if (config == FastMasaConfigs.Generic.OPEN_QUICK_CONFIG) {
+            this.updateOpenQuickConfigButtonPosition();
+        } else if (genericControlKind(config) != GenericControlKind.NONE) {
+            this.drawGenericControl(context, config, this.getGenericControlX(), y + 5, mouseX, mouseY);
+        } else {
             context.drawTextWithShadow(this.textRenderer, this.fit(value, 130), this.width - MARGIN - 138, y + 10,
                     0xFFFFFF);
         }
+    }
+
+    private void drawGenericControl(DrawContext context, IConfigBase config, int x, int y, int mouseX, int mouseY) {
+        switch (genericControlKind(config)) {
+            case BOOLEAN -> {
+                BooleanControlLayout layout = booleanControlLayout(this.width);
+                boolean enabled = ((IConfigBoolean) config).getBooleanValue();
+                this.drawAction(context, layout.controlX(), y, layout.toggleWidth(), enabled ? "ON" : "OFF", mouseX, mouseY);
+                this.drawAction(context, layout.resetX(), y, layout.resetWidth(),
+                        StringUtils.translate("malilib.gui.button.reset.caps"), mouseX, mouseY);
+            }
+            case INTEGER -> this.drawNumericControl(context, config, x, y,
+                    Integer.toString(((IConfigInteger) config).getIntegerValue()), this.getIntegerRatio((IConfigInteger) config),
+                    mouseX, mouseY);
+            case DOUBLE -> this.drawNumericControl(context, config, x, y,
+                    String.format(Locale.ROOT, "%.2f", ((IConfigDouble) config).getDoubleValue()), this.getDoubleRatio((IConfigDouble) config),
+                    mouseX, mouseY);
+            case NONE -> {
+            }
+        }
+    }
+
+    private void drawNumericControl(DrawContext context, IConfigBase config, int x, int y, String value, double ratio,
+            int mouseX, int mouseY) {
+        NumericControlLayout layout = numericControlLayout(this.width);
+        context.fill(x, y, x + layout.valueWidth(), y + BUTTON_HEIGHT, 0xFF161616);
+        context.drawTextWithShadow(this.textRenderer, this.fit(value, layout.valueWidth() - 8), x + 4, y + 6, 0xFFFFFF);
+        int fillWidth = (int) Math.round(layout.sliderWidth() * clampRatio(ratio));
+        context.fill(layout.sliderX(), y + BUTTON_HEIGHT / 2 - 1, layout.sliderX() + layout.sliderWidth(), y + BUTTON_HEIGHT / 2 + 2,
+                GuiHitTest.contains(layout.sliderX(), y, layout.sliderWidth(), BUTTON_HEIGHT, mouseX, mouseY) ? 0xFF404040 : 0xFF2A2A2A);
+        context.fill(layout.sliderX(), y + BUTTON_HEIGHT / 2 - 1, layout.sliderX() + fillWidth, y + BUTTON_HEIGHT / 2 + 2, 0xFFE6397C);
+        int knobX = layout.sliderX() + Math.max(0, fillWidth - 2);
+        int knobWidth = Math.min(4, Math.max(0, layout.right() - knobX));
+        context.fill(knobX, y + 3, knobX + knobWidth, y + BUTTON_HEIGHT - 3, 0xFFFFFFFF);
+        this.drawAction(context, layout.resetX(), y, layout.resetWidth(),
+                StringUtils.translate("malilib.gui.button.reset.caps"), mouseX, mouseY);
     }
 
     private void drawShortcutRow(DrawContext context, ShortcutRow row, int y, int mouseX, int mouseY) {
@@ -499,18 +616,77 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int background = label.equals("-") ? 0xFF5A2525 : 0xFF303030;
         boolean hovered = GuiHitTest.contains(x, y, width, BUTTON_HEIGHT, mouseX, mouseY);
         context.fill(x, y, x + width, y + BUTTON_HEIGHT, hovered ? lighten(background) : background);
-        context.drawCenteredTextWithShadow(this.textRenderer, label, x + width / 2, y + 6, 0xFFFFFF);
+        context.drawCenteredTextWithShadow(this.textRenderer, this.fit(label, width - 6), x + width / 2, y + 6, 0xFFFFFF);
     }
 
-    private boolean selectGenericRow(int rowIndex) {
+    private boolean handleGenericClick(int rowIndex, int mouseX, int mouseY) {
         IConfigBase config = this.genericRows.get(rowIndex);
         if (config instanceof IHotkey) {
             return false;
         }
 
+        int y = LIST_Y + (rowIndex - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP) + 5;
+        int controlX = this.getGenericControlX();
+        if (config instanceof IConfigBoolean booleanConfig) {
+            BooleanControlLayout layout = booleanControlLayout(this.width);
+            if (GuiHitTest.contains(layout.controlX(), y, layout.toggleWidth(), BUTTON_HEIGHT, mouseX, mouseY)) {
+                booleanConfig.setBooleanValue(booleanConfig.getBooleanValue() == false);
+                this.afterInlineGenericConfigChanged();
+                return true;
+            }
+            if (this.resetGenericConfig(config, layout.resetX(), y, mouseX, mouseY, layout.resetWidth())) {
+                return true;
+            }
+        } else if (config instanceof IConfigInteger || config instanceof IConfigDouble) {
+            NumericControlLayout layout = numericControlLayout(this.width);
+            if (GuiHitTest.contains(layout.sliderX(), y, layout.sliderWidth(), BUTTON_HEIGHT, mouseX, mouseY)) {
+                this.activeNumericSliderConfig = config;
+                this.applyNumericSliderValue(config, mouseX);
+                return true;
+            }
+            if (this.resetGenericConfig(config, layout.resetX(), y, mouseX, mouseY, layout.resetWidth())) {
+                return true;
+            }
+        }
+
         this.selectedGenericConfig = config;
         this.initGui();
         return true;
+    }
+
+    private boolean resetGenericConfig(IConfigBase config, int x, int y, int mouseX, int mouseY) {
+        return this.resetGenericConfig(config, x, y, mouseX, mouseY, 54);
+    }
+
+    private boolean resetGenericConfig(IConfigBase config, int x, int y, int mouseX, int mouseY, int width) {
+        if (GuiHitTest.contains(x, y, width, BUTTON_HEIGHT, mouseX, mouseY)
+                && config instanceof IConfigResettable resettable && resettable.isModified()) {
+            resettable.resetToDefault();
+            this.afterInlineGenericConfigChanged();
+            return true;
+        }
+        return false;
+    }
+
+    private void applyNumericSliderValue(IConfigBase config, int mouseX) {
+        NumericControlLayout layout = numericControlLayout(this.width);
+        double ratio = layout.sliderWidth() == 0 ? 0.0 : clampRatio((mouseX - layout.sliderX()) / (double) layout.sliderWidth());
+        if (config instanceof IConfigInteger integerConfig) {
+            int min = integerConfig.getMinIntegerValue();
+            integerConfig.setIntegerValue(min + (int) Math.round(ratio * (integerConfig.getMaxIntegerValue() - min)));
+        } else if (config instanceof IConfigDouble doubleConfig) {
+            double min = doubleConfig.getMinDoubleValue();
+            doubleConfig.setDoubleValue(min + ratio * (doubleConfig.getMaxDoubleValue() - min));
+        }
+        this.afterInlineGenericConfigChanged();
+    }
+
+    private void afterInlineGenericConfigChanged() {
+        this.notifyOwnConfigChanged(false);
+        if (this.selectedGenericConfig != null && this.valueField != null) {
+            this.valueField.setTextWrapper(this.configValue(this.selectedGenericConfig));
+        }
+        this.refreshRows();
     }
 
     private boolean handleShortcutClick(int rowIndex, int mouseX, int mouseY) {
@@ -757,7 +933,46 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private int getGenericControlX() {
-        return Math.max(MARGIN + 120, this.width - MARGIN - 184);
+        return numericControlLayout(this.width).controlX();
+    }
+
+    static NumericControlLayout numericControlLayout(int width) {
+        // 窄窗口压缩数值框、滑条和重置按钮，但保持常规宽度下的原始尺寸和顺序。
+        int right = Math.max(MARGIN, width - MARGIN);
+        int controlX = Math.max(MARGIN + 80, right - NUMERIC_CONTROL_WIDTH);
+        if (controlX > right - 30) {
+            controlX = Math.max(MARGIN, right - 30);
+        }
+        int available = Math.max(0, right - controlX);
+        int gap = Math.min(6, available / 20);
+        int remaining = Math.max(0, available - gap * 2);
+        int valueWidth = Math.min(NUMERIC_VALUE_WIDTH, remaining / 3);
+        int resetWidth = Math.min(NUMERIC_RESET_WIDTH, remaining / 3);
+        int sliderWidth = Math.max(0, remaining - valueWidth - resetWidth);
+        return new NumericControlLayout(controlX, valueWidth, gap, sliderWidth, resetWidth);
+    }
+
+    static BooleanControlLayout booleanControlLayout(int width) {
+        NumericControlLayout numeric = numericControlLayout(width);
+        int available = Math.max(0, numeric.right() - numeric.controlX());
+        int gap = Math.min(numeric.gap(), available / 20);
+        int remaining = Math.max(0, available - gap);
+        int preferredTotal = 64 + 54;
+        int toggleWidth = Math.min(64, remaining * 64 / preferredTotal);
+        int resetWidth = Math.min(54, remaining - toggleWidth);
+        return new BooleanControlLayout(numeric.controlX(), toggleWidth, gap, resetWidth);
+    }
+
+    private double getIntegerRatio(IConfigInteger config) {
+        int min = config.getMinIntegerValue();
+        int max = config.getMaxIntegerValue();
+        return max <= min ? 0.0 : (config.getIntegerValue() - min) / (double) (max - min);
+    }
+
+    private double getDoubleRatio(IConfigDouble config) {
+        double min = config.getMinDoubleValue();
+        double max = config.getMaxDoubleValue();
+        return max <= min ? 0.0 : (config.getDoubleValue() - min) / (max - min);
     }
 
     private boolean isInsideList(int mouseX, int mouseY) {
@@ -776,17 +991,29 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private String fit(String text, int maxWidth) {
-        if (text == null) {
+        return fitText(text, maxWidth, this::getStringWidth);
+    }
+
+    static String fitText(String text, int maxWidth, ToIntFunction<String> width) {
+        if (text == null || maxWidth <= 0) {
             return "";
         }
-        if (this.getStringWidth(text) <= maxWidth) {
+        if (width.applyAsInt(text) <= maxWidth) {
             return text;
         }
+
+        String ellipsis = "...";
         int end = text.length();
-        while (end > 0 && this.getStringWidth(text.substring(0, end) + "...") > maxWidth) {
+        if (width.applyAsInt(ellipsis) > maxWidth) {
+            while (end > 0 && width.applyAsInt(text.substring(0, end)) > maxWidth) {
+                end--;
+            }
+            return text.substring(0, end);
+        }
+        while (end > 0 && width.applyAsInt(text.substring(0, end) + ellipsis) > maxWidth) {
             end--;
         }
-        return text.substring(0, end) + "...";
+        return text.substring(0, end) + ellipsis;
     }
 
     private static String nextValue(List<String> values, String current) {
@@ -796,6 +1023,31 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static double clampRatio(double value) {
+        return Math.max(0.0, Math.min(1.0, value));
+    }
+
+    static GenericControlKind genericControlKind(IConfigBase config) {
+        if (config instanceof IConfigBoolean) {
+            return GenericControlKind.BOOLEAN;
+        }
+        if (config instanceof IConfigInteger) {
+            return GenericControlKind.INTEGER;
+        }
+        if (config instanceof IConfigDouble) {
+            return GenericControlKind.DOUBLE;
+        }
+        return GenericControlKind.NONE;
+    }
+
+    static FilterMode nextFilterMode(boolean shortcutsTabActive, FilterMode currentMode) {
+        return shortcutsTabActive ? (currentMode == FilterMode.MISSING ? FilterMode.ALL : FilterMode.MISSING) : currentMode.next();
+    }
+
+    static FilterMode normalizeFilterMode(boolean shortcutsTabActive, FilterMode currentMode) {
+        return shortcutsTabActive && currentMode == FilterMode.ADDED ? FilterMode.ALL : currentMode;
     }
 
     private static int lighten(int color) {
@@ -817,7 +1069,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         }
     }
 
-    private enum FilterMode {
+    enum FilterMode {
         ALL("fast-masa-config.gui.full.filter.all"),
         ADDED("fast-masa-config.gui.full.filter.added"),
         MISSING("fast-masa-config.gui.full.filter.missing");
@@ -831,6 +1083,41 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         private FilterMode next() {
             FilterMode[] values = values();
             return values[(this.ordinal() + 1) % values.length];
+        }
+    }
+
+    enum GenericControlKind {
+        BOOLEAN,
+        INTEGER,
+        DOUBLE,
+        NONE
+    }
+
+    record NumericControlLayout(int controlX, int valueWidth, int gap, int sliderWidth, int resetWidth) {
+        int sliderX() {
+            return this.controlX + this.valueWidth + this.gap;
+        }
+
+        int resetX() {
+            return this.sliderX() + this.sliderWidth + this.gap;
+        }
+
+        int right() {
+            return this.resetX() + this.resetWidth;
+        }
+
+        int resetOffset() {
+            return this.resetX() - this.controlX;
+        }
+    }
+
+    record BooleanControlLayout(int controlX, int toggleWidth, int gap, int resetWidth) {
+        int resetX() {
+            return this.controlX + this.toggleWidth + this.gap;
+        }
+
+        int right() {
+            return this.resetX() + this.resetWidth;
         }
     }
 
@@ -859,7 +1146,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             KeybindSettings settings = this.keybind.getSettings();
             int iconSize = 18;
             int edgeColor = this.keybind.areSettingsModified() ? 0xFFFFBB33
-                    : (this.hovered ? 0xFFFFA0 : 0xFFFFFFFF);
+                    : (this.hovered ? 0xFFFFA0A0 : 0xFFFFFFFF);
 
             context.fill(this.x, this.y, this.x + 20, this.y + 20, edgeColor);
             context.fill(this.x + 1, this.y + 1, this.x + 19, this.y + 19, 0xFF000000);
