@@ -31,6 +31,7 @@
   "fast-masa-config.gui.full.filter.mod": "模组: %s",
   "fast-masa-config.gui.full.filter.group": "分组: %s",
   "fast-masa-config.gui.full.hotkey_settings.hover": "左键: 高级热键设置\n右键: 重置热键设置",
+  "fast-masa-ui.gui.full.hotkey_settings.hover": "左键: 高级热键设置\n右键: 重置热键设置",
   "fast-masa-config.gui.tab.generic": "通用",
   "fast-masa-config.gui.tab.shortcuts": "快捷方式",
   "fast-masa-config.gui.tab.all_configs": "全部配置",

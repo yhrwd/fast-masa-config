@@ -276,11 +276,14 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private void createManualShortcutEditor() {
-        int valueWidth = Math.max(40, this.width - MARGIN * 2 - 62);
+        int addWidth = 52;
+        int gap = 8;
+        int rightPadding = MARGIN + 4;
+        int valueWidth = Math.max(40, this.width - MARGIN - rightPadding - addWidth - gap);
         this.manualIdField = new GuiTextFieldGeneric(MARGIN, this.height - 28, valueWidth, 18, this.textRenderer);
         this.manualIdField.setMaxLengthWrapper(256);
         this.addTextField(this.manualIdField, field -> true);
-        this.addButton(new ButtonGeneric(MARGIN + valueWidth + 6, this.height - 28, 52, BUTTON_HEIGHT, "+"),
+        this.addButton(new ButtonGeneric(MARGIN + valueWidth + gap, this.height - 28, addWidth, BUTTON_HEIGHT, "+"),
                 (ignored, mouseButton) -> this.addManualShortcut());
     }
 
@@ -299,7 +302,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                 this.notifyOwnConfigChanged(true);
             } else {
                 GuiBase.openGui(new GuiKeybindSettings(FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind(),
-                        FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getName(), null, GuiUtils.getCurrentScreen()));
+                        FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getName(), null, this));
             }
         });
         this.updateOpenQuickConfigButtonPosition();
