@@ -19,6 +19,7 @@ import fi.dy.masa.malilib.config.IStringRepresentable;
 import fi.dy.masa.malilib.config.gui.ButtonPressDirtyListenerSimple;
 import fi.dy.masa.malilib.event.InputEventHandler;
 import fi.dy.masa.malilib.MaLiLibConfigs;
+import fi.dy.masa.malilib.MaLiLibReference;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.GuiConfigsBase.ConfigOptionWrapper;
 import fi.dy.masa.malilib.gui.GuiKeybindSettings;
@@ -29,11 +30,16 @@ import fi.dy.masa.malilib.gui.interfaces.IConfigInfoProvider;
 import fi.dy.masa.malilib.gui.interfaces.IKeybindConfigGui;
 import fi.dy.masa.malilib.gui.widgets.WidgetDropDownList;
 import fi.dy.masa.malilib.hotkeys.IHotkey;
+import fi.dy.masa.malilib.hotkeys.IKeybind;
+import fi.dy.masa.malilib.hotkeys.KeybindSettings;
 import fi.dy.masa.malilib.registry.Registry;
+import fi.dy.masa.malilib.render.RenderUtils;
 import fi.dy.masa.malilib.util.StringUtils;
+import fi.dy.masa.malilib.util.GuiUtils;
 import fi.dy.masa.malilib.util.data.ModInfo;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -270,7 +276,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private void createManualShortcutEditor() {
-        int valueWidth = Math.max(100, this.width - MARGIN * 2 - 58);
+        int valueWidth = Math.max(40, this.width - MARGIN * 2 - 62);
         this.manualIdField = new GuiTextFieldGeneric(MARGIN, this.height - 28, valueWidth, 18, this.textRenderer);
         this.manualIdField.setMaxLengthWrapper(256);
         this.addTextField(this.manualIdField, field -> true);
@@ -293,7 +299,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                 this.notifyOwnConfigChanged(true);
             } else {
                 GuiBase.openGui(new GuiKeybindSettings(FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind(),
-                        FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getName(), null, this));
+                        FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getName(), null, GuiUtils.getCurrentScreen()));
             }
         });
         this.updateOpenQuickConfigButtonPosition();
@@ -445,8 +451,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
             switch (tab) {
                 case GENERIC -> this.drawGenericRow(context, this.genericRows.get(index), y);
-                case SHORTCUTS -> this.drawShortcutRow(context, this.shortcutRows.get(index), y);
-                case ALL_CONFIGS -> this.drawAllConfigRow(context, this.allConfigRows.get(index), y);
+                case SHORTCUTS -> this.drawShortcutRow(context, this.shortcutRows.get(index), y, mouseX, mouseY);
+                case ALL_CONFIGS -> this.drawAllConfigRow(context, this.allConfigRows.get(index), y, mouseX, mouseY);
             }
         }
     }
@@ -463,30 +469,33 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         }
     }
 
-    private void drawShortcutRow(DrawContext context, ShortcutRow row, int y) {
+    private void drawShortcutRow(DrawContext context, ShortcutRow row, int y, int mouseX, int mouseY) {
         String name = row.entry == null ? row.shortcut.manualId() : row.entry.displayName();
         String meta = row.entry == null ? StringUtils.translate("fast-masa-config.gui.full.status.not_found")
                 : row.entry.modName() + " / " + row.entry.groupName() + " / " + row.shortcut.manualId();
         int buttonsX = this.width - MARGIN - 102;
         context.drawTextWithShadow(this.textRenderer, this.fit(name, buttonsX - MARGIN - 16), MARGIN + 8, y + 5, 0xFFFFFF);
         context.drawTextWithShadow(this.textRenderer, this.fit(meta, buttonsX - MARGIN - 16), MARGIN + 8, y + 18, 0xCFA4B7);
-        this.drawAction(context, buttonsX, y + 5, 24, "^");
-        this.drawAction(context, buttonsX + 28, y + 5, 24, "v");
-        this.drawAction(context, buttonsX + 56, y + 5, 42, "-");
+        this.drawAction(context, buttonsX, y + 5, 24, "^", mouseX, mouseY);
+        this.drawAction(context, buttonsX + 28, y + 5, 24, "v", mouseX, mouseY);
+        this.drawAction(context, buttonsX + 56, y + 5, 42, "-", mouseX, mouseY);
     }
 
-    private void drawAllConfigRow(DrawContext context, ConfigIndexEntry entry, int y) {
+    private void drawAllConfigRow(DrawContext context, ConfigIndexEntry entry, int y, int mouseX, int mouseY) {
         int buttonX = this.width - MARGIN - 64;
         String meta = entry.modName() + " / " + entry.groupName() + " / " + entry.manualId();
         context.drawTextWithShadow(this.textRenderer, this.fit(entry.displayName(), buttonX - MARGIN - 16), MARGIN + 8, y + 5,
                 0xFFFFFF);
         context.drawTextWithShadow(this.textRenderer, this.fit(meta, buttonX - MARGIN - 16), MARGIN + 8, y + 18, 0xCFA4B7);
         this.drawAction(context, buttonX, y + 5, 64,
-                ShortcutConfigStore.containsTarget(entry.modId(), entry.groupId(), entry.configName()) ? "-" : "+");
+                ShortcutConfigStore.containsTarget(entry.modId(), entry.groupId(), entry.configName()) ? "-" : "+",
+                mouseX, mouseY);
     }
 
-    private void drawAction(DrawContext context, int x, int y, int width, String label) {
-        context.fill(x, y, x + width, y + BUTTON_HEIGHT, 0xFF303030);
+    private void drawAction(DrawContext context, int x, int y, int width, String label, int mouseX, int mouseY) {
+        int background = label.equals("-") ? 0xFF5A2525 : 0xFF303030;
+        boolean hovered = GuiHitTest.contains(x, y, width, BUTTON_HEIGHT, mouseX, mouseY);
+        context.fill(x, y, x + width, y + BUTTON_HEIGHT, hovered ? lighten(background) : background);
         context.drawCenteredTextWithShadow(this.textRenderer, label, x + width / 2, y + 6, 0xFFFFFF);
     }
 
@@ -786,6 +795,13 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         return Math.max(min, Math.min(max, value));
     }
 
+    private static int lighten(int color) {
+        int red = Math.min(255, ((color >> 16) & 0xFF) + 24);
+        int green = Math.min(255, ((color >> 8) & 0xFF) + 24);
+        int blue = Math.min(255, (color & 0xFF) + 24);
+        return 0xFF000000 | (red << 16) | (green << 8) | blue;
+    }
+
     private enum ConfigGuiTab {
         GENERIC("fast-masa-config.gui.tab.generic"),
         SHORTCUTS("fast-masa-config.gui.tab.shortcuts"),
@@ -816,5 +832,45 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private record ShortcutRow(int storeIndex, ShortcutEntry shortcut, ConfigIndexEntry entry) {
+    }
+
+    /** 复用 MaLiLib 的热键设置图标，并让 GuiBase 能正确读取 hover 状态。 */
+    private static final class HotkeySettingsButton extends ButtonGeneric {
+        private static final Identifier TEXTURE = Identifier.of(MaLiLibReference.MOD_ID,
+                "textures/gui/gui_widgets.png");
+        private final IKeybind keybind;
+
+        private HotkeySettingsButton(int x, int y, int width, int height, IKeybind keybind) {
+            super(x, y, width, height, "");
+            this.keybind = keybind;
+            this.setRenderDefaultBackground(false);
+        }
+
+        @Override
+        public void render(int mouseX, int mouseY, boolean selected, DrawContext context) {
+            if (this.visible == false) {
+                return;
+            }
+
+            this.hovered = this.enabled && GuiHitTest.contains(this.x, this.y, this.width, this.height, mouseX, mouseY);
+            KeybindSettings settings = this.keybind.getSettings();
+            int iconSize = 18;
+            int edgeColor = this.keybind.areSettingsModified() ? 0xFFFFBB33
+                    : (this.hovered ? 0xFFFFA0 : 0xFFFFFFFF);
+
+            context.fill(this.x, this.y, this.x + 20, this.y + 20, edgeColor);
+            context.fill(this.x + 1, this.y + 1, this.x + 19, this.y + 19, 0xFF000000);
+            RenderUtils.bindTexture(TEXTURE);
+            RenderUtils.drawTexturedRect(this.x + 1, this.y + 1, 0,
+                    settings.getActivateOn().ordinal() * iconSize, iconSize, iconSize);
+            RenderUtils.drawTexturedRect(this.x + 1, this.y + 1, 18,
+                    settings.getAllowExtraKeys() ? 0 : iconSize, iconSize, iconSize);
+            RenderUtils.drawTexturedRect(this.x + 1, this.y + 1, 36,
+                    settings.isOrderSensitive() ? iconSize : 0, iconSize, iconSize);
+            RenderUtils.drawTexturedRect(this.x + 1, this.y + 1, 54,
+                    settings.isExclusive() ? iconSize : 0, iconSize, iconSize);
+            RenderUtils.drawTexturedRect(this.x + 1, this.y + 1, 72,
+                    settings.shouldCancel() ? iconSize : 0, iconSize, iconSize);
+        }
     }
 }

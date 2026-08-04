@@ -30,6 +30,7 @@
   "fast-masa-config.gui.full.filter.value_all": "All",
   "fast-masa-config.gui.full.filter.mod": "Mod: %s",
   "fast-masa-config.gui.full.filter.group": "Group: %s",
+  "fast-masa-config.gui.full.hotkey_settings.hover": "Left click: advanced hotkey settings\nRight click: reset hotkey settings",
   "fast-masa-config.gui.tab.generic": "Generic",
   "fast-masa-config.gui.tab.shortcuts": "Shortcuts",
   "fast-masa-config.gui.tab.all_configs": "All Configs",
