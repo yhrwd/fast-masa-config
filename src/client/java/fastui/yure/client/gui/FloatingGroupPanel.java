@@ -11,6 +11,7 @@ import fastui.yure.config.ShortcutControlType;
 import fastui.yure.config.ShortcutEntry;
 import fi.dy.masa.malilib.render.GuiContext;
 import fi.dy.masa.malilib.render.RenderUtils;
+import fi.dy.masa.malilib.util.StringUtils;
 import net.minecraft.client.gui.Font;
 
 import java.util.ArrayList;
@@ -51,20 +52,23 @@ public final class FloatingGroupPanel {
                 this.layout.x() + this.layout.width() - 20, this.layout.y(), 20, this.layout.headerHeight());
     }
 
-    public boolean isDockHit(int mouseX, int mouseY) {
+    public boolean isHideHit(int mouseX, int mouseY) {
         return this.layout != null && GuiHitTest.isInside(mouseX, mouseY,
                 this.layout.x() + this.layout.width() - 40, this.layout.y(), 20, this.layout.headerHeight());
     }
 
+    public boolean isFullConfigHit(int mouseX, int mouseY) {
+        return this.layout != null && GuiHitTest.isInside(mouseX, mouseY,
+                this.layout.x() + this.layout.width() - 60, this.layout.y(), 20, this.layout.headerHeight());
+    }
+
     public void toggleCollapsed() {
-        ConfigGroupStore.get(this.groupId).ifPresent(group -> ConfigGroupStore.setWindowState(group.id(), group.floating(),
+        ConfigGroupStore.get(this.groupId).ifPresent(group -> ConfigGroupStore.setWindowState(group.id(),
                 !group.collapsed(), group.x(), group.y()));
     }
 
-    public boolean dock() {
-        return ConfigGroupStore.get(this.groupId).map(group ->
-                ConfigGroupStore.setWindowState(group.id(), false, group.collapsed(), group.x(), group.y()))
-                .orElse(false);
+    public boolean hide() {
+        return ConfigGroupStore.hide(this.groupId, true);
     }
 
     public boolean moveTo(int requestedX, int requestedY, int screenWidth, int screenHeight) {
@@ -79,7 +83,7 @@ public final class FloatingGroupPanel {
             if (!positionChangedFromLayout(this.layout.x(), this.layout.y(), clampedX, clampedY)) {
                 return false;
             }
-            return ConfigGroupStore.setWindowState(group.id(), group.floating(), group.collapsed(), clampedX, clampedY);
+            return ConfigGroupStore.setWindowState(group.id(), group.collapsed(), clampedX, clampedY);
         }).orElse(false);
     }
 
@@ -112,12 +116,19 @@ public final class FloatingGroupPanel {
             return;
         }
 
-        this.rows = buildRows(group, index);
-        int[] rowHeights = this.rows.stream().mapToInt(RowModel::height).toArray();
-        this.layout = GroupWindowLayout.calculate(screenWidth, screenHeight, group.x(), group.y(), group.collapsed(),
-                rowHeights);
+        if (group.collapsed()) {
+            this.rows = List.of();
+            this.controls = List.of();
+            this.layout = GroupWindowLayout.calculate(screenWidth, screenHeight, group.x(), group.y(), true,
+                    new int[0]);
+        } else {
+            this.rows = buildRows(group, index);
+            int[] rowHeights = this.rows.stream().mapToInt(RowModel::height).toArray();
+            this.layout = GroupWindowLayout.calculate(screenWidth, screenHeight, group.x(), group.y(), false,
+                    rowHeights);
+            this.controls = buildControls();
+        }
         this.scrollOffset = this.layout.clampScrollOffset(this.scrollOffset);
-        this.controls = buildControls();
 
         int accent = group.color();
         RenderUtils.drawRect(context, this.layout.x(), this.layout.y(), this.layout.width(), this.layout.height(),
@@ -126,8 +137,12 @@ public final class FloatingGroupPanel {
                 HoloPanelVisuals.withAlpha(accent, 0xD8));
         context.drawString(this.font, fitText(group.name(), this.layout.width() - 54), this.layout.x() + 7,
                 this.layout.y() + 6, TEXT, false);
-        context.drawString(this.font, "x", this.layout.x() + this.layout.width() - 34, this.layout.y() + 5, TEXT, false);
-        context.drawString(this.font, group.collapsed() ? "+" : "-", this.layout.x() + this.layout.width() - 14,
+        context.drawString(this.font, StringUtils.translate("fast-masa-config.gui.floating.full_config"),
+                this.layout.x() + this.layout.width() - 57, this.layout.y() + 5, TEXT, false);
+        context.drawString(this.font, StringUtils.translate("fast-masa-config.gui.floating.hide"),
+                this.layout.x() + this.layout.width() - 34, this.layout.y() + 5, TEXT, false);
+        context.drawString(this.font, StringUtils.translate(group.collapsed() ? "fast-masa-config.gui.floating.expand"
+                : "fast-masa-config.gui.floating.collapse"), this.layout.x() + this.layout.width() - 14,
                 this.layout.y() + 5, TEXT, false);
 
         if (group.collapsed()) {
@@ -136,11 +151,10 @@ public final class FloatingGroupPanel {
 
         for (int indexInRows = 0; indexInRows < this.rows.size(); indexInRows++) {
             GroupWindowLayout.Row row = this.layout.rows().get(indexInRows);
-            int y = row.y() - this.scrollOffset;
-            if (y + row.height() <= this.layout.y() + this.layout.headerHeight()
-                    || y >= this.layout.y() + this.layout.height()) {
+            if (!this.layout.isRowFullyVisible(row, this.scrollOffset)) {
                 continue;
             }
+            int y = row.y() - this.scrollOffset;
             drawRow(context, this.rows.get(indexInRows), row.x(), y, row.width(), mouseX, mouseY, accent);
         }
 
@@ -198,7 +212,7 @@ public final class FloatingGroupPanel {
         List<RowModel> result = new ArrayList<>();
         for (GroupItem item : group.items()) {
             ShortcutEntry shortcut = new ShortcutEntry(item.modId(), item.groupId(), item.configName(), "",
-                    ShortcutControlType.TOGGLE, 1.0, null, null);
+                    ShortcutControlType.SLIDER, 1.0, null, null);
             ResolvedShortcut resolved = ShortcutResolver.find(index, shortcut)
                     .map(entry -> new ResolvedShortcut(shortcut, entry)).orElse(null);
             boolean numeric = resolved != null && ShortcutControl.getControlType(resolved.configEntry().config())
@@ -237,11 +251,12 @@ public final class FloatingGroupPanel {
         String label = active ? row.shortcut().configEntry().displayName() : row.item().configName();
         context.drawString(this.font, fitText(label, width - 34), x + 6, y + 4, active ? TEXT : 0x887F6C75, false);
         if (!active) {
-            context.drawString(this.font, "unavailable", x + 6, y + 15, 0x776F5B64, false);
+            context.drawString(this.font, StringUtils.translate("fast-masa-config.gui.floating.unavailable"), x + 6,
+                    y + 15, 0x776F5B64, false);
             return;
         }
         if (!row.numeric()) {
-            drawToggle(context, row.shortcut(), x + width - 36, y + 7, hovered);
+            drawToggle(context, row.shortcut(), x + width - 36, y + 7, accent);
         } else if (row.item().expanded()) {
             double ratio = ShortcutControl.getSliderRatio(row.shortcut().configEntry().config());
             int sliderX = x + width - SLIDER_WIDTH - 8;
@@ -249,13 +264,16 @@ public final class FloatingGroupPanel {
             RenderUtils.drawRect(context, sliderX, y + ROW_HEIGHT + 10, (int) Math.round(SLIDER_WIDTH * ratio), 3, accent);
             context.drawString(this.font, ShortcutControl.getValueText(row.shortcut().configEntry().config()), x + 6,
                     y + ROW_HEIGHT + 7, MUTED, false);
+            context.drawString(this.font, StringUtils.translate("fast-masa-config.gui.floating.collapse"), x + width - 17,
+                    y + 6, MUTED, false);
         } else {
-            context.drawString(this.font, "...", x + width - 17, y + 6, MUTED, false);
+            context.drawString(this.font, StringUtils.translate("fast-masa-config.gui.floating.expand"), x + width - 17,
+                    y + 6, MUTED, false);
         }
     }
 
-    private void drawToggle(GuiContext context, ResolvedShortcut shortcut, int x, int y, boolean hovered) {
-        int color = ShortcutControl.getBooleanValue(shortcut.configEntry().config()) ? 0xFFE6397C : 0xFF4A303A;
+    private void drawToggle(GuiContext context, ResolvedShortcut shortcut, int x, int y, int accent) {
+        int color = ShortcutControl.getBooleanValue(shortcut.configEntry().config()) ? accent : 0xFF4A303A;
         RenderUtils.drawRect(context, x, y, 30, 12, color);
         RenderUtils.drawRect(context, x + (ShortcutControl.getBooleanValue(shortcut.configEntry().config()) ? 18 : 2), y + 2,
                 8, 8, TEXT);

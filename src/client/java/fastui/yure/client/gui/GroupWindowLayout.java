@@ -18,7 +18,7 @@ public record GroupWindowLayout(
         List<Row> rows
 ) {
     public static final int SAFE_MARGIN = 20;
-    public static final int DESIRED_WIDTH = 260;
+    public static final int DESIRED_WIDTH = 212;
     public static final int MIN_SAFE_WIDTH = 180;
     public static final int HEADER_HEIGHT = 20;
 
@@ -70,6 +70,13 @@ public record GroupWindowLayout(
 
     public int clampScrollOffset(int scrollOffset) {
         return clamp(scrollOffset, 0, this.maxScrollOffset);
+    }
+
+    public boolean isRowFullyVisible(Row row, int scrollOffset) {
+        int contentTop = this.y + this.headerHeight;
+        int contentBottom = this.y + this.height;
+        int rowTop = row.y() - this.clampScrollOffset(scrollOffset);
+        return rowTop >= contentTop && rowTop + row.height() <= contentBottom;
     }
 
     private static int clamp(int value, int minimum, int maximum) {

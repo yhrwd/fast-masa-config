@@ -38,12 +38,12 @@ class GroupWindowHitTestTest {
     @Test
     void recognizesScrollbarAndExcludesRightAndBottomBounds() {
         GroupWindowLayout layout = GroupWindowLayout.calculate(400, 300, 40, 40, false, new int[]{25});
-        GroupWindowHitTest.Bounds scrollbar = new GroupWindowHitTest.Bounds(294, 60, 6, 25);
+        GroupWindowHitTest.Bounds scrollbar = new GroupWindowHitTest.Bounds(layout.x() + layout.width() - 6, 60, 6, 25);
 
         assertEquals(new GroupWindowHitTest.Result(GroupWindowHitTest.Target.SCROLLBAR, -1),
-                GroupWindowHitTest.hitTest(layout, 0, 294, 60, scrollbar, List.of()));
+                GroupWindowHitTest.hitTest(layout, 0, scrollbar.x(), 60, scrollbar, List.of()));
         assertEquals(new GroupWindowHitTest.Result(GroupWindowHitTest.Target.NONE, -1),
-                GroupWindowHitTest.hitTest(layout, 0, 300, 85, scrollbar, List.of()));
+                GroupWindowHitTest.hitTest(layout, 0, scrollbar.x() + scrollbar.width(), 85, scrollbar, List.of()));
         assertEquals(new GroupWindowHitTest.Result(GroupWindowHitTest.Target.NONE, -1),
                 GroupWindowHitTest.hitTest(layout, 0, 20, 20, scrollbar, List.of()));
     }
@@ -52,7 +52,7 @@ class GroupWindowHitTestTest {
     void resolvesTheCorrectRowAfterScrolling() {
         GroupWindowLayout layout = GroupWindowLayout.calculate(300, 100, 20, 20, false, new int[]{25, 51});
 
-        assertEquals(new GroupWindowHitTest.Result(GroupWindowHitTest.Target.ROW, 1),
+        assertEquals(new GroupWindowHitTest.Result(GroupWindowHitTest.Target.NONE, -1),
                 GroupWindowHitTest.hitTest(layout, 25, 30, 50, null, List.of()));
     }
 
@@ -70,23 +70,34 @@ class GroupWindowHitTestTest {
     }
 
     @Test
+    void rejectsPartiallyScrolledRowsAndControls() {
+        GroupWindowLayout layout = GroupWindowLayout.calculate(300, 100, 20, 20, false, new int[]{25, 25});
+        GroupWindowHitTest.ItemControls controls = new GroupWindowHitTest.ItemControls(0,
+                new GroupWindowHitTest.Bounds(50, 40, 18, 20),
+                new GroupWindowHitTest.Bounds(100, 40, 60, 8));
+
+        assertEquals(new GroupWindowHitTest.Result(GroupWindowHitTest.Target.NONE, -1),
+                GroupWindowHitTest.hitTest(layout, 10, 55, 45, null, List.of(controls)));
+    }
+
+    @Test
     void scrollbarWinsOverRowAtTheRightEdge() {
         GroupWindowLayout layout = GroupWindowLayout.calculate(400, 300, 40, 40, false, new int[]{25});
-        GroupWindowHitTest.Bounds scrollbar = new GroupWindowHitTest.Bounds(294, 60, 6, 25);
+        GroupWindowHitTest.Bounds scrollbar = new GroupWindowHitTest.Bounds(layout.x() + layout.width() - 6, 60, 6, 25);
 
         assertEquals(new GroupWindowHitTest.Result(GroupWindowHitTest.Target.SCROLLBAR, -1),
-                GroupWindowHitTest.hitTest(layout, 0, 294, 60, scrollbar, List.of()));
+                GroupWindowHitTest.hitTest(layout, 0, scrollbar.x(), 60, scrollbar, List.of()));
     }
 
     @Test
     void scrollbarWinsOverOverlappingExpandedRowControls() {
         GroupWindowLayout layout = GroupWindowLayout.calculate(400, 300, 40, 40, false, new int[]{51});
-        GroupWindowHitTest.Bounds scrollbar = new GroupWindowHitTest.Bounds(294, 60, 6, 25);
+        GroupWindowHitTest.Bounds scrollbar = new GroupWindowHitTest.Bounds(layout.x() + layout.width() - 6, 60, 6, 25);
         GroupWindowHitTest.ItemControls controls = new GroupWindowHitTest.ItemControls(0,
-                new GroupWindowHitTest.Bounds(290, 65, 10, 20),
-                new GroupWindowHitTest.Bounds(290, 65, 10, 20));
+                new GroupWindowHitTest.Bounds(scrollbar.x(), 65, 10, 20),
+                new GroupWindowHitTest.Bounds(scrollbar.x(), 65, 10, 20));
 
         assertEquals(new GroupWindowHitTest.Result(GroupWindowHitTest.Target.SCROLLBAR, -1),
-                GroupWindowHitTest.hitTest(layout, 0, 294, 70, scrollbar, List.of(controls)));
+                GroupWindowHitTest.hitTest(layout, 0, scrollbar.x(), 70, scrollbar, List.of(controls)));
     }
 }

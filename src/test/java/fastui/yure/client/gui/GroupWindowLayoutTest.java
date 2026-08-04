@@ -3,6 +3,7 @@ package fastui.yure.client.gui;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GroupWindowLayoutTest {
@@ -10,8 +11,8 @@ class GroupWindowLayoutTest {
     void clampsRequestedPositionAndUsesSafeWidth() {
         GroupWindowLayout layout = GroupWindowLayout.calculate(800, 600, 900, 900, false, new int[]{25, 51});
 
-        assertEquals(260, layout.width());
-        assertEquals(520, layout.x());
+        assertEquals(212, layout.width());
+        assertEquals(568, layout.x());
         assertEquals(484, layout.y());
         assertEquals(20, layout.safeMargin());
     }
@@ -31,8 +32,8 @@ class GroupWindowLayoutTest {
 
         assertEquals(20, layout.headerHeight());
         assertEquals(2, layout.rows().size());
-        assertEquals(new GroupWindowLayout.Row(0, 40, 70, 260, 25), layout.rows().get(0));
-        assertEquals(new GroupWindowLayout.Row(1, 40, 95, 260, 51), layout.rows().get(1));
+        assertEquals(new GroupWindowLayout.Row(0, 40, 70, 212, 25), layout.rows().get(0));
+        assertEquals(new GroupWindowLayout.Row(1, 40, 95, 212, 51), layout.rows().get(1));
         assertEquals(96, layout.height());
     }
 
@@ -44,6 +45,14 @@ class GroupWindowLayoutTest {
         assertEquals(20, layout.contentHeight());
         assertEquals(0, layout.rows().size());
         assertEquals(0, layout.maxScrollOffset());
+    }
+
+    @Test
+    void onlyTreatsRowsFullyInsideTheScrolledContentViewportAsVisible() {
+        GroupWindowLayout layout = GroupWindowLayout.calculate(300, 100, 20, 20, false, new int[]{25, 25});
+
+        assertFalse(layout.isRowFullyVisible(layout.rows().getFirst(), 10));
+        assertTrue(layout.isRowFullyVisible(layout.rows().get(1), 10));
     }
 
     @Test

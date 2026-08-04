@@ -1,6 +1,11 @@
 package fastui.yure.client.gui;
 
+import fastui.yure.config.GroupItem;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Arrays;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -9,10 +14,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class QuickConfigGroupGeometryTest {
     @Test
-    void selectorOnlyHitsVisibleMenuRows() {
-        assertEquals(1, QuickConfigPanel.selectorIndexAt(20, 40, 124, 18, 3, 30, 59));
-        assertEquals(-1, QuickConfigPanel.selectorIndexAt(20, 40, 124, 18, 3, 30, 94));
-        assertEquals(-1, QuickConfigPanel.selectorIndexAt(20, 40, 124, 18, 3, 144, 59));
+    void collapsedWindowHasTargetWidthAndNoInteractiveContent() {
+        GroupWindowLayout layout = GroupWindowLayout.calculate(800, 600, 100, 100, true,
+                new int[]{0, -1});
+
+        assertEquals(212, layout.width());
+        assertEquals(0, layout.rows().size());
+        assertEquals(layout.headerHeight(), layout.height());
+        assertEquals(GroupWindowHitTest.Target.NONE, GroupWindowHitTest.hitTest(layout, 0, 120,
+                layout.y() + layout.headerHeight(), null, java.util.List.of()).target());
     }
 
     @Test
@@ -21,12 +31,6 @@ class QuickConfigGroupGeometryTest {
                 600, 500, 260, 200, 20));
         assertArrayEquals(new int[]{20, 20}, FloatingGroupPanel.clampPosition(-10, -10,
                 600, 500, 260, 200, 20));
-    }
-
-    @Test
-    void usesSingleColumnGroupsLayoutAtAndBelowTheNarrowThreshold() {
-        assertEquals(true, FastMasaConfigGui.isNarrowGroupsLayout(520));
-        assertEquals(false, FastMasaConfigGui.isNarrowGroupsLayout(521));
     }
 
     @Test
@@ -42,8 +46,50 @@ class QuickConfigGroupGeometryTest {
     }
 
     @Test
-    void groupConfigIndexKeyDistinguishesSameNameConfigsFromDifferentGroups() {
-        assertFalse(FastMasaConfigGui.getGroupItemKey("tweakeroo", "Generic", "fastBlockPlacement")
-                .equals(FastMasaConfigGui.getGroupItemKey("tweakeroo", "Hotkeys", "fastBlockPlacement")));
+    void interruptedDragOnlyFlushesWhenPositionChanged() {
+        assertTrue(QuickConfigScreen.shouldFlushPendingDrag(true));
+        assertFalse(QuickConfigScreen.shouldFlushPendingDrag(false));
     }
+
+    @Test
+    void normalizesMissingTargetToFirstAvailableGroupBeforeControlsRender() {
+        assertEquals("default", FastMasaConfigGui.normalizedTargetGroupId("", List.of("default", "building")));
+        assertEquals("building", FastMasaConfigGui.normalizedTargetGroupId("building", List.of("default", "building")));
+    }
+
+    @Test
+    void wrapsFilterControlsBelowTheNarrowBreakpoint() {
+        assertFalse(FastMasaConfigGui.filterControlsWrap(290));
+        assertTrue(FastMasaConfigGui.filterControlsWrap(289));
+    }
+
+    @Test
+    void numericControlFitsBeforeScrollbarAt320Pixels() {
+        FastMasaConfigGui.NumericControlLayout layout = FastMasaConfigGui.NumericControlLayout.calculate(320);
+
+        assertTrue(layout.resetX() + layout.resetWidth() <= 320 - 12 - 3);
+        assertTrue(layout.sliderX() >= layout.valueX() + layout.valueWidth());
+        assertTrue(layout.resetX() >= layout.sliderX() + layout.sliderWidth());
+    }
+
+    @Test
+    void groupMembershipUsesTheCanonicalThreePartTarget() {
+        List<GroupItem> items = List.of(new GroupItem("tweakeroo", "Generic", "fastBlockPlacement", false));
+
+        assertTrue(FastMasaConfigGui.isTargetInGroup(items, "tweakeroo", "Generic", "fastBlockPlacement"));
+        assertFalse(FastMasaConfigGui.isTargetInGroup(items, "tweakeroo", "Hotkeys", "fastBlockPlacement"));
+    }
+
+    @Test
+    void normalizesDuplicateAndUnboundMovementCodes() {
+        assertEquals(Set.of(17, 30), QuickConfigScreen.normalizeMovementKeyCodes(Arrays.asList(17, null, 17, 30)));
+    }
+
+    @Test
+    void keepsGroupActionsInsideA260PixelViewport() {
+        FastMasaConfigGui.GroupActionLayout layout = FastMasaConfigGui.GroupActionLayout.calculate(260);
+
+        assertTrue(layout.rightEdge() <= 260 - 12);
+    }
+
 }

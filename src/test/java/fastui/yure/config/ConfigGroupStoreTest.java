@@ -63,10 +63,10 @@ class ConfigGroupStoreTest {
     }
 
     @Test
-    void roundTripsWindowStateAndExpandedItems() {
+    void roundTripsWindowStateWithoutPersistingObsoleteFloatingFlag() {
         ConfigGroupStore.clear();
         ConfigGroup group = ConfigGroupStore.create("建筑", 0xFFE6397C);
-        ConfigGroupStore.setWindowState(group.id(), true, false, 40, 60);
+        ConfigGroupStore.setWindowState(group.id(), false, 40, 60);
         ConfigGroupStore.addItem(group.id(), new GroupItem("tweakeroo", "Generic", "fastBlockPlacement", true));
 
         JsonArray saved = ConfigGroupStore.toJson();
@@ -74,12 +74,26 @@ class ConfigGroupStoreTest {
         ConfigGroupStore.fromJson(saved);
 
         ConfigGroup loaded = ConfigGroupStore.get(group.id()).orElseThrow();
-        assertTrue(loaded.floating());
         assertFalse(loaded.collapsed());
         assertEquals(40, loaded.x());
         assertEquals(60, loaded.y());
         assertTrue(loaded.items().getFirst().expanded());
         assertEquals("Generic", loaded.items().getFirst().groupId());
+    }
+
+    @Test
+    void ignoresLegacyFloatingFlagWhenLoadingGroups() {
+        ConfigGroupStore.fromJson(JsonParser.parseString("""
+                [{"id":"default","name":"Fast Masa Config","floating":false,"collapsed":true,"x":40,"y":60}]
+                """).getAsJsonArray());
+
+        JsonObject saved = ConfigGroupStore.toJson().get(0).getAsJsonObject();
+        ConfigGroup loaded = ConfigGroupStore.get("default").orElseThrow();
+
+        assertFalse(saved.has("floating"));
+        assertTrue(loaded.collapsed());
+        assertEquals(40, loaded.x());
+        assertEquals(60, loaded.y());
     }
 
     @Test
@@ -105,6 +119,8 @@ class ConfigGroupStoreTest {
 
         assertTrue(ConfigGroupStore.hide(defaultGroup.id(), true));
         assertTrue(defaultGroup.hidden());
+        assertTrue(ConfigGroupStore.hide(defaultGroup.id(), false));
+        assertFalse(defaultGroup.hidden());
         assertTrue(ConfigGroupStore.remove(userGroup.id()));
         assertFalse(ConfigGroupStore.remove(defaultGroup.id()));
     }

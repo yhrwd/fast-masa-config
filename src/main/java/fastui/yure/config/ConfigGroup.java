@@ -10,7 +10,6 @@ public final class ConfigGroup {
     private int color;
     private boolean system;
     private boolean hidden;
-    private boolean floating;
     private boolean collapsed;
     private int x;
     private int y;
@@ -43,10 +42,6 @@ public final class ConfigGroup {
         return this.hidden;
     }
 
-    public boolean floating() {
-        return this.floating;
-    }
-
     public boolean collapsed() {
         return this.collapsed;
     }
@@ -75,8 +70,7 @@ public final class ConfigGroup {
         this.hidden = hidden;
     }
 
-    void setWindowState(boolean floating, boolean collapsed, int x, int y) {
-        this.floating = floating;
+    void setWindowState(boolean collapsed, int x, int y) {
         this.collapsed = collapsed;
         this.x = x;
         this.y = y;

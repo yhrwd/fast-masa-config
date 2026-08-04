@@ -4,14 +4,10 @@ import fastui.yure.FastMasaConfig;
 import fastui.yure.client.index.ConfigIndexEntry;
 import fastui.yure.client.index.ConfigIndexService;
 import fastui.yure.client.input.HeldKeyInputSuppressor;
-import fastui.yure.client.shortcut.ShortcutResolver;
 import fastui.yure.config.FastMasaConfigs;
 import fastui.yure.config.ConfigGroup;
 import fastui.yure.config.ConfigGroupStore;
 import fastui.yure.config.GroupItem;
-import fastui.yure.config.ShortcutConfigStore;
-import fastui.yure.config.ShortcutControlType;
-import fastui.yure.config.ShortcutEntry;
 import fi.dy.masa.malilib.MaLiLib;
 import fi.dy.masa.malilib.MaLiLibConfigs;
 import fi.dy.masa.malilib.MaLiLibReference;
@@ -47,7 +43,6 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -73,10 +68,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private static final int COLOR_MUTED = 0xFFCFA4B7;
     private static final int SCROLLBAR_WIDTH = 3;
     private static final int NUMERIC_VALUE_WIDTH = 50;
-    private static final int NUMERIC_SLIDER_X_OFFSET = 56;
     private static final int NUMERIC_SLIDER_WIDTH = 68;
-    private static final int NUMERIC_RESET_X_OFFSET = 130;
-    private static final int GROUPS_NARROW_WIDTH = 520;
 
     private static ConfigGuiTab tab = ConfigGuiTab.GENERIC;
 
@@ -85,7 +77,6 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private final ButtonPressDirtyListenerSimple dirtyListener = new ButtonPressDirtyListenerSimple();
 
     private GuiTextFieldGeneric searchField;
-    private GuiTextFieldGeneric manualIdField;
     private GuiTextFieldGeneric groupNameField;
     private ConfigButtonKeybind activeKeybindButton;
     private ConfigButtonKeybind openQuickConfigButton;
@@ -94,15 +85,11 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     private List<IConfigBase> filteredGenericConfigs = List.of();
     private List<ConfigIndexEntry> filteredConfigs = List.of();
-    private List<ShortcutView> shortcutViews = List.of();
-    private Map<String, ConfigIndexEntry> groupConfigIndex = Map.of();
     private FilterMode filterMode = FilterMode.ALL;
     private String selectedModId = "";
     private String selectedConfigGroupId = "";
     private String selectedGroupId = "";
     private int scrollOffset;
-    private int groupScrollOffset;
-    private int groupItemScrollOffset;
 
     /**
      * 从 ModMenu 或命令直接打开时使用的构造函数，没有父界面，也不需要吞掉打开热键。
@@ -129,19 +116,13 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.inputSuppressor = new HeldKeyInputSuppressor(suppressKeys);
     }
 
-    /** 创建并预选分组管理页，供快捷面板的“编辑分组”入口使用。 */
-    public static FastMasaConfigGui createGroupsGui(Screen parent, Set<Integer> suppressKeys) {
-        tab = ConfigGuiTab.GROUPS;
-        return new FastMasaConfigGui(parent, suppressKeys);
-    }
-
-    static boolean isNarrowGroupsLayout(int width) {
-        return width <= GROUPS_NARROW_WIDTH;
-    }
-
     @Override
     public void initGui() {
         super.initGui();
+        ConfigGroupStore.ensureDefaultGroup();
+        if (tab == ConfigGuiTab.ALL_CONFIGS) {
+            this.normalizeSelectedGroup();
+        }
         this.clearOptions();
         this.buildConfigSwitcher();
         this.createTabButtons();
@@ -160,7 +141,6 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.drawContents(ctx, mouseX, mouseY, partialTicks);
         this.drawButtons(ctx, mouseX, mouseY, partialTicks);
         this.drawTextFields(ctx, mouseX, mouseY);
-        this.drawSearchPlaceholder(ctx);
         this.drawWidgets(ctx, mouseX, mouseY);
         this.drawHoveredWidget(ctx, mouseX, mouseY);
         this.drawButtonHoverTexts(ctx, mouseX, mouseY, partialTicks);
@@ -187,9 +167,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
         return switch (tab) {
             case GENERIC -> this.handleGenericClick(mouseX, mouseY);
-            case SHORTCUTS -> this.handleShortcutClick(mouseX, mouseY);
             case ALL_CONFIGS -> this.handleAllConfigsClick(mouseX, mouseY);
-            case GROUPS -> this.handleGroupsClick(mouseX, mouseY);
         };
     }
 
@@ -219,37 +197,6 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         }
 
         if (this.isInsideList((int) mouseX, (int) mouseY)) {
-            if (tab == ConfigGuiTab.GROUPS) {
-                if (this.isInsideGroupColumn((int) mouseX, (int) mouseY)) {
-                    int previous = this.groupScrollOffset;
-                    this.groupScrollOffset = clamp(this.groupScrollOffset + (verticalAmount < 0 ? 1 : -1), 0,
-                            Math.max(0, ConfigGroupStore.getGroups().size() - this.getGroupVisibleRows()));
-                    return previous != this.groupScrollOffset;
-                }
-
-                if (this.isInsideGroupConfigColumn((int) mouseX, (int) mouseY) == false) {
-                    return false;
-                }
-
-                ConfigGroup selected = this.getSelectedGroup();
-                int itemRows = this.getGroupItemVisibleRows();
-                int itemCount = selected == null ? 0 : selected.items().size();
-                int addableRows = this.getGroupAddableVisibleRows();
-                int addTop = this.getGroupAddTop();
-                if (mouseY < addTop) {
-                    int previous = this.groupItemScrollOffset;
-                    this.groupItemScrollOffset = clamp(this.groupItemScrollOffset + (verticalAmount < 0 ? 1 : -1), 0,
-                            Math.max(0, itemCount - itemRows));
-                    return previous != this.groupItemScrollOffset;
-                }
-                if (addableRows == 0) {
-                    return false;
-                }
-                int previous = this.scrollOffset;
-                this.scrollOffset = clamp(this.scrollOffset + (verticalAmount < 0 ? 1 : -1), 0,
-                        Math.max(0, this.filteredConfigs.size() - addableRows));
-                return previous != this.scrollOffset;
-            }
             int previous = this.scrollOffset;
             this.scrollOffset = clamp(this.scrollOffset + (verticalAmount < 0 ? 1 : -1), 0,
                     Math.max(0, this.getCurrentRowCount() - this.getVisibleRows()));
@@ -320,9 +267,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     protected void drawContents(GuiContext ctx, int mouseX, int mouseY, float partialTicks) {
         switch (tab) {
             case GENERIC -> this.drawGenericRows(ctx, mouseX, mouseY);
-            case SHORTCUTS -> this.drawShortcutRows(ctx, mouseX, mouseY);
             case ALL_CONFIGS -> this.drawAllConfigRows(ctx, mouseX, mouseY);
-            case GROUPS -> this.drawGroupRows(ctx, mouseX, mouseY);
         }
     }
 
@@ -437,18 +382,18 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     private void createTabInputs() {
         this.searchField = null;
-        this.manualIdField = null;
-        this.groupNameField = null;
 
         boolean compactFilters = this.isCompactFilterLayout();
-        int filterButtonWidth = tab == ConfigGuiTab.GENERIC || tab == ConfigGuiTab.GROUPS ? 0
+        boolean wrapFilters = tab != ConfigGuiTab.GENERIC && filterControlsWrap(this.width);
+        int filterButtonWidth = tab == ConfigGuiTab.GENERIC ? 0
                 : (compactFilters ? 60 : 110);
         int modButtonWidth = tab == ConfigGuiTab.GENERIC ? 0 : (compactFilters ? 60 : 118);
         int groupButtonWidth = tab == ConfigGuiTab.GENERIC ? 0 : (compactFilters ? 60 : 118);
-        int searchWidth = Math.min(220,
+        int searchWidth = wrapFilters ? Math.max(80, this.width - MARGIN * 2) : Math.min(220,
                 Math.max(80, this.width - MARGIN * 2 - filterButtonWidth - modButtonWidth - groupButtonWidth - 18));
         this.searchField = new GuiTextFieldGeneric(MARGIN, SEARCH_Y, searchWidth, 18, this.font);
         this.searchField.setMaxLength(128);
+        this.searchField.setSuggestion(StringUtils.translate("fast-masa-config.gui.full.search"));
         this.addTextField(this.searchField, field -> {
             this.scrollOffset = 0;
             this.refreshVisibleRows();
@@ -456,22 +401,22 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         });
 
         if (tab != ConfigGuiTab.GENERIC) {
-            if (tab != ConfigGuiTab.GROUPS) {
-                this.addButton(new ButtonGeneric(MARGIN + searchWidth + 6, SEARCH_Y - 1, filterButtonWidth,
-                        BUTTON_HEIGHT, this.getFilterButtonText()), (button, mouseButton) -> {
-                            this.filterMode = this.getNextFilterMode();
-                            this.scrollOffset = 0;
-                            this.initGui();
-                        });
-            }
-            this.addButton(new ButtonGeneric(MARGIN + searchWidth + filterButtonWidth + 12, SEARCH_Y - 1,
+            int filterY = wrapFilters ? SEARCH_Y + BUTTON_HEIGHT + 4 : SEARCH_Y - 1;
+            int filterX = wrapFilters ? MARGIN : MARGIN + searchWidth + 6;
+            this.addButton(new ButtonGeneric(filterX, filterY, filterButtonWidth,
+                    BUTTON_HEIGHT, this.getFilterButtonText()), (button, mouseButton) -> {
+                        this.filterMode = this.getNextFilterMode();
+                        this.scrollOffset = 0;
+                        this.initGui();
+                    });
+            this.addButton(new ButtonGeneric(filterX + filterButtonWidth + 6, filterY,
                     modButtonWidth, BUTTON_HEIGHT, this.getModFilterButtonText()), (button, mouseButton) -> {
                         this.cycleModFilter();
                         this.scrollOffset = 0;
                         this.initGui();
                     });
             this.addButton(
-                    new ButtonGeneric(MARGIN + searchWidth + filterButtonWidth + modButtonWidth + 18, SEARCH_Y - 1,
+                    new ButtonGeneric(filterX + filterButtonWidth + modButtonWidth + 12, filterY,
                             groupButtonWidth, BUTTON_HEIGHT, this.getGroupFilterButtonText()),
                     (button, mouseButton) -> {
                         this.cycleGroupFilter();
@@ -482,29 +427,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             this.createGenericButtons();
         }
 
-        if (tab == ConfigGuiTab.SHORTCUTS) {
-            int inputY = this.height - 30;
-            int inputWidth = Math.max(80, this.width - MARGIN * 2 - 72);
-            this.manualIdField = new GuiTextFieldGeneric(MARGIN, inputY, inputWidth, 18, this.font);
-            this.manualIdField.setMaxLength(256);
-            this.manualIdField.setSuggestion("modId/groupId/configName");
-            this.addTextField(this.manualIdField, field -> true);
-            this.addButton(new ButtonGeneric(MARGIN + inputWidth + 6, inputY - 1, 58, BUTTON_HEIGHT, "+"),
-                     (button, mouseButton) -> this.addManualShortcut());
-        } else if (tab == ConfigGuiTab.GROUPS) {
-            int inputY = this.height - 30;
-            int inputWidth = Math.max(80, this.width - MARGIN * 2 - 190);
-            this.groupNameField = new GuiTextFieldGeneric(MARGIN, inputY, inputWidth, 18, this.font);
-            this.groupNameField.setMaxLength(128);
-            this.groupNameField.setSuggestion(StringUtils.translate("fast-masa-config.gui.groups.name"));
-            this.addTextField(this.groupNameField, field -> true);
-            int buttonX = MARGIN + inputWidth + 6;
-            this.addButton(new ButtonGeneric(buttonX, inputY - 1, 54, BUTTON_HEIGHT,
-                    StringUtils.translate("fast-masa-config.gui.groups.create")),
-                    (button, mouseButton) -> this.createGroup());
-            this.addButton(new ButtonGeneric(buttonX + 58, inputY - 1, 54, BUTTON_HEIGHT,
-                    StringUtils.translate("fast-masa-config.gui.groups.rename")),
-                    (button, mouseButton) -> this.renameSelectedGroup());
+        if (tab == ConfigGuiTab.ALL_CONFIGS) {
+            this.createAllConfigsGroupControls();
         }
     }
 
@@ -540,56 +464,16 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             String filter = this.getSearchText();
             List<ConfigIndexEntry> index = ConfigIndexService.scanSupportedConfigs();
             this.normalizeSelectedFilters(index);
+            this.normalizeSelectedGroup();
             this.filteredConfigs = index.stream()
                     .filter(this::matchesSelectedFilters)
                     .filter(entry -> this.matchesConfig(entry, filter))
                     .filter(this::matchesConfigFilterMode)
-                    .toList();
-        } else if (tab == ConfigGuiTab.SHORTCUTS) {
-            String filter = this.getSearchText();
-            List<ConfigIndexEntry> index = ConfigIndexService.scanSupportedConfigs();
-            this.normalizeSelectedFilters(index);
-            List<ShortcutView> views = new ArrayList<>();
-            List<ShortcutEntry> shortcuts = ShortcutConfigStore.getEntries();
-
-            for (int i = 0; i < shortcuts.size(); i++) {
-                ShortcutEntry shortcut = shortcuts.get(i);
-                ConfigIndexEntry config = ShortcutResolver.find(index, shortcut).orElse(null);
-                ShortcutView view = new ShortcutView(i, shortcut, config);
-
-                if (this.matchesSelectedFilters(view) && this.matchesShortcut(view, filter)
-                        && this.matchesShortcutFilterMode(view)) {
-                    views.add(view);
-                }
-            }
-
-            this.shortcutViews = List.copyOf(views);
-        } else if (tab == ConfigGuiTab.GROUPS) {
-            List<ConfigIndexEntry> index = ConfigIndexService.scanSupportedConfigs();
-            this.normalizeSelectedFilters(index);
-            this.normalizeSelectedGroup();
-            Map<String, ConfigIndexEntry> entriesByTarget = new HashMap<>();
-            for (ConfigIndexEntry entry : index) {
-                entriesByTarget.put(getGroupItemKey(entry.modId(), entry.groupId(), entry.configName()), entry);
-            }
-            this.groupConfigIndex = Map.copyOf(entriesByTarget);
-            String filter = this.getSearchText();
-            this.filteredConfigs = index.stream()
-                    .filter(this::matchesSelectedFilters)
-                    .filter(entry -> this.matchesConfig(entry, filter))
-                    .filter(this::isAddableToSelectedGroup)
+                    .sorted((left, right) -> Boolean.compare(this.isInSelectedGroup(right), this.isInSelectedGroup(left)))
                     .toList();
         }
 
         this.scrollOffset = clamp(this.scrollOffset, 0, Math.max(0, this.getCurrentRowCount() - this.getVisibleRows()));
-        if (tab == ConfigGuiTab.GROUPS) {
-            this.groupScrollOffset = clamp(this.groupScrollOffset, 0,
-                    Math.max(0, ConfigGroupStore.getGroups().size() - this.getGroupVisibleRows()));
-            ConfigGroup selected = this.getSelectedGroup();
-            int itemCount = selected == null ? 0 : selected.items().size();
-            this.groupItemScrollOffset = clamp(this.groupItemScrollOffset, 0,
-                    Math.max(0, itemCount - this.getGroupItemVisibleRows()));
-        }
     }
 
     private void drawGenericRows(GuiContext context, int mouseX, int mouseY) {
@@ -631,14 +515,17 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         if (config instanceof IConfigBoolean booleanConfig) {
             boolean enabled = booleanConfig.getBooleanValue();
             int bg = enabled ? 0xFF256D45 : 0xFF4A2A2A;
-            this.drawSmallButton(context, x, y, 64, enabled ? "ON" : "OFF", bg,
+            this.drawSmallButton(context, x, y, 64, StringUtils.translate(enabled
+                    ? "fast-masa-config.gui.boolean.on" : "fast-masa-config.gui.boolean.off"), bg,
                     GuiHitTest.isInside(mouseX, mouseY, x, y, 64, BUTTON_HEIGHT));
-            this.drawResetButton(context, config, x + 70, y, mouseX, mouseY);
+            this.drawResetButton(context, config, x + 70, y, 54, mouseX, mouseY);
         } else if (config instanceof IConfigInteger integerConfig) {
-            this.drawNumericControl(context, config, x, y, mouseX, mouseY, integerConfig.getStringValue(),
+            this.drawNumericControl(context, config, NumericControlLayout.calculate(this.width), y, mouseX, mouseY,
+                    integerConfig.getStringValue(),
                     this.getIntegerRatio(integerConfig));
         } else if (config instanceof IConfigDouble doubleConfig) {
-            this.drawNumericControl(context, config, x, y, mouseX, mouseY, formatDouble(doubleConfig.getDoubleValue()),
+            this.drawNumericControl(context, config, NumericControlLayout.calculate(this.width), y, mouseX, mouseY,
+                    formatDouble(doubleConfig.getDoubleValue()),
                     this.getDoubleRatio(doubleConfig));
         }
     }
@@ -656,48 +543,6 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             this.hotkeySettingsButton.setY(y);
             this.hotkeySettingsButton.setEnabled(y >= 0);
         }
-    }
-
-    private void drawShortcutRows(GuiContext context, int mouseX, int mouseY) {
-        this.drawListHeader(context, this.shortcutViews.size(), ShortcutConfigStore.getEntries().size());
-
-        if (this.shortcutViews.isEmpty()) {
-            this.drawEmptyText(context,
-                    StringUtils.translate(
-                            ShortcutConfigStore.getEntries().isEmpty() ? "fast-masa-config.gui.full.empty_shortcuts"
-                                    : "fast-masa-config.gui.full.empty_search"));
-            return;
-        }
-
-        int visible = this.getVisibleRows();
-        int end = Math.min(this.shortcutViews.size(), this.scrollOffset + visible);
-
-        for (int i = this.scrollOffset; i < end; i++) {
-            this.drawShortcutRow(context, this.shortcutViews.get(i), i - this.scrollOffset, mouseX, mouseY);
-        }
-
-        this.drawScrollBar(context, this.shortcutViews.size());
-    }
-
-    private void drawShortcutRow(GuiContext context, ShortcutView view, int visibleIndex, int mouseX, int mouseY) {
-        int x = MARGIN;
-        int y = LIST_Y + visibleIndex * (ROW_HEIGHT + ROW_GAP);
-        int width = this.width - MARGIN * 2;
-        boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT);
-        String label = view.config == null ? view.shortcut.manualId() : view.config.displayName();
-        String meta = view.config == null ? StringUtils.translate("fast-masa-config.gui.full.status.not_found")
-                : view.config.modName() + " / " + view.config.groupName() + " / " + view.shortcut.manualId();
-        int buttonsX = x + width - 102;
-
-        this.drawRowBase(context, x, y, width, hovered);
-        this.drawString(context, fitText(label, buttonsX - x - 16), x + 8, y + 6, COLOR_TEXT);
-        this.drawString(context, fitText(meta, buttonsX - x - 16), x + 8, y + 18, COLOR_MUTED);
-        this.drawSmallButton(context, buttonsX, y + 5, 24, "↑", 0xFF303030,
-                GuiHitTest.isInside(mouseX, mouseY, buttonsX, y + 5, 24, BUTTON_HEIGHT));
-        this.drawSmallButton(context, buttonsX + 28, y + 5, 24, "↓", 0xFF303030,
-                GuiHitTest.isInside(mouseX, mouseY, buttonsX + 28, y + 5, 24, BUTTON_HEIGHT));
-        this.drawSmallButton(context, buttonsX + 56, y + 5, 42, "-", 0xFF5A2525,
-                GuiHitTest.isInside(mouseX, mouseY, buttonsX + 56, y + 5, 42, BUTTON_HEIGHT));
     }
 
     private void drawAllConfigRows(GuiContext context, int mouseX, int mouseY) {
@@ -718,118 +563,25 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.drawScrollBar(context, this.filteredConfigs.size());
     }
 
-    private void drawGroupRows(GuiContext context, int mouseX, int mouseY) {
-        int groupX = MARGIN;
-        boolean narrow = isNarrowGroupsLayout(this.width);
-        int groupWidth = narrow ? this.width - MARGIN * 2 : this.getGroupColumnWidth();
-        int configX = narrow ? MARGIN : groupX + groupWidth + 8;
-        int configWidth = this.width - configX - MARGIN;
-        this.drawString(context, StringUtils.translate("fast-masa-config.gui.groups.title"), groupX, LIST_Y - 14,
-                COLOR_TEXT);
-        if (!narrow) {
-            this.drawString(context, StringUtils.translate("fast-masa-config.gui.groups.addable"), configX, LIST_Y - 14,
-                    COLOR_TEXT);
-        }
-
-        List<ConfigGroup> groups = ConfigGroupStore.getGroups();
-        if (groups.isEmpty()) {
-            this.drawEmptyTextAt(context, StringUtils.translate("fast-masa-config.gui.groups.empty"), groupX, LIST_Y,
-                    groupWidth);
-        }
-
-        int groupEnd = Math.min(groups.size(), this.groupScrollOffset + this.getGroupVisibleRows());
-        for (int i = this.groupScrollOffset; i < groupEnd; i++) {
-            ConfigGroup group = groups.get(i);
-            int y = LIST_Y + (i - this.groupScrollOffset) * (ROW_HEIGHT + ROW_GAP);
-            boolean hovered = GuiHitTest.isInside(mouseX, mouseY, groupX, y, groupWidth, ROW_HEIGHT);
-            this.drawRowBase(context, groupX, y, groupWidth, hovered || group.id().equals(this.selectedGroupId));
-            int buttonsX = this.getGroupRowButtonsX();
-            this.drawString(context, fitText(group.name(), buttonsX - groupX - 12), groupX + 8, y + 6, COLOR_TEXT);
-            this.drawSmallButton(context, buttonsX, y + 5, 22, "↑", 0xFF303030,
-                    GuiHitTest.isInside(mouseX, mouseY, buttonsX, y + 5, 22, BUTTON_HEIGHT));
-            this.drawSmallButton(context, buttonsX + 24, y + 5, 22, "↓", 0xFF303030,
-                    GuiHitTest.isInside(mouseX, mouseY, buttonsX + 24, y + 5, 22, BUTTON_HEIGHT));
-            this.drawSmallButton(context, buttonsX + 48, y + 5, 28, "-", 0xFF5A2525,
-                    GuiHitTest.isInside(mouseX, mouseY, buttonsX + 48, y + 5, 28, BUTTON_HEIGHT));
-            this.drawSmallButton(context, buttonsX + 80, y + 5, 32, group.floating() ? "DOCK" : "FLOAT",
-                    group.floating() ? 0xFF6A344B : 0xFF303030,
-                    GuiHitTest.isInside(mouseX, mouseY, buttonsX + 80, y + 5, 32, BUTTON_HEIGHT));
-        }
-
-        ConfigGroup selected = this.getSelectedGroup();
-        int itemTop = this.getGroupItemsTop();
-        int itemHeight = this.getGroupItemVisibleRows();
-        this.drawString(context, StringUtils.translate("fast-masa-config.gui.groups.items"), configX, itemTop - 14, COLOR_MUTED);
-        if (selected != null) {
-            List<GroupItem> items = selected.items();
-            int itemEnd = Math.min(items.size(), this.groupItemScrollOffset + itemHeight);
-            for (int i = this.groupItemScrollOffset; i < itemEnd; i++) {
-                this.drawGroupItemRow(context, items.get(i), i, configX, configWidth, itemTop, mouseX, mouseY);
-            }
-            if (items.isEmpty()) {
-                this.drawEmptyTextAt(context, StringUtils.translate("fast-masa-config.gui.groups.empty_items"), configX,
-                        itemTop, configWidth);
-            }
-        }
-
-        int addTop = itemTop + itemHeight * (ROW_HEIGHT + ROW_GAP) + 18;
-        String configCount = this.filteredConfigs.size() + " / " + ConfigIndexService.scanSupportedConfigs().size();
-        this.drawString(context, configCount, configX + configWidth - this.font.width(configCount), addTop - 14,
-                COLOR_MUTED);
-        if (this.filteredConfigs.isEmpty()) {
-            this.drawEmptyTextAt(context, StringUtils.translate("fast-masa-config.gui.full.empty_search"), configX,
-                    addTop, configWidth);
-        } else {
-            int visible = this.getGroupAddableVisibleRows();
-            int end = Math.min(this.filteredConfigs.size(), this.scrollOffset + visible);
-            for (int i = this.scrollOffset; i < end; i++) {
-                ConfigIndexEntry entry = this.filteredConfigs.get(i);
-                int y = addTop + (i - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP);
-                boolean hovered = GuiHitTest.isInside(mouseX, mouseY, configX, y, configWidth, ROW_HEIGHT);
-                int buttonX = configX + configWidth - 58;
-                this.drawRowBase(context, configX, y, configWidth, hovered);
-                this.drawString(context, fitText(entry.displayName(), buttonX - configX - 12), configX + 8, y + 6,
-                        COLOR_TEXT);
-                this.drawString(context, fitText(entry.modName() + " / " + entry.groupName(), buttonX - configX - 12),
-                        configX + 8, y + 18, COLOR_MUTED);
-                this.drawSmallButton(context, buttonX, y + 5, 54, "+", 0xFF303030,
-                        GuiHitTest.isInside(mouseX, mouseY, buttonX, y + 5, 54, BUTTON_HEIGHT));
-            }
-        }
-    }
-
-    private void drawGroupItemRow(GuiContext context, GroupItem item, int index, int x, int width, int top,
-            int mouseX, int mouseY) {
-        int y = top + (index - this.groupItemScrollOffset) * (ROW_HEIGHT + ROW_GAP);
-        int buttonsX = x + width - 82;
-        ConfigIndexEntry entry = this.groupConfigIndex.get(getGroupItemKey(item.modId(), item.groupId(), item.configName()));
-        String label = entry == null ? item.configName() : entry.displayName();
-        boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT);
-        this.drawRowBase(context, x, y, width, hovered);
-        this.drawString(context, fitText(label, buttonsX - x - 8), x + 8, y + 6, COLOR_TEXT);
-        this.drawString(context, fitText(item.modId() + " / " + item.groupId(), buttonsX - x - 8), x + 8, y + 18,
-                COLOR_MUTED);
-        this.drawSmallButton(context, buttonsX, y + 5, 22, "↑", 0xFF303030,
-                GuiHitTest.isInside(mouseX, mouseY, buttonsX, y + 5, 22, BUTTON_HEIGHT));
-        this.drawSmallButton(context, buttonsX + 24, y + 5, 22, "↓", 0xFF303030,
-                GuiHitTest.isInside(mouseX, mouseY, buttonsX + 24, y + 5, 22, BUTTON_HEIGHT));
-        this.drawSmallButton(context, buttonsX + 48, y + 5, 30, "-", 0xFF5A2525,
-                GuiHitTest.isInside(mouseX, mouseY, buttonsX + 48, y + 5, 30, BUTTON_HEIGHT));
-    }
-
     private void drawAllConfigRow(GuiContext context, ConfigIndexEntry entry, int visibleIndex, int mouseX,
             int mouseY) {
         int x = MARGIN;
-        int y = LIST_Y + visibleIndex * (ROW_HEIGHT + ROW_GAP);
+        int y = this.getListTop() + visibleIndex * (ROW_HEIGHT + ROW_GAP);
         int width = this.width - MARGIN * 2;
         int buttonX = x + width - 68;
-        boolean selected = ShortcutConfigStore.containsTarget(entry.modId(), entry.groupId(), entry.configName());
+        boolean selected = this.isInSelectedGroup(entry);
         boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT);
         String meta = entry.modName() + " / " + entry.groupName() + " / " + entry.manualId();
 
         this.drawRowBase(context, x, y, width, hovered);
         this.drawString(context, fitText(entry.displayName(), buttonX - x - 16), x + 8, y + 6, COLOR_TEXT);
         this.drawString(context, fitText(meta, buttonX - x - 16), x + 8, y + 18, COLOR_MUTED);
+        if (selected) {
+            this.drawSmallButton(context, buttonX - 48, y + 5, 20, "↑", 0xFF303030,
+                    GuiHitTest.isInside(mouseX, mouseY, buttonX - 48, y + 5, 20, BUTTON_HEIGHT));
+            this.drawSmallButton(context, buttonX - 24, y + 5, 20, "↓", 0xFF303030,
+                    GuiHitTest.isInside(mouseX, mouseY, buttonX - 24, y + 5, 20, BUTTON_HEIGHT));
+        }
         this.drawSmallButton(context, buttonX, y + 5, 64, selected ? "-" : "+", selected ? 0xFF5A2525 : 0xFF303030,
                 GuiHitTest.isInside(mouseX, mouseY, buttonX, y + 5, 64, BUTTON_HEIGHT));
     }
@@ -839,20 +591,9 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.drawString(context, text, this.width - MARGIN - this.font.width(text), SEARCH_Y + 5, COLOR_MUTED);
     }
 
-    private void drawSearchPlaceholder(GuiContext context) {
-        if (this.searchField != null && this.searchField.getValue().isBlank()
-                && this.searchField.isFocused() == false) {
-            this.drawString(context, StringUtils.translate("fast-masa-config.gui.full.search"),
-                    this.searchField.getX() + 4, this.searchField.getY() + 5, 0xFF777777);
-        }
-    }
-
     private void drawEmptyText(GuiContext context, String text) {
-        this.drawString(context, fitText(text, this.width - MARGIN * 2 - 16), MARGIN + 8, LIST_Y + 12, COLOR_MUTED);
-    }
-
-    private void drawEmptyTextAt(GuiContext context, String text, int x, int y, int width) {
-        this.drawString(context, fitText(text, width - 16), x + 8, y + 12, COLOR_MUTED);
+        this.drawString(context, fitText(text, this.width - MARGIN * 2 - 16), MARGIN + 8, this.getListTop() + 12,
+                COLOR_MUTED);
     }
 
     private void drawRowBase(GuiContext context, int x, int y, int width, boolean hovered) {
@@ -867,8 +608,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             return;
         }
 
-        int top = LIST_Y;
-        int bottom = tab == ConfigGuiTab.SHORTCUTS ? this.height - 40 : this.height - 18;
+        int top = this.getListTop();
+        int bottom = this.height - 18;
         int height = Math.max(1, bottom - top);
         int thumbHeight = Math.max(16, height * visibleRows / rowCount);
         int maxOffset = Math.max(1, rowCount - visibleRows);
@@ -892,13 +633,13 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.drawString(context, fitText(text, width - 8), x + 4, y + 6, COLOR_TEXT);
     }
 
-    private void drawNumericControl(GuiContext context, IConfigBase config, int x, int y, int mouseX, int mouseY,
+    private void drawNumericControl(GuiContext context, IConfigBase config, NumericControlLayout layout, int y,
+            int mouseX, int mouseY,
             String valueText, double ratio) {
-        int sliderX = x + NUMERIC_SLIDER_X_OFFSET;
-        this.drawValueBox(context, x, y, NUMERIC_VALUE_WIDTH, valueText);
-        this.drawNumericSlider(context, sliderX, y, NUMERIC_SLIDER_WIDTH, ratio,
-                GuiHitTest.isInside(mouseX, mouseY, sliderX, y, NUMERIC_SLIDER_WIDTH, BUTTON_HEIGHT));
-        this.drawResetButton(context, config, x + NUMERIC_RESET_X_OFFSET, y, mouseX, mouseY);
+        this.drawValueBox(context, layout.valueX(), y, layout.valueWidth(), valueText);
+        this.drawNumericSlider(context, layout.sliderX(), y, layout.sliderWidth(), ratio,
+                GuiHitTest.isInside(mouseX, mouseY, layout.sliderX(), y, layout.sliderWidth(), BUTTON_HEIGHT));
+        this.drawResetButton(context, config, layout.resetX(), y, layout.resetWidth(), mouseX, mouseY);
     }
 
     private void drawNumericSlider(GuiContext context, int x, int y, int width, double ratio, boolean hovered) {
@@ -911,11 +652,11 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         RenderUtils.drawRect(context, knobX, y + 3, 4, BUTTON_HEIGHT - 6, COLOR_TEXT);
     }
 
-    private void drawResetButton(GuiContext context, IConfigBase config, int x, int y, int mouseX, int mouseY) {
+    private void drawResetButton(GuiContext context, IConfigBase config, int x, int y, int width, int mouseX, int mouseY) {
         boolean modified = config instanceof IConfigResettable resettable && resettable.isModified();
-        this.drawSmallButton(context, x, y, 54, StringUtils.translate("malilib.gui.button.reset.caps"),
+        this.drawSmallButton(context, x, y, width, StringUtils.translate("malilib.gui.button.reset.caps"),
                 modified ? 0xFF303030 : 0xFF202020,
-                modified && GuiHitTest.isInside(mouseX, mouseY, x, y, 54, BUTTON_HEIGHT));
+                modified && GuiHitTest.isInside(mouseX, mouseY, x, y, width, BUTTON_HEIGHT));
     }
 
     private boolean handleGenericClick(int mouseX, int mouseY) {
@@ -937,15 +678,16 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                 return true;
             }
 
-            if (this.handleResetClick(config, mouseX, mouseY, controlX + 70, y)) {
+            if (this.handleResetClick(config, mouseX, mouseY, controlX + 70, y, 54)) {
                 return true;
             }
         } else if (config instanceof IConfigInteger || config instanceof IConfigDouble) {
-            if (this.handleNumericSliderClick(config, mouseX, mouseY, controlX, y)) {
+            NumericControlLayout layout = NumericControlLayout.calculate(this.width);
+            if (this.handleNumericSliderClick(config, mouseX, mouseY, layout, y)) {
                 return true;
             }
 
-            if (this.handleResetClick(config, mouseX, mouseY, controlX + NUMERIC_RESET_X_OFFSET, y)) {
+            if (this.handleResetClick(config, mouseX, mouseY, layout.resetX(), y, layout.resetWidth())) {
                 return true;
             }
         }
@@ -953,51 +695,22 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         return false;
     }
 
-    private boolean handleNumericSliderClick(IConfigBase config, int mouseX, int mouseY, int controlX, int y) {
-        if (GuiHitTest.isInside(mouseX, mouseY, controlX + NUMERIC_SLIDER_X_OFFSET, y, NUMERIC_SLIDER_WIDTH,
+    private boolean handleNumericSliderClick(IConfigBase config, int mouseX, int mouseY, NumericControlLayout layout,
+            int y) {
+        if (GuiHitTest.isInside(mouseX, mouseY, layout.sliderX(), y, layout.sliderWidth(),
                 BUTTON_HEIGHT) == false) {
             return false;
         }
 
         this.activeNumericSliderConfig = config;
-        this.applyNumericSliderValue(config, mouseX);
+        this.applyNumericSliderValue(config, mouseX, layout);
         return true;
     }
 
-    private boolean handleShortcutClick(int mouseX, int mouseY) {
-        int index = this.getRowIndexAt(mouseX, mouseY, this.shortcutViews.size());
-
-        if (index < 0) {
-            return false;
-        }
-
-        ShortcutView view = this.shortcutViews.get(index);
-        int x = MARGIN;
-        int width = this.width - MARGIN * 2;
-        int rowY = LIST_Y + (index - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP) + 5;
-        int buttonsX = x + width - 102;
-
-        if (GuiHitTest.isInside(mouseX, mouseY, buttonsX, rowY, 24, BUTTON_HEIGHT)) {
-            this.afterMoveShortcut(ShortcutConfigStore.move(view.storeIndex, -1));
-            return true;
-        }
-
-        if (GuiHitTest.isInside(mouseX, mouseY, buttonsX + 28, rowY, 24, BUTTON_HEIGHT)) {
-            this.afterMoveShortcut(ShortcutConfigStore.move(view.storeIndex, 1));
-            return true;
-        }
-
-        if (GuiHitTest.isInside(mouseX, mouseY, buttonsX + 56, rowY, 42, BUTTON_HEIGHT)) {
-            ShortcutConfigStore.removeTarget(view.shortcut.modId(), view.shortcut.groupId(),
-                    view.shortcut.configName());
-            this.afterShortcutChanged();
-            return true;
-        }
-
-        return false;
-    }
-
     private boolean handleAllConfigsClick(int mouseX, int mouseY) {
+        if (this.handleAllConfigsGroupAction(mouseX, mouseY)) {
+            return true;
+        }
         int index = this.getRowIndexAt(mouseX, mouseY, this.filteredConfigs.size());
 
         if (index < 0) {
@@ -1007,111 +720,85 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         ConfigIndexEntry entry = this.filteredConfigs.get(index);
         int x = MARGIN;
         int width = this.width - MARGIN * 2;
-        int rowY = LIST_Y + (index - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP) + 5;
+        int rowY = this.getListTop() + (index - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP) + 5;
         int buttonX = x + width - 68;
 
-        if (GuiHitTest.isInside(mouseX, mouseY, buttonX, rowY, 64, BUTTON_HEIGHT)) {
-            if (ShortcutConfigStore.containsTarget(entry.modId(), entry.groupId(), entry.configName())) {
-                ShortcutConfigStore.removeTarget(entry.modId(), entry.groupId(), entry.configName());
-                this.afterShortcutChanged();
-            } else {
-                this.addShortcut(entry);
-                this.afterShortcutChanged();
+        if (this.isInSelectedGroup(entry)) {
+            int itemIndex = this.getSelectedGroupItemIndex(entry);
+            ConfigGroup selected = this.getSelectedGroup();
+            if (selected != null && GuiHitTest.isInside(mouseX, mouseY, buttonX - 48, rowY, 20, BUTTON_HEIGHT)) {
+                if (ConfigGroupStore.moveItem(selected.id(), itemIndex, -1)) {
+                    this.afterGroupChanged();
+                }
+                return true;
             }
+            if (selected != null && GuiHitTest.isInside(mouseX, mouseY, buttonX - 24, rowY, 20, BUTTON_HEIGHT)) {
+                if (ConfigGroupStore.moveItem(selected.id(), itemIndex, 1)) {
+                    this.afterGroupChanged();
+                }
+                return true;
+            }
+        }
 
+        if (GuiHitTest.isInside(mouseX, mouseY, buttonX, rowY, 64, BUTTON_HEIGHT)) {
+            ConfigGroup selected = this.getSelectedGroup();
+            if (selected == null) {
+                return true;
+            }
+            if (this.isInSelectedGroup(entry)) {
+                int itemIndex = this.getSelectedGroupItemIndex(entry);
+                if (itemIndex >= 0) {
+                    ConfigGroupStore.removeItem(selected.id(), itemIndex);
+                }
+            } else {
+                ConfigGroupStore.addItem(selected.id(), new GroupItem(entry.modId(), entry.groupId(), entry.configName(), false));
+            }
+            this.afterGroupChanged();
             return true;
         }
 
         return false;
     }
 
-    private boolean handleGroupsClick(int mouseX, int mouseY) {
-        int groupX = MARGIN;
-        int groupWidth = isNarrowGroupsLayout(this.width) ? this.width - MARGIN * 2 : this.getGroupColumnWidth();
-        List<ConfigGroup> groups = ConfigGroupStore.getGroups();
-        int groupEnd = Math.min(groups.size(), this.groupScrollOffset + this.getGroupVisibleRows());
-        for (int i = this.groupScrollOffset; i < groupEnd; i++) {
-            int y = LIST_Y + (i - this.groupScrollOffset) * (ROW_HEIGHT + ROW_GAP);
-            if (GuiHitTest.isInside(mouseX, mouseY, groupX, y, groupWidth, ROW_HEIGHT) == false) {
-                continue;
-            }
-
-            ConfigGroup group = groups.get(i);
-            int buttonsX = this.getGroupRowButtonsX();
-            if (GuiHitTest.isInside(mouseX, mouseY, buttonsX, y + 5, 22, BUTTON_HEIGHT)) {
-                if (ConfigGroupStore.moveGroup(group.id(), -1)) {
-                    this.afterGroupChanged();
-                }
-            } else if (GuiHitTest.isInside(mouseX, mouseY, buttonsX + 24, y + 5, 22, BUTTON_HEIGHT)) {
-                if (ConfigGroupStore.moveGroup(group.id(), 1)) {
-                    this.afterGroupChanged();
-                }
-            } else if (GuiHitTest.isInside(mouseX, mouseY, buttonsX + 48, y + 5, 28, BUTTON_HEIGHT)) {
-                if (ConfigGroupStore.remove(group.id())) {
-                    this.selectedGroupId = ConfigGroupStore.getGroups().stream().findFirst().map(ConfigGroup::id).orElse("");
-                    this.afterGroupChanged();
-                }
-            } else if (GuiHitTest.isInside(mouseX, mouseY, buttonsX + 80, y + 5, 32, BUTTON_HEIGHT)) {
-                ConfigGroupStore.setWindowState(group.id(), !group.floating(), group.collapsed(), group.x(), group.y());
-                this.afterGroupChanged();
-            } else if (this.selectedGroupId.equals(group.id()) == false) {
-                this.selectedGroupId = group.id();
-                this.groupItemScrollOffset = 0;
-                this.scrollOffset = 0;
-                this.refreshVisibleRows();
-            }
+    private boolean handleAllConfigsGroupAction(int mouseX, int mouseY) {
+        int actionY = this.getGroupControlsY();
+        int selectorWidth = this.getGroupSelectorWidth();
+        int actionX = MARGIN + selectorWidth + 4;
+        if (GuiHitTest.isInside(mouseX, mouseY, MARGIN, actionY, selectorWidth, BUTTON_HEIGHT)) {
+            this.selectNextTargetGroup();
             return true;
         }
-
-        ConfigGroup selected = this.getSelectedGroup();
-        if (selected == null) {
-            return false;
-        }
-
-        int configX = isNarrowGroupsLayout(this.width) ? MARGIN : groupX + groupWidth + 8;
-        int configWidth = this.width - configX - MARGIN;
-        int itemRows = this.getGroupItemVisibleRows();
-        int itemEnd = Math.min(selected.items().size(), this.groupItemScrollOffset + itemRows);
-        for (int i = this.groupItemScrollOffset; i < itemEnd; i++) {
-            int y = this.getGroupItemsTop() + (i - this.groupItemScrollOffset) * (ROW_HEIGHT + ROW_GAP) + 5;
-            int buttonsX = configX + configWidth - 82;
-            if (GuiHitTest.isInside(mouseX, mouseY, buttonsX, y, 22, BUTTON_HEIGHT)) {
-                if (ConfigGroupStore.moveItem(selected.id(), i, -1)) {
-                    this.afterGroupChanged();
-                }
-                return true;
-            }
-            if (GuiHitTest.isInside(mouseX, mouseY, buttonsX + 24, y, 22, BUTTON_HEIGHT)) {
-                if (ConfigGroupStore.moveItem(selected.id(), i, 1)) {
-                    this.afterGroupChanged();
-                }
-                return true;
-            }
-            if (GuiHitTest.isInside(mouseX, mouseY, buttonsX + 48, y, 30, BUTTON_HEIGHT)) {
-                if (ConfigGroupStore.removeItem(selected.id(), i)) {
-                    this.afterGroupChanged();
-                }
-                return true;
-            }
-        }
-
-        int addTop = this.getGroupAddTop();
-        int visible = this.getGroupAddableVisibleRows();
-        int index = (mouseY - addTop) / (ROW_HEIGHT + ROW_GAP) + this.scrollOffset;
-        int rowY = addTop + (index - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP) + 5;
-        int buttonX = configX + configWidth - 58;
-        if (GuiHitTest.isInside(mouseX, mouseY, configX, addTop, configWidth,
-                visible * (ROW_HEIGHT + ROW_GAP))
-                && index >= 0 && index < this.filteredConfigs.size() && mouseY < rowY + ROW_HEIGHT
-                && index < this.scrollOffset + visible
-                && GuiHitTest.isInside(mouseX, mouseY, buttonX, rowY, 54, BUTTON_HEIGHT)) {
-            ConfigIndexEntry entry = this.filteredConfigs.get(index);
-            if (ConfigGroupStore.addItem(selected.id(), new GroupItem(entry.modId(), entry.groupId(), entry.configName(), false))) {
+        if (GuiHitTest.isInside(mouseX, mouseY, actionX, actionY, 30, BUTTON_HEIGHT)) {
+            ConfigGroup selected = this.getSelectedGroup();
+            if (selected != null && ConfigGroupStore.hide(selected.id(), !selected.hidden())) {
                 this.afterGroupChanged();
             }
             return true;
         }
-
+        if (GuiHitTest.isInside(mouseX, mouseY, actionX + 34, actionY, 30, BUTTON_HEIGHT)) {
+            ConfigGroup selected = this.getSelectedGroup();
+            if (selected != null && ConfigGroupStore.remove(selected.id())) {
+                this.selectedGroupId = "";
+                this.afterGroupChanged();
+            }
+            return true;
+        }
+        if (GuiHitTest.isInside(mouseX, mouseY, actionX + 68, actionY, 24, BUTTON_HEIGHT)) {
+            ConfigGroup selected = this.getSelectedGroup();
+            if (selected != null && ConfigGroupStore.moveGroup(selected.id(), -1)) {
+                this.afterGroupChanged();
+                this.initGui();
+            }
+            return true;
+        }
+        if (GuiHitTest.isInside(mouseX, mouseY, actionX + 96, actionY, 24, BUTTON_HEIGHT)) {
+            ConfigGroup selected = this.getSelectedGroup();
+            if (selected != null && ConfigGroupStore.moveGroup(selected.id(), 1)) {
+                this.afterGroupChanged();
+                this.initGui();
+            }
+            return true;
+        }
         return false;
     }
 
@@ -1136,67 +823,74 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         }
     }
 
+    private void createAllConfigsGroupControls() {
+        int controlsY = this.getGroupControlsY();
+        GroupActionLayout actionLayout = GroupActionLayout.calculate(this.width);
+        int selectorWidth = actionLayout.selectorWidth();
+        int actionX = actionLayout.actionX();
+        ConfigGroup selected = this.getSelectedGroup();
+        String targetLabel = StringUtils.translate("fast-masa-config.gui.group.target")
+                + (selected == null ? StringUtils.translate("fast-masa-config.gui.group.none") : selected.name())
+                + (selected != null && selected.hidden() ? StringUtils.translate("fast-masa-config.gui.group.hidden") : "");
+        this.addButton(new ButtonGeneric(MARGIN, controlsY, selectorWidth, BUTTON_HEIGHT, targetLabel),
+                (button, mouseButton) -> this.selectNextTargetGroup());
+        this.addButton(new ButtonGeneric(actionX, controlsY, 30, BUTTON_HEIGHT,
+                StringUtils.translate(selected != null && selected.hidden() ? "fast-masa-config.gui.group.show"
+                        : "fast-masa-config.gui.group.hide")), (button, mouseButton) -> {
+                    ConfigGroup current = this.getSelectedGroup();
+                    if (current != null && ConfigGroupStore.hide(current.id(), !current.hidden())) {
+                        this.afterGroupChanged();
+                        this.initGui();
+                    }
+                });
+        ButtonGeneric deleteButton = new ButtonGeneric(actionX + 34, controlsY, 30, BUTTON_HEIGHT, "x");
+        deleteButton.setHoverStrings("fast-masa-config.gui.group.delete");
+        deleteButton.setEnabled(selected != null && !selected.system());
+        this.addButton(deleteButton, (button, mouseButton) -> {
+            ConfigGroup current = this.getSelectedGroup();
+            if (current != null && ConfigGroupStore.remove(current.id())) {
+                this.selectedGroupId = "";
+                this.afterGroupChanged();
+                this.initGui();
+            }
+        });
+        ButtonGeneric moveGroupUpButton = new ButtonGeneric(actionX + 68, controlsY, 24, BUTTON_HEIGHT, "↑");
+        moveGroupUpButton.setHoverStrings("fast-masa-config.gui.group.move_up");
+        this.addButton(moveGroupUpButton, (button, mouseButton) -> this.moveSelectedGroup(-1));
+        ButtonGeneric moveGroupDownButton = new ButtonGeneric(actionX + 96, controlsY, 24, BUTTON_HEIGHT, "↓");
+        moveGroupDownButton.setHoverStrings("fast-masa-config.gui.group.move_down");
+        this.addButton(moveGroupDownButton, (button, mouseButton) -> this.moveSelectedGroup(1));
+
+        int nameY = controlsY + BUTTON_HEIGHT + 4;
+        int nameWidth = Math.max(60, this.width - MARGIN * 2 - 68);
+        this.groupNameField = new GuiTextFieldGeneric(MARGIN, nameY, nameWidth, 18, this.font);
+        this.groupNameField.setMaxLength(128);
+        this.groupNameField.setSuggestion(StringUtils.translate("fast-masa-config.gui.groups.name"));
+        this.addTextField(this.groupNameField, field -> true);
+        ButtonGeneric createButton = new ButtonGeneric(MARGIN + nameWidth + 4, nameY - 1, 30, BUTTON_HEIGHT, "+");
+        createButton.setHoverStrings("fast-masa-config.gui.group.create");
+        this.addButton(createButton, (button, mouseButton) -> this.createGroup());
+        ButtonGeneric renameButton = new ButtonGeneric(MARGIN + nameWidth + 38, nameY - 1, 30, BUTTON_HEIGHT, "R");
+        renameButton.setHoverStrings("fast-masa-config.gui.group.rename");
+        this.addButton(renameButton, (button, mouseButton) -> this.renameSelectedGroup());
+    }
+
     private void afterGroupChanged() {
-        this.groupItemScrollOffset = 0;
         this.scrollOffset = 0;
         this.refreshVisibleRows();
         this.notifyOwnConfigChanged(false);
     }
 
-    private void addManualShortcut() {
-        if (this.manualIdField == null) {
-            return;
-        }
-
-        String manualId = this.manualIdField.getValue().trim();
-
-        if (manualId.isBlank()) {
-            return;
-        }
-
-        try {
-            ShortcutEntry candidate = ShortcutEntry.fromManualId(manualId);
-            ConfigIndexEntry entry = ShortcutResolver.find(ConfigIndexService.scanSupportedConfigs(), candidate)
-                    .orElse(null);
-
-            if (entry == null) {
-                return;
-            }
-
-            if (this.addShortcut(entry)) {
-                this.manualIdField.setValue("");
-                this.afterShortcutChanged();
-            }
-        } catch (IllegalArgumentException ignored) {
+    private void moveSelectedGroup(int offset) {
+        ConfigGroup selected = this.getSelectedGroup();
+        if (selected != null && ConfigGroupStore.moveGroup(selected.id(), offset)) {
+            this.afterGroupChanged();
+            this.initGui();
         }
     }
 
-    private boolean addShortcut(ConfigIndexEntry entry) {
-        return ShortcutConfigStore.add(new ShortcutEntry(
-                entry.modId(),
-                entry.groupId(),
-                entry.configName(),
-                "",
-                entry.config().getType() == ConfigType.BOOLEAN ? ShortcutControlType.TOGGLE
-                        : ShortcutControlType.SLIDER,
-                entry.config().getType() == ConfigType.INTEGER ? 1.0 : 0.05,
-                null,
-                null));
-    }
-
-    private void afterMoveShortcut(boolean moved) {
-        if (moved) {
-            this.afterShortcutChanged();
-        }
-    }
-
-    private void afterShortcutChanged() {
-        this.notifyOwnConfigChanged(false);
-        this.refreshVisibleRows();
-    }
-
-    private boolean handleResetClick(IConfigBase config, int mouseX, int mouseY, int x, int y) {
-        if (GuiHitTest.isInside(mouseX, mouseY, x, y, 54, BUTTON_HEIGHT)
+    private boolean handleResetClick(IConfigBase config, int mouseX, int mouseY, int x, int y, int width) {
+        if (GuiHitTest.isInside(mouseX, mouseY, x, y, width, BUTTON_HEIGHT)
                 && config instanceof IConfigResettable resettable && resettable.isModified()) {
             resettable.resetToDefault();
             this.notifyOwnConfigChanged(false);
@@ -1250,49 +944,37 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private boolean matchesConfigFilterMode(ConfigIndexEntry entry) {
-        return switch (this.filterMode) {
-            case ALL -> true;
-            case ADDED -> ShortcutConfigStore.containsTarget(entry.modId(), entry.groupId(), entry.configName());
-            case MISSING ->
-                ShortcutConfigStore.containsTarget(entry.modId(), entry.groupId(), entry.configName()) == false;
-        };
-    }
-
-    private boolean isAddableToSelectedGroup(ConfigIndexEntry entry) {
         ConfigGroup selected = this.getSelectedGroup();
-        return selected != null && selected.items().stream()
-                .noneMatch(item -> item.isSameTarget(entry.modId(), entry.groupId(), entry.configName()));
-    }
-
-    private boolean matchesShortcut(ShortcutView view, String filter) {
-        if (filter.isBlank()) {
-            return true;
-        }
-
-        String haystack = (view.shortcut.manualId() + " "
-                + (view.config == null ? ""
-                        : view.config.modName() + " " + view.config.groupName() + " " + view.config.displayName()))
-                .toLowerCase(Locale.ROOT);
-        return haystack.contains(filter);
-    }
-
-    private boolean matchesSelectedFilters(ShortcutView view) {
-        String modId = view.config == null ? view.shortcut.modId() : view.config.modId();
-        String groupId = view.config == null ? view.shortcut.groupId() : view.config.groupId();
-
-        if (this.selectedModId.isBlank() == false && modId.equals(this.selectedModId) == false) {
-            return false;
-        }
-
-        return this.selectedConfigGroupId.isBlank() || groupId.equals(this.selectedConfigGroupId);
-    }
-
-    private boolean matchesShortcutFilterMode(ShortcutView view) {
+        boolean added = selected != null && isTargetInGroup(selected.items(), entry.modId(), entry.groupId(),
+                entry.configName());
         return switch (this.filterMode) {
             case ALL -> true;
-            case ADDED -> view.config != null;
-            case MISSING -> view.config == null;
+            case ADDED -> added;
+            case MISSING -> !added;
         };
+    }
+
+    private boolean isInSelectedGroup(ConfigIndexEntry entry) {
+        ConfigGroup selected = this.getSelectedGroup();
+        return selected != null && isTargetInGroup(selected.items(), entry.modId(), entry.groupId(), entry.configName());
+    }
+
+    private int getSelectedGroupItemIndex(ConfigIndexEntry entry) {
+        ConfigGroup selected = this.getSelectedGroup();
+        if (selected == null) {
+            return -1;
+        }
+        for (int index = 0; index < selected.items().size(); index++) {
+            GroupItem item = selected.items().get(index);
+            if (item.isSameTarget(entry.modId(), entry.groupId(), entry.configName())) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    static boolean isTargetInGroup(List<GroupItem> items, String modId, String groupId, String configName) {
+        return items.stream().anyMatch(item -> item.isSameTarget(modId, groupId, configName));
     }
 
     private String getSearchText() {
@@ -1302,24 +984,19 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private int getCurrentRowCount() {
         return switch (tab) {
             case GENERIC -> this.filteredGenericConfigs.size();
-            case SHORTCUTS -> this.shortcutViews.size();
             case ALL_CONFIGS -> this.filteredConfigs.size();
-            case GROUPS -> this.filteredConfigs.size();
         };
     }
 
     private int getVisibleRows() {
-        if (tab == ConfigGuiTab.GROUPS) {
-            return this.getGroupAddableVisibleRows();
-        }
-        int bottom = tab == ConfigGuiTab.SHORTCUTS ? this.height - 40 : this.height - 18;
-        int top = LIST_Y;
+        int bottom = this.height - 18;
+        int top = this.getListTop();
         return Math.max(1, (bottom - top) / (ROW_HEIGHT + ROW_GAP));
     }
 
     private boolean isInsideList(int mouseX, int mouseY) {
-        int top = LIST_Y;
-        int bottom = tab == ConfigGuiTab.SHORTCUTS || tab == ConfigGuiTab.GROUPS ? this.height - 40 : this.height - 18;
+        int top = this.getListTop();
+        int bottom = this.height - 18;
         return GuiHitTest.isInside(mouseX, mouseY, MARGIN, top, this.width - MARGIN * 2, bottom - top);
     }
 
@@ -1327,45 +1004,58 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         return this.width <= 420;
     }
 
-    private int getGroupColumnWidth() {
-        return Math.min(204, Math.max(120, (this.width - MARGIN * 2 - 8) / 2));
-    }
-
-    private int getGroupRowButtonsX() {
-        int width = isNarrowGroupsLayout(this.width) ? this.width - MARGIN * 2 : this.getGroupColumnWidth();
-        return MARGIN + width - 112;
-    }
-
-    private int getGroupColumnBottom() {
-        return this.height - 40;
-    }
-
-    private int getGroupVisibleRows() {
-        if (isNarrowGroupsLayout(this.width)) {
-            return Math.min(2, Math.max(1, (this.getGroupColumnBottom() - LIST_Y) / (ROW_HEIGHT + ROW_GAP) / 4));
+    private int getListTop() {
+        if (tab == ConfigGuiTab.ALL_CONFIGS) {
+            return this.getGroupControlsY() + BUTTON_HEIGHT * 2 + 8;
         }
-        return Math.max(0, (this.getGroupColumnBottom() - LIST_Y) / (ROW_HEIGHT + ROW_GAP));
+        return tab != ConfigGuiTab.GENERIC && filterControlsWrap(this.width) ? SEARCH_Y + BUTTON_HEIGHT * 2 + 8 : LIST_Y;
     }
 
-    private boolean isInsideGroupColumn(int mouseX, int mouseY) {
-        int width = isNarrowGroupsLayout(this.width) ? this.width - MARGIN * 2 : this.getGroupColumnWidth();
-        int height = isNarrowGroupsLayout(this.width) ? this.getGroupVisibleRows() * (ROW_HEIGHT + ROW_GAP)
-                : this.getGroupColumnBottom() - LIST_Y;
-        return GuiHitTest.isInside(mouseX, mouseY, MARGIN, LIST_Y, width, height);
+    private int getGroupControlsY() {
+        return SEARCH_Y + BUTTON_HEIGHT + 4 + (filterControlsWrap(this.width) ? BUTTON_HEIGHT + 4 : 0);
     }
 
-    private boolean isInsideGroupConfigColumn(int mouseX, int mouseY) {
-        int x = isNarrowGroupsLayout(this.width) ? MARGIN : MARGIN + this.getGroupColumnWidth() + 8;
-        int top = isNarrowGroupsLayout(this.width) ? this.getGroupItemsTop() : LIST_Y;
-        return GuiHitTest.isInside(mouseX, mouseY, x, top, this.width - x - MARGIN,
-                this.getGroupColumnBottom() - top);
+    static boolean filterControlsWrap(int screenWidth) {
+        return screenWidth < 290;
+    }
+
+    private int getGroupSelectorWidth() {
+        return GroupActionLayout.calculate(this.width).selectorWidth();
+    }
+
+    static record GroupActionLayout(int selectorWidth, int actionX, int rightEdge) {
+        static GroupActionLayout calculate(int screenWidth) {
+            int actionsWidth = 120;
+            int selectorWidth = Math.min(130, Math.max(60, screenWidth - MARGIN * 2 - actionsWidth - 4));
+            int actionX = MARGIN + selectorWidth + 4;
+            return new GroupActionLayout(selectorWidth, actionX, actionX + actionsWidth);
+        }
+    }
+
+    private void selectNextTargetGroup() {
+        List<ConfigGroup> groups = ConfigGroupStore.getGroups();
+        if (groups.isEmpty()) {
+            return;
+        }
+        int current = -1;
+        for (int index = 0; index < groups.size(); index++) {
+            if (groups.get(index).id().equals(this.selectedGroupId)) {
+                current = index;
+                break;
+            }
+        }
+        this.selectedGroupId = groups.get((current + 1) % groups.size()).id();
+        this.initGui();
     }
 
     private void normalizeSelectedGroup() {
-        if (ConfigGroupStore.get(this.selectedGroupId).isEmpty()) {
-            this.selectedGroupId = ConfigGroupStore.getGroups().stream().findFirst().map(ConfigGroup::id).orElse("");
-            this.groupItemScrollOffset = 0;
-        }
+        this.selectedGroupId = normalizedTargetGroupId(this.selectedGroupId,
+                ConfigGroupStore.getGroups().stream().map(ConfigGroup::id).toList());
+    }
+
+    static String normalizedTargetGroupId(String selectedGroupId, List<String> groupIds) {
+        return groupIds.contains(selectedGroupId) ? selectedGroupId
+                : (groupIds.isEmpty() ? "" : groupIds.getFirst());
     }
 
     @Nullable
@@ -1373,40 +1063,14 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         return ConfigGroupStore.get(this.selectedGroupId).orElse(null);
     }
 
-    private int getGroupItemVisibleRows() {
-        if (isNarrowGroupsLayout(this.width)) {
-            return Math.min(2, Math.max(1, (this.getGroupColumnBottom() - this.getGroupItemsTop())
-                    / (ROW_HEIGHT + ROW_GAP) / 3));
-        }
-        return Math.min(4, Math.max(0, (this.getGroupColumnBottom() - LIST_Y) / (ROW_HEIGHT + ROW_GAP) / 2));
-    }
-
-    private int getGroupItemsTop() {
-        return isNarrowGroupsLayout(this.width)
-                ? LIST_Y + this.getGroupVisibleRows() * (ROW_HEIGHT + ROW_GAP) + 18
-                : LIST_Y;
-    }
-
-    private int getGroupAddTop() {
-        return this.getGroupItemsTop() + this.getGroupItemVisibleRows() * (ROW_HEIGHT + ROW_GAP) + 18;
-    }
-
-    private int getGroupAddableVisibleRows() {
-        return Math.max(0, (this.getGroupColumnBottom() - this.getGroupAddTop()) / (ROW_HEIGHT + ROW_GAP));
-    }
-
-    static String getGroupItemKey(String modId, String groupId, String configName) {
-        return modId + '\u0000' + groupId + '\u0000' + configName;
-    }
-
     private int getRowIndexAt(int mouseX, int mouseY, int rowCount) {
         if (this.isInsideList(mouseX, mouseY) == false) {
             return -1;
         }
 
-        int visibleIndex = (mouseY - LIST_Y) / (ROW_HEIGHT + ROW_GAP);
+        int visibleIndex = (mouseY - this.getListTop()) / (ROW_HEIGHT + ROW_GAP);
         int index = this.scrollOffset + visibleIndex;
-        int rowY = LIST_Y + visibleIndex * (ROW_HEIGHT + ROW_GAP);
+        int rowY = this.getListTop() + visibleIndex * (ROW_HEIGHT + ROW_GAP);
 
         if (mouseY >= rowY + ROW_HEIGHT || index < 0 || index >= rowCount) {
             return -1;
@@ -1423,18 +1087,10 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         if (this.isCompactFilterLayout()) {
             return StringUtils.translate("fast-masa-config.gui.full.filter.compact");
         }
-        if (tab == ConfigGuiTab.SHORTCUTS && this.filterMode == FilterMode.MISSING) {
-            return StringUtils.translate("fast-masa-config.gui.full.filter.invalid");
-        }
-
         return StringUtils.translate(this.filterMode.translationKey);
     }
 
     private FilterMode getNextFilterMode() {
-        if (tab == ConfigGuiTab.SHORTCUTS) {
-            return this.filterMode == FilterMode.MISSING ? FilterMode.ALL : FilterMode.MISSING;
-        }
-
         return this.filterMode.next();
     }
 
@@ -1525,30 +1181,33 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private void applyNumericSliderValue(IConfigBase config, int mouseX) {
+        this.applyNumericSliderValue(config, mouseX, NumericControlLayout.calculate(this.width));
+    }
+
+    private void applyNumericSliderValue(IConfigBase config, int mouseX, NumericControlLayout layout) {
         if (config instanceof IConfigInteger integerConfig) {
-            this.applyNumericSliderValue(integerConfig, mouseX);
+            this.applyNumericSliderValue(integerConfig, mouseX, layout);
         } else if (config instanceof IConfigDouble doubleConfig) {
-            this.applyNumericSliderValue(doubleConfig, mouseX);
+            this.applyNumericSliderValue(doubleConfig, mouseX, layout);
         }
     }
 
-    private void applyNumericSliderValue(IConfigInteger config, int mouseX) {
+    private void applyNumericSliderValue(IConfigInteger config, int mouseX, NumericControlLayout layout) {
         int min = config.getMinIntegerValue();
         int max = config.getMaxIntegerValue();
-        config.setIntegerValue(min + (int) Math.round(this.getSliderRatioAt(mouseX) * (max - min)));
+        config.setIntegerValue(min + (int) Math.round(this.getSliderRatioAt(mouseX, layout) * (max - min)));
         this.notifyOwnConfigChanged(false);
     }
 
-    private void applyNumericSliderValue(IConfigDouble config, int mouseX) {
+    private void applyNumericSliderValue(IConfigDouble config, int mouseX, NumericControlLayout layout) {
         double min = config.getMinDoubleValue();
         double max = config.getMaxDoubleValue();
-        config.setDoubleValue(min + this.getSliderRatioAt(mouseX) * (max - min));
+        config.setDoubleValue(min + this.getSliderRatioAt(mouseX, layout) * (max - min));
         this.notifyOwnConfigChanged(false);
     }
 
-    private double getSliderRatioAt(int mouseX) {
-        int sliderX = this.getControlX() + NUMERIC_SLIDER_X_OFFSET;
-        return clampRatio((mouseX - sliderX) / (double) NUMERIC_SLIDER_WIDTH);
+    private double getSliderRatioAt(int mouseX, NumericControlLayout layout) {
+        return clampRatio((mouseX - layout.sliderX()) / (double) layout.sliderWidth());
     }
 
     private String fitText(String text, int maxWidth) {
@@ -1589,11 +1248,24 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         return Math.max(0.0, Math.min(1.0, value));
     }
 
+    static record NumericControlLayout(int valueX, int valueWidth, int sliderX, int sliderWidth, int resetX,
+            int resetWidth) {
+        static NumericControlLayout calculate(int screenWidth) {
+            int valueWidth = screenWidth <= 360 ? 36 : NUMERIC_VALUE_WIDTH;
+            int sliderWidth = screenWidth <= 360 ? 42 : NUMERIC_SLIDER_WIDTH;
+            int resetWidth = 54;
+            int totalWidth = valueWidth + 6 + sliderWidth + 6 + resetWidth;
+            int rightEdge = screenWidth - MARGIN - SCROLLBAR_WIDTH;
+            int valueX = Math.max(MARGIN + 96, rightEdge - totalWidth);
+            int sliderX = valueX + valueWidth + 6;
+            int resetX = sliderX + sliderWidth + 6;
+            return new NumericControlLayout(valueX, valueWidth, sliderX, sliderWidth, resetX, resetWidth);
+        }
+    }
+
     private enum ConfigGuiTab {
         GENERIC("fast-masa-config.gui.tab.generic"),
-        SHORTCUTS("fast-masa-config.gui.tab.shortcuts"),
-        ALL_CONFIGS("fast-masa-config.gui.tab.all_configs"),
-        GROUPS("fast-masa-config.gui.tab.groups");
+        ALL_CONFIGS("fast-masa-config.gui.tab.all_configs");
 
         private final String translationKey;
 
@@ -1621,9 +1293,6 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             FilterMode[] values = values();
             return values[(this.ordinal() + 1) % values.length];
         }
-    }
-
-    private record ShortcutView(int storeIndex, ShortcutEntry shortcut, ConfigIndexEntry config) {
     }
 
     private static final class HotkeySettingsButton extends ButtonGeneric {

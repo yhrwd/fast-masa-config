@@ -38,7 +38,8 @@ public final class GroupWindowHitTest {
         }
 
         for (GroupWindowLayout.Row row : layout.rows()) {
-            if (contentViewport.contains(mouseX, mouseY)
+            if (isFullyInsideContent(contentViewport, row.x(), row.y() - clampedScrollOffset, row.width(), row.height())
+                    && contentViewport.contains(mouseX, mouseY)
                     && GuiHitTest.isInside(mouseX, mouseY, row.x(), row.y() - clampedScrollOffset,
                     row.width(), row.height())) {
                 return new Result(Target.ROW, row.itemIndex());
@@ -49,10 +50,16 @@ public final class GroupWindowHitTest {
     }
 
     private static boolean isInsideContent(int mouseX, int mouseY, Bounds contentViewport, Bounds bounds,
-                                           int scrollOffset) {
-        return bounds != null && contentViewport.contains(mouseX, mouseY)
+                                            int scrollOffset) {
+        return bounds != null && isFullyInsideContent(contentViewport, bounds.x(), bounds.y() - scrollOffset,
+                bounds.width(), bounds.height()) && contentViewport.contains(mouseX, mouseY)
                 && GuiHitTest.isInside(mouseX, mouseY, bounds.x(), bounds.y() - scrollOffset,
                 bounds.width(), bounds.height());
+    }
+
+    private static boolean isFullyInsideContent(Bounds viewport, int x, int y, int width, int height) {
+        return x >= viewport.x() && y >= viewport.y() && x + width <= viewport.x() + viewport.width()
+                && y + height <= viewport.y() + viewport.height();
     }
 
     public enum Target {

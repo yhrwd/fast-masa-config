@@ -106,9 +106,9 @@ public final class ConfigGroupStore {
         return get(groupId).map(group -> group.setItemExpanded(index, expanded)).orElse(false);
     }
 
-    public static boolean setWindowState(String groupId, boolean floating, boolean collapsed, int x, int y) {
+    public static boolean setWindowState(String groupId, boolean collapsed, int x, int y) {
         Optional<ConfigGroup> group = get(groupId);
-        group.ifPresent(value -> value.setWindowState(floating, collapsed, x, y));
+        group.ifPresent(value -> value.setWindowState(collapsed, x, y));
         return group.isPresent();
     }
 
@@ -126,7 +126,6 @@ public final class ConfigGroupStore {
             object.addProperty("color", group.color());
             object.addProperty("system", group.system());
             object.addProperty("hidden", group.hidden());
-            object.addProperty("floating", group.floating());
             object.addProperty("collapsed", group.collapsed());
             object.addProperty("x", group.x());
             object.addProperty("y", group.y());
@@ -170,8 +169,8 @@ public final class ConfigGroupStore {
             ConfigGroup group = new ConfigGroup(id, defaultGroup ? DEFAULT_GROUP_NAME : name,
                     intValue(object, "color", DEFAULT_COLOR), defaultGroup);
             group.setHidden(booleanValue(object, "hidden", false));
-            group.setWindowState(booleanValue(object, "floating", false), booleanValue(object, "collapsed", false),
-                    intValue(object, "x", 0), intValue(object, "y", 0));
+            group.setWindowState(booleanValue(object, "collapsed", false), intValue(object, "x", 0),
+                    intValue(object, "y", 0));
             GROUPS.add(group);
 
             JsonElement items = object.get("items");
