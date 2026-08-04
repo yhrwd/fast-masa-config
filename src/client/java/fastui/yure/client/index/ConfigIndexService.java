@@ -57,14 +57,15 @@ public final class ConfigIndexService {
         for (GuiConfigsBase.ConfigOptionWrapper wrapper : wrappers) {
             IConfigBase config = wrapper.getConfig();
 
-            if (config != null && isSupported(config) && containsIndexedTarget(result, source.modId(), config.getName()) == false) {
+            if (config != null && isSupported(config) && containsIndexedTarget(result, source.modId(), groupId, config.getName()) == false) {
                 result.add(new ConfigIndexEntry(source.modId(), source.modName(), groupId, groupName, config.getName(), getDisplayName(config), config));
             }
         }
     }
 
-    private static boolean containsIndexedTarget(List<ConfigIndexEntry> result, String modId, String configName) {
-        return result.stream().anyMatch(entry -> entry.modId().equals(modId) && entry.configName().equals(configName));
+    static boolean containsIndexedTarget(List<ConfigIndexEntry> result, String modId, String groupId, String configName) {
+        return result.stream().anyMatch(entry -> entry.modId().equals(modId)
+                && entry.groupId().equals(groupId) && entry.configName().equals(configName));
     }
 
     public static boolean isSupported(IConfigBase config) {

@@ -11,14 +11,17 @@ import fi.dy.masa.malilib.util.data.json.JsonUtils;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 public final class FastMasaConfigHandler implements IConfigHandler {
     private static final String CONFIG_FILE_NAME = FastMasaConfig.MOD_ID + ".json";
-    private static final int CONFIG_VERSION = 1;
+    private static final int CONFIG_VERSION = 2;
 
     @Override
     public void load() {
         // 本 handler 只读取 fast-masa-config.json；首次安装时文件不存在就保持默认值，不碰其它 MaLiLib 模组配置。
+        ConfigGroupStore.clear();
+        ShortcutConfigStore.clear();
         Path configFile = FileUtils.getConfigDirectory().resolve(CONFIG_FILE_NAME);
 
         if (Files.exists(configFile) && Files.isReadable(configFile)) {
@@ -28,12 +31,32 @@ public final class FastMasaConfigHandler implements IConfigHandler {
                 JsonObject root = element.getAsJsonObject();
                 ConfigUtils.readConfigBase(root, "Generic", FastMasaConfigs.Generic.OPTIONS);
 
-                if (root.has("Shortcuts") && root.get("Shortcuts").isJsonArray()) {
-                    ShortcutConfigStore.fromJson(root.getAsJsonArray("Shortcuts"));
-                }
+                loadShortcuts(root);
+                loadGroups(root, ShortcutConfigStore.getEntries());
             } else {
                 FastMasaConfig.LOGGER.error("无法读取配置文件: {}", configFile.toAbsolutePath());
             }
+        }
+
+        ConfigGroupStore.ensureDefaultGroup();
+    }
+
+    static void loadShortcuts(JsonObject root) {
+        ShortcutConfigStore.clear();
+        JsonElement shortcuts = root == null ? null : root.get("Shortcuts");
+        if (shortcuts != null && shortcuts.isJsonArray()) {
+            ShortcutConfigStore.fromJson(shortcuts.getAsJsonArray());
+        }
+    }
+
+    static void loadGroups(JsonObject root, List<ShortcutEntry> shortcuts) {
+        JsonElement groups = root == null ? null : root.get("Groups");
+        if (groups != null && groups.isJsonArray()) {
+            ConfigGroupStore.fromJson(groups.getAsJsonArray());
+        }
+
+        if (groups == null || !groups.isJsonArray() || ConfigGroupStore.getGroups().isEmpty()) {
+            ConfigGroupStore.migrateShortcutsIfEmpty(shortcuts);
         }
     }
 
@@ -50,6 +73,7 @@ public final class FastMasaConfigHandler implements IConfigHandler {
             JsonObject root = new JsonObject();
             ConfigUtils.writeConfigBase(root, "Generic", FastMasaConfigs.Generic.OPTIONS);
             root.add("Shortcuts", ShortcutConfigStore.toJson());
+            root.add("Groups", ConfigGroupStore.toJson());
             root.add("config_version", new JsonPrimitive(CONFIG_VERSION));
             JsonUtils.writeJsonToFile(root, dir.resolve(CONFIG_FILE_NAME));
         } else {

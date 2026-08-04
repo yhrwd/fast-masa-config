@@ -77,7 +77,7 @@ class ShortcutConfigStoreTest {
     }
 
     @Test
-    void ignoresDuplicateTargetsWhenAddingOrReplacing() {
+    void keepsTargetsWithTheSameNameInDifferentGroups() {
         ShortcutConfigStore.clear();
         ShortcutEntry first = new ShortcutEntry("tweakeroo", "Generic", "fastBlockPlacement", "First", ShortcutControlType.TOGGLE, 1.0, null, null);
         ShortcutEntry duplicate = new ShortcutEntry("tweakeroo", "Hotkeys", "fastBlockPlacement", "Duplicate", ShortcutControlType.SLIDER, 0.05, null, null);
@@ -85,12 +85,13 @@ class ShortcutConfigStoreTest {
         ShortcutConfigStore.add(first);
         ShortcutConfigStore.add(duplicate);
 
-        assertEquals(1, ShortcutConfigStore.getEntries().size());
+        assertEquals(2, ShortcutConfigStore.getEntries().size());
         assertEquals("First", ShortcutConfigStore.getEntries().getFirst().labelOverride());
+        assertEquals("Duplicate", ShortcutConfigStore.getEntries().get(1).labelOverride());
 
         ShortcutConfigStore.replaceWithManualIds(List.of("minihud:fontScale", "minihud:fontScale", "minihud/Renderer/fontScale"));
 
-        assertEquals(List.of("minihud:fontScale"), ShortcutConfigStore.toManualIds());
+        assertEquals(List.of("minihud:fontScale", "minihud/Renderer/fontScale"), ShortcutConfigStore.toManualIds());
     }
 
     @Test

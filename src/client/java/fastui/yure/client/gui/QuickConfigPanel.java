@@ -1,6 +1,14 @@
 package fastui.yure.client.gui;
 
 import fastui.yure.client.shortcut.ShortcutControl;
+import fastui.yure.client.index.ConfigIndexEntry;
+import fastui.yure.client.index.ConfigIndexService;
+import fastui.yure.client.shortcut.ResolvedShortcut;
+import fastui.yure.client.shortcut.ShortcutResolver;
+import fastui.yure.config.ConfigGroup;
+import fastui.yure.config.ConfigGroupStore;
+import fastui.yure.config.GroupItem;
+import fastui.yure.config.ShortcutEntry;
 import fastui.yure.config.FastMasaConfigs;
 import fastui.yure.config.ShortcutControlType;
 import fi.dy.masa.malilib.render.RenderUtils;
@@ -12,6 +20,7 @@ import fi.dy.masa.malilib.render.GuiContext;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 
 /**
  * 按住热键时显示的快捷配置面板。
@@ -39,6 +48,7 @@ public final class QuickConfigPanel {
     private int settingsButtonY;
     private int shortcutsTabX;
     private int enabledTabX;
+    private int groupsTabX;
     private int tabY;
     private int visibleRows = 1;
     private int columns = 1;
@@ -46,6 +56,24 @@ public final class QuickConfigPanel {
     private int scrollOffset;
     private double settingsHoverProgress;
     private long openedAtMillis = -1L;
+    private String selectedGroupId;
+    private int groupSelectorX;
+    private int groupSelectorY;
+    private int groupEditX;
+    private int groupEditY;
+    private int groupEditWidth;
+    private List<GroupRow> groupRows = List.of();
+    private List<ConfigIndexEntry> groupIndex = List.of();
+    private final Map<String, FloatingGroupPanel> floatingPanels = new HashMap<>();
+    private final List<String> floatingOrder = new ArrayList<>();
+    private boolean groupSelectorOpen;
+    private int groupMenuX;
+    private int groupMenuY;
+    private int groupMenuWidth;
+    private int groupMenuRowHeight;
+    private List<ConfigGroup> groupSelectorOptions = List.of();
+    private int groupVisibleStart;
+    private int groupVisibleEnd;
 
     /**
      * 保存 Minecraft 的文字渲染器，后续所有文本宽度计算和绘制都用同一个实例。
@@ -82,6 +110,11 @@ public final class QuickConfigPanel {
         this.scrollOffset = layout.clampScrollOffset(scrollOffset);
         this.y += rise;
 
+        if (mode == PanelMode.GROUPS && !ConfigGroupStore.getGroups().isEmpty()) {
+            renderGroups(context, screenWidth, screenHeight, mouseX, mouseY, scrollOffset, open);
+            return;
+        }
+
         drawPanelShell(context, open);
         context.drawString(this.Font, "FAST", this.x + 9, this.y + 7, TEXT, false);
         context.drawString(this.Font, "UI", this.x + 35, this.y + 7, ACCENT, false);
@@ -93,6 +126,7 @@ public final class QuickConfigPanel {
                     : "fast-masa-config.gui.quick.empty";
             context.drawString(this.Font, fitText(StringUtils.translate(emptyKey), this.width - 22), this.x + 10,
                     this.y + 31, TEXT, false);
+            renderFloatingGroups(context, screenWidth, screenHeight, mouseX, mouseY);
             return;
         }
 
@@ -105,6 +139,7 @@ public final class QuickConfigPanel {
         if (this.maxScrollOffset > 0) {
             drawScrollIndicator(context);
         }
+        renderFloatingGroups(context, screenWidth, screenHeight, mouseX, mouseY);
     }
 
     /**
@@ -155,6 +190,105 @@ public final class QuickConfigPanel {
         return GuiHitTest.isInside(mouseX, mouseY, this.settingsButtonX, this.settingsButtonY, 16, 16);
     }
 
+    public boolean hasGroups() {
+        return !ConfigGroupStore.getGroups().isEmpty();
+    }
+
+    public String selectedGroupId() {
+        return this.selectedGroupId;
+    }
+
+    public List<FloatingGroupPanel> floatingPanels() {
+        return this.floatingOrder.stream().map(this.floatingPanels::get).filter(panel -> panel != null).toList();
+    }
+
+    public GroupHit getGroupHit(int mouseX, int mouseY) {
+        if (this.groupSelectorOpen) {
+            int selectorIndex = selectorIndexAt(this.groupMenuX, this.groupMenuY, this.groupMenuWidth,
+                    this.groupMenuRowHeight, this.groupSelectorOptions.size(), mouseX, mouseY);
+            if (selectorIndex >= 0) {
+                return new GroupHit(GroupTarget.SELECTOR_ITEM, this.groupSelectorOptions.get(selectorIndex).id(), -1);
+            }
+            if (!GuiHitTest.isInside(mouseX, mouseY, this.groupSelectorX, this.groupSelectorY, 124, 16)) {
+                return new GroupHit(GroupTarget.MENU_DISMISS, null, -1);
+            }
+        }
+        if (GuiHitTest.isInside(mouseX, mouseY, this.groupSelectorX, this.groupSelectorY, 124, 16)) {
+            return new GroupHit(GroupTarget.SELECTOR, null, -1);
+        }
+        if (GuiHitTest.isInside(mouseX, mouseY, this.groupEditX, this.groupEditY, this.groupEditWidth, 16)) {
+            return new GroupHit(GroupTarget.EDIT, null, -1);
+        }
+        for (int index = this.groupVisibleStart; index < this.groupVisibleEnd; index++) {
+            GroupRow row = this.groupRows.get(index);
+            if (row.shortcut() != null && ShortcutControl.getControlType(row.shortcut().configEntry().config()) != ShortcutControlType.TOGGLE
+                    && GuiHitTest.isInside(mouseX, mouseY, row.sliderX(), row.y() + 16, row.sliderWidth(), 8)) {
+                return new GroupHit(GroupTarget.SLIDER, this.selectedGroupId, index);
+            }
+            if (GuiHitTest.isInside(mouseX, mouseY, row.x(), row.y(), row.width(), QuickPanelLayout.ROW_HEIGHT)) {
+                return new GroupHit(GroupTarget.ROW, this.selectedGroupId, index);
+            }
+        }
+        return new GroupHit(GroupTarget.NONE, null, -1);
+    }
+
+    public List<ConfigGroup> selectableGroups() {
+        return ConfigGroupStore.getGroups();
+    }
+
+    public void selectGroup(String groupId) {
+        if (ConfigGroupStore.get(groupId).filter(group -> !group.floating()).isPresent()) {
+            this.selectedGroupId = groupId;
+            this.groupSelectorOpen = false;
+        }
+    }
+
+    public boolean moveFloatingGroup(String groupId, int x, int y, int screenWidth, int screenHeight) {
+        FloatingGroupPanel panel = this.floatingPanels.get(groupId);
+        if (panel != null) {
+            return panel.moveTo(x, y, screenWidth, screenHeight);
+        }
+        return false;
+    }
+
+    public void toggleGroupSelector() {
+        this.groupSelectorOpen = !this.groupSelectorOpen;
+    }
+
+    public void dismissGroupSelector() {
+        this.groupSelectorOpen = false;
+    }
+
+    public void raiseFloatingGroup(String groupId) {
+        if (this.floatingOrder.remove(groupId)) {
+            this.floatingOrder.add(groupId);
+        }
+    }
+
+    static int selectorIndexAt(int menuX, int menuY, int menuWidth, int rowHeight, int optionCount,
+            int mouseX, int mouseY) {
+        if (rowHeight <= 0 || optionCount <= 0 || !GuiHitTest.isInside(mouseX, mouseY, menuX, menuY, menuWidth,
+                rowHeight * optionCount)) {
+            return -1;
+        }
+        int index = (mouseY - menuY) / rowHeight;
+        return index >= 0 && index < optionCount ? index : -1;
+    }
+
+    public double getCompactSliderRatio(int index, int mouseX) {
+        if (index < 0 || index >= this.groupRows.size()) return 0.0;
+        GroupRow row = this.groupRows.get(index);
+        return Math.max(0.0, Math.min(1.0, (mouseX - row.sliderX()) / (double) Math.max(1, row.sliderWidth())));
+    }
+
+    public ResolvedShortcut getCompactShortcut(int index) {
+        return index >= 0 && index < this.groupRows.size() ? this.groupRows.get(index).shortcut() : null;
+    }
+
+    public int compactScroll(double verticalAmount) {
+        return this.scroll(this.scrollOffset, verticalAmount);
+    }
+
     public PanelMode getModeAt(int mouseX, int mouseY) {
         if (GuiHitTest.isInside(mouseX, mouseY, this.shortcutsTabX, this.tabY, MODE_TAB_WIDTH, 14)) {
             return PanelMode.SHORTCUTS;
@@ -162,6 +296,10 @@ public final class QuickConfigPanel {
 
         if (GuiHitTest.isInside(mouseX, mouseY, this.enabledTabX, this.tabY, MODE_TAB_WIDTH, 14)) {
             return PanelMode.ENABLED_BOOLEANS;
+        }
+
+        if (GuiHitTest.isInside(mouseX, mouseY, this.groupsTabX, this.tabY, MODE_TAB_WIDTH, 14)) {
+            return PanelMode.GROUPS;
         }
 
         return null;
@@ -182,6 +320,135 @@ public final class QuickConfigPanel {
         drawCornerArrow(context, this.x + this.width - 10, this.y + 2, -1, 1, ACCENT);
         drawCornerArrow(context, this.x + 2, this.y + this.height - 10, 1, -1, ACCENT);
         drawCornerArrow(context, this.x + this.width - 10, this.y + this.height - 10, -1, -1, ACCENT);
+    }
+
+    private void renderGroups(GuiContext context, int screenWidth, int screenHeight, int mouseX, int mouseY,
+            int requestedScrollOffset, double open) {
+        ConfigGroup selected = ConfigGroupStore.getGroups().stream().filter(group -> !group.floating())
+                .filter(group -> this.selectedGroupId == null || group.id().equals(this.selectedGroupId)).findFirst()
+                .orElseGet(() -> ConfigGroupStore.getGroups().stream().filter(group -> !group.floating()).findFirst().orElse(null));
+        this.selectedGroupId = selected == null ? null : selected.id();
+        this.groupIndex = ConfigIndexService.scanSupportedConfigs();
+        List<GroupRow> rows = selected == null ? List.of() : buildGroupRows(selected);
+        this.groupRows = rows;
+        QuickPanelLayout layout = QuickPanelLayout.calculate(screenWidth, screenHeight,
+                FastMasaConfigs.Generic.PANEL_WIDTH.getIntegerValue(), FastMasaConfigs.Generic.PANEL_MAX_HEIGHT.getIntegerValue(),
+                FastMasaConfigs.Generic.PANEL_SCALE.getDoubleValue(), rows.size());
+        this.x = layout.x();
+        this.y = layout.y();
+        this.width = layout.width();
+        this.height = Math.min(layout.height() + 18, Math.max(54, screenHeight - 40));
+        this.columns = 1;
+        this.cellWidth = layout.cellWidth();
+        this.visibleRows = Math.max(1, Math.min(rows.size(),
+                (this.height - QuickPanelLayout.HEADER_HEIGHT - 22 - QuickPanelLayout.PANEL_PADDING
+                        + QuickPanelLayout.GAP) / (QuickPanelLayout.ROW_HEIGHT + QuickPanelLayout.GAP)));
+        this.maxScrollOffset = Math.max(0, rows.size() - this.visibleRows);
+        this.scrollOffset = Math.max(0, Math.min(this.maxScrollOffset, requestedScrollOffset));
+        drawPanelShell(context, open);
+        context.drawString(this.Font, "FAST UI", this.x + 9, this.y + 7, TEXT, false);
+        this.settingsButtonX = this.x + this.width - 24;
+        this.settingsButtonY = this.y + 5;
+        drawSettingsButton(context, mouseX, mouseY);
+        drawModeTabs(context, mouseX, mouseY, PanelMode.GROUPS);
+        this.groupSelectorX = this.x + 7;
+        this.groupSelectorY = this.y + QuickPanelLayout.HEADER_HEIGHT + 18;
+        this.groupEditX = this.x + this.width - 76;
+        this.groupEditY = this.groupSelectorY;
+        this.groupEditWidth = 68;
+        this.groupSelectorOptions = ConfigGroupStore.getGroups().stream().filter(group -> !group.floating()).toList();
+        this.groupMenuX = this.groupSelectorX;
+        this.groupMenuY = this.groupSelectorY + 16;
+        this.groupMenuWidth = 124;
+        this.groupMenuRowHeight = 18;
+        RenderUtils.drawRect(context, this.groupSelectorX, this.groupSelectorY, 124, 16,
+                this.groupSelectorOpen ? 0xFFE6397C : 0xD8211820);
+        context.drawString(this.Font, fitText(selected == null ? "Groups" : selected.name(), 108), this.groupSelectorX + 5,
+                this.groupSelectorY + 4, TEXT, false);
+        RenderUtils.drawRect(context, this.groupEditX, this.groupEditY, this.groupEditWidth, 16, 0xD8211820);
+        context.drawString(this.Font, "EDIT GROUPS", this.groupEditX + 4, this.groupEditY + 4, MUTED, false);
+        if (this.groupSelectorOpen) {
+            RenderUtils.drawRect(context, this.groupMenuX, this.groupMenuY, this.groupMenuWidth,
+                    this.groupMenuRowHeight * this.groupSelectorOptions.size(), 0xF01A1A1D);
+            for (int index = 0; index < this.groupSelectorOptions.size(); index++) {
+                ConfigGroup option = this.groupSelectorOptions.get(index);
+                context.drawString(this.Font, fitText(option.name(), this.groupMenuWidth - 8), this.groupMenuX + 4,
+                        this.groupMenuY + index * this.groupMenuRowHeight + 5,
+                        option.id().equals(this.selectedGroupId) ? ACCENT : TEXT, false);
+            }
+        }
+        this.groupVisibleStart = this.scrollOffset;
+        this.groupVisibleEnd = Math.min(rows.size(), this.scrollOffset + this.visibleRows);
+        for (int index = this.groupVisibleStart; index < this.groupVisibleEnd; index++) {
+            GroupRow row = rows.get(index);
+            int rowY = this.y + QuickPanelLayout.HEADER_HEIGHT + 22 + (index - this.scrollOffset) * (QuickPanelLayout.ROW_HEIGHT + 2);
+            this.groupRows.set(index, row.withPosition(this.x + 7, rowY, this.cellWidth));
+            drawGroupRow(context, this.groupRows.get(index), mouseX, mouseY);
+        }
+        renderFloatingGroups(context, screenWidth, screenHeight, mouseX, mouseY);
+    }
+
+    private void renderFloatingGroups(GuiContext context, int screenWidth, int screenHeight, int mouseX, int mouseY) {
+        this.groupIndex = ConfigIndexService.scanSupportedConfigs();
+        for (ConfigGroup group : ConfigGroupStore.getGroups()) {
+            if (!group.floating()) continue;
+            FloatingGroupPanel panel = this.floatingPanels.computeIfAbsent(group.id(), id -> new FloatingGroupPanel(this.Font, id));
+            if (!this.floatingOrder.contains(group.id())) this.floatingOrder.add(group.id());
+        }
+        this.floatingPanels.keySet().removeIf(id -> ConfigGroupStore.get(id).isEmpty());
+        this.floatingOrder.removeIf(id -> !this.floatingPanels.containsKey(id)
+                || ConfigGroupStore.get(id).map(group -> !group.floating()).orElse(true));
+        for (String groupId : this.floatingOrder) {
+            FloatingGroupPanel panel = this.floatingPanels.get(groupId);
+            if (panel != null) {
+                panel.render(context, screenWidth, screenHeight, mouseX, mouseY, this.groupIndex);
+            }
+        }
+    }
+
+    private List<GroupRow> buildGroupRows(ConfigGroup group) {
+        List<GroupRow> result = new ArrayList<>();
+        for (GroupItem item : group.items()) {
+            ShortcutEntry entry = new ShortcutEntry(item.modId(), item.groupId(), item.configName(), "",
+                    ShortcutControlType.TOGGLE, 1.0, null, null);
+            ResolvedShortcut shortcut = ShortcutResolver.find(this.groupIndex, entry)
+                    .map(indexEntry -> new ResolvedShortcut(entry, indexEntry)).orElse(null);
+            String label = shortcut == null ? item.configName() : shortcut.configEntry().displayName();
+            result.add(new GroupRow(item, shortcut, label, 0, 0, 0, this.cellWidth));
+        }
+        return result;
+    }
+
+    private void drawGroupRow(GuiContext context, GroupRow row, int mouseX, int mouseY) {
+        boolean active = row.shortcut() != null;
+        boolean hovered = active && GuiHitTest.isInside(mouseX, mouseY, row.x(), row.y(), row.width(), QuickPanelLayout.ROW_HEIGHT);
+        RenderUtils.drawRect(context, row.x(), row.y(), row.width(), QuickPanelLayout.ROW_HEIGHT,
+                HoloPanelVisuals.withAlpha(hovered ? 0xFF34202A : 0xFF211820, active ? 0xC8 : 0x68));
+        context.drawString(this.Font, fitText(row.label(), row.width() - 88), row.x() + 6, row.y() + 4,
+                active ? TEXT : 0x887F6C75, false);
+        if (!active) {
+            context.drawString(this.Font, "unavailable", row.x() + 6, row.y() + 15, 0x776F5B64, false);
+            return;
+        }
+        if (ShortcutControl.getControlType(row.shortcut().configEntry().config()) == ShortcutControlType.TOGGLE) {
+            drawToggle(context, QuickPanelItem.fromShortcut(row.shortcut()), row.x() + row.width() - 36, row.y() + 7, hovered);
+        } else {
+            double ratio = ShortcutControl.getSliderRatio(row.shortcut().configEntry().config());
+            RenderUtils.drawRect(context, row.sliderX(), row.y() + 18, row.sliderWidth(), 3, TRACK);
+            RenderUtils.drawRect(context, row.sliderX(), row.y() + 18, (int) Math.round(row.sliderWidth() * ratio), 3, ACCENT);
+            context.drawString(this.Font, ShortcutControl.getValueText(row.shortcut().configEntry().config()), row.x() + row.width() - 34,
+                    row.y() + 4, MUTED, false);
+        }
+    }
+
+    public enum GroupTarget { NONE, SELECTOR, SELECTOR_ITEM, MENU_DISMISS, EDIT, ROW, SLIDER }
+    public record GroupHit(GroupTarget target, String groupId, int itemIndex) {}
+    private record GroupRow(GroupItem item, ResolvedShortcut shortcut, String label, int x, int y, int sliderX, int width) {
+        GroupRow withPosition(int x, int y, int width) {
+            int sliderX = x + width - 82;
+            return new GroupRow(this.item, this.shortcut, this.label, x, y, sliderX, width);
+        }
+        int sliderWidth() { return 76; }
     }
 
     /**
@@ -232,6 +499,14 @@ public final class QuickConfigPanel {
         this.tabY = this.y + 5;
         this.enabledTabX = this.settingsButtonX - MODE_TAB_WIDTH - 4;
         this.shortcutsTabX = this.enabledTabX - MODE_TAB_WIDTH - 2;
+        this.groupsTabX = this.shortcutsTabX - MODE_TAB_WIDTH - 2;
+        if (ConfigGroupStore.getGroups().isEmpty()) {
+            this.groupsTabX = this.shortcutsTabX;
+        }
+        if (!ConfigGroupStore.getGroups().isEmpty()) {
+            drawModeTab(context, this.groupsTabX, this.tabY, MODE_TAB_WIDTH, "GROUPS", mode == PanelMode.GROUPS,
+                    mouseX, mouseY);
+        }
         drawModeTab(context, this.shortcutsTabX, this.tabY, MODE_TAB_WIDTH,
                 StringUtils.translate("fast-masa-config.gui.quick.tab.shortcuts"), mode == PanelMode.SHORTCUTS, mouseX,
                 mouseY);
@@ -410,6 +685,7 @@ public final class QuickConfigPanel {
 
     public enum PanelMode {
         SHORTCUTS,
-        ENABLED_BOOLEANS
+        ENABLED_BOOLEANS,
+        GROUPS
     }
 }

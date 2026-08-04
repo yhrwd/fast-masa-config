@@ -24,18 +24,9 @@ public final class ShortcutResolver {
     }
 
     public static Optional<ConfigIndexEntry> find(List<ConfigIndexEntry> index, ShortcutEntry shortcut) {
-        Optional<ConfigIndexEntry> exactGroup = index.stream()
-                .filter(entry -> entry.modId().equals(shortcut.modId()))
-                .filter(entry -> entry.groupId().equals(shortcut.groupId()))
-                .filter(entry -> entry.configName().equals(shortcut.configName()))
-                .findFirst();
-
-        if (exactGroup.isPresent()) {
-            return exactGroup;
-        }
-
         return index.stream()
                 .filter(entry -> entry.modId().equals(shortcut.modId()))
+                .filter(entry -> entry.groupId().equals(shortcut.groupId()))
                 .filter(entry -> entry.configName().equals(shortcut.configName()))
                 .findFirst();
     }
