@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GroupWindowHitTestTest {
     @Test
@@ -99,5 +100,43 @@ class GroupWindowHitTestTest {
 
         assertEquals(new GroupWindowHitTest.Result(GroupWindowHitTest.Target.SCROLLBAR, -1),
                 GroupWindowHitTest.hitTest(layout, 0, scrollbar.x(), 70, scrollbar, List.of(controls)));
+    }
+
+    @Test
+    void narrowControlsStayNonNegativeAndInsideTheirRow() {
+        GroupWindowLayout.Row row = new GroupWindowLayout.Row(40, 40, 60, 10, 42);
+
+        GroupWindowHitTest.Bounds expand = FloatingGroupPanel.expandBounds(row);
+        GroupWindowHitTest.Bounds slider = FloatingGroupPanel.sliderBounds(row);
+
+        assertTrue(expand.width() >= 0);
+        assertTrue(slider.width() >= 0);
+        assertTrue(expand.x() >= row.x());
+        assertTrue(expand.x() + expand.width() <= row.x() + row.width());
+        assertTrue(slider.x() >= row.x());
+        assertTrue(slider.x() + slider.width() <= row.x() + row.width());
+    }
+
+    @Test
+    void narrowTextNeverReturnsAnEllipsisThatCannotFit() {
+        assertEquals("", FloatingGroupPanel.fitText("abcdef", -1, String::length));
+        assertEquals("ab", FloatingGroupPanel.fitText("abcdef", 2, String::length));
+        assertEquals("a...", FloatingGroupPanel.fitText("abcdef", 4, String::length));
+    }
+
+    @Test
+    void numericControlsUseBoxedExpandAndSliderBoundsBelowTheRow() {
+        GroupWindowLayout.Row row = new GroupWindowLayout.Row(0, 40, 60, 196, 42);
+
+        GroupWindowHitTest.Bounds expand = FloatingGroupPanel.expandBounds(row);
+        GroupWindowHitTest.Bounds slider = FloatingGroupPanel.sliderBounds(row);
+        GroupWindowHitTest.Bounds value = FloatingGroupPanel.valueBounds(row);
+
+        assertEquals(new GroupWindowHitTest.Bounds(214, 62, 16, 16), expand);
+        assertEquals(new GroupWindowHitTest.Bounds(84, 93, 88, 9), slider);
+        assertEquals(new GroupWindowHitTest.Bounds(178, 93, 32, 9), value);
+        assertTrue(slider.x() > row.x());
+        assertTrue(slider.x() + slider.width() <= value.x());
+        assertTrue(value.x() + value.width() <= expand.x());
     }
 }

@@ -16,13 +16,12 @@ class ConfigGroupStoreTest {
     @Test
     void managesGroupMetadataAndOrder() {
         ConfigGroupStore.clear();
-        ConfigGroup first = ConfigGroupStore.create("建筑", 0xFFE6397C);
-        ConfigGroup second = ConfigGroupStore.create("渲染", 0xFF457B9D);
+        ConfigGroup first = ConfigGroupStore.create("建筑");
+        ConfigGroup second = ConfigGroupStore.create("渲染");
 
         assertFalse(first.id().isBlank());
         assertTrue(ConfigGroupStore.rename(first.id(), "建造"));
         assertEquals("建造", first.name());
-        assertEquals(0xFF457B9D, second.color());
         assertTrue(ConfigGroupStore.moveGroup(second.id(), -1));
         assertEquals(List.of(second.id(), first.id()), ConfigGroupStore.getGroups().stream().map(ConfigGroup::id).toList());
         assertTrue(ConfigGroupStore.remove(first.id()));
@@ -33,10 +32,10 @@ class ConfigGroupStoreTest {
     void rejectsBlankGroupNames() {
         ConfigGroupStore.clear();
 
-        assertThrows(IllegalArgumentException.class, () -> ConfigGroupStore.create(null, 0xFFE6397C));
-        assertThrows(IllegalArgumentException.class, () -> ConfigGroupStore.create(" ", 0xFFE6397C));
+        assertThrows(IllegalArgumentException.class, () -> ConfigGroupStore.create(null));
+        assertThrows(IllegalArgumentException.class, () -> ConfigGroupStore.create(" "));
 
-        ConfigGroup group = ConfigGroupStore.create("建筑", 0xFFE6397C);
+        ConfigGroup group = ConfigGroupStore.create("建筑");
         assertFalse(ConfigGroupStore.rename(group.id(), null));
         assertFalse(ConfigGroupStore.rename(group.id(), " "));
         assertEquals("建筑", group.name());
@@ -45,7 +44,7 @@ class ConfigGroupStoreTest {
     @Test
     void addsTargetsOnceWithinTheSameGroupAndPreservesOrder() {
         ConfigGroupStore.clear();
-        ConfigGroup group = ConfigGroupStore.create("建筑", 0xFFE6397C);
+        ConfigGroup group = ConfigGroupStore.create("建筑");
 
         assertTrue(ConfigGroupStore.addItem(group.id(), new GroupItem("tweakeroo", "Generic", "fastBlockPlacement", false)));
         assertTrue(ConfigGroupStore.addItem(group.id(), new GroupItem("tweakeroo", "Hotkeys", "fastBlockPlacement", false)));
@@ -65,7 +64,7 @@ class ConfigGroupStoreTest {
     @Test
     void roundTripsWindowStateWithoutPersistingObsoleteFloatingFlag() {
         ConfigGroupStore.clear();
-        ConfigGroup group = ConfigGroupStore.create("建筑", 0xFFE6397C);
+        ConfigGroup group = ConfigGroupStore.create("建筑");
         ConfigGroupStore.setWindowState(group.id(), false, 40, 60);
         ConfigGroupStore.addItem(group.id(), new GroupItem("tweakeroo", "Generic", "fastBlockPlacement", true));
 
@@ -84,13 +83,14 @@ class ConfigGroupStoreTest {
     @Test
     void ignoresLegacyFloatingFlagWhenLoadingGroups() {
         ConfigGroupStore.fromJson(JsonParser.parseString("""
-                [{"id":"default","name":"Fast Masa Config","floating":false,"collapsed":true,"x":40,"y":60}]
+                [{"id":"default","name":"Fast Masa Config","color":123,"floating":false,"collapsed":true,"x":40,"y":60}]
                 """).getAsJsonArray());
 
         JsonObject saved = ConfigGroupStore.toJson().get(0).getAsJsonObject();
         ConfigGroup loaded = ConfigGroupStore.get("default").orElseThrow();
 
         assertFalse(saved.has("floating"));
+        assertFalse(saved.has("color"));
         assertTrue(loaded.collapsed());
         assertEquals(40, loaded.x());
         assertEquals(60, loaded.y());
@@ -115,7 +115,7 @@ class ConfigGroupStoreTest {
     void hidesGroupsWithoutChangingExternalUserGroupDeletion() {
         ConfigGroupStore.clear();
         ConfigGroup defaultGroup = ConfigGroupStore.ensureDefaultGroup();
-        ConfigGroup userGroup = ConfigGroupStore.create("建筑", 0xFFE6397C);
+        ConfigGroup userGroup = ConfigGroupStore.create("建筑");
 
         assertTrue(ConfigGroupStore.hide(defaultGroup.id(), true));
         assertTrue(defaultGroup.hidden());
@@ -128,7 +128,7 @@ class ConfigGroupStoreTest {
     @Test
     void normalizesNullItemGroupIdBeforeJsonRoundTrip() {
         ConfigGroupStore.clear();
-        ConfigGroup group = ConfigGroupStore.create("建筑", 0xFFE6397C);
+        ConfigGroup group = ConfigGroupStore.create("建筑");
 
         assertTrue(ConfigGroupStore.addItem(group.id(), new GroupItem("tweakeroo", null, "fastBlockPlacement", false)));
         assertEquals("", ConfigGroupStore.get(group.id()).orElseThrow().items().getFirst().groupId());

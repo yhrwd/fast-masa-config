@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public final class ConfigGroupStore {
-    private static final int DEFAULT_COLOR = 0xFFE6397C;
     private static final String DEFAULT_GROUP_ID = "default";
     private static final String DEFAULT_GROUP_NAME = "Fast Masa Config";
     private static final List<ConfigGroup> GROUPS = new ArrayList<>();
@@ -19,12 +18,12 @@ public final class ConfigGroupStore {
     private ConfigGroupStore() {
     }
 
-    public static ConfigGroup create(String name, int color) {
+    public static ConfigGroup create(String name) {
         if (isBlank(name)) {
             throw new IllegalArgumentException("分组名称不能为空");
         }
 
-        ConfigGroup group = new ConfigGroup(UUID.randomUUID().toString(), name, color, false);
+        ConfigGroup group = new ConfigGroup(UUID.randomUUID().toString(), name, false);
         GROUPS.add(group);
         return group;
     }
@@ -38,7 +37,7 @@ public final class ConfigGroupStore {
             return group;
         }
 
-        ConfigGroup group = new ConfigGroup(DEFAULT_GROUP_ID, DEFAULT_GROUP_NAME, DEFAULT_COLOR, true);
+        ConfigGroup group = new ConfigGroup(DEFAULT_GROUP_ID, DEFAULT_GROUP_NAME, true);
         GROUPS.add(group);
         return group;
     }
@@ -123,7 +122,6 @@ public final class ConfigGroupStore {
             JsonObject object = new JsonObject();
             object.addProperty("id", group.id());
             object.addProperty("name", group.name());
-            object.addProperty("color", group.color());
             object.addProperty("system", group.system());
             object.addProperty("hidden", group.hidden());
             object.addProperty("collapsed", group.collapsed());
@@ -166,8 +164,7 @@ public final class ConfigGroupStore {
             }
 
             boolean defaultGroup = DEFAULT_GROUP_ID.equals(id);
-            ConfigGroup group = new ConfigGroup(id, defaultGroup ? DEFAULT_GROUP_NAME : name,
-                    intValue(object, "color", DEFAULT_COLOR), defaultGroup);
+            ConfigGroup group = new ConfigGroup(id, defaultGroup ? DEFAULT_GROUP_NAME : name, defaultGroup);
             group.setHidden(booleanValue(object, "hidden", false));
             group.setWindowState(booleanValue(object, "collapsed", false), intValue(object, "x", 0),
                     intValue(object, "y", 0));

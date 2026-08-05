@@ -7,7 +7,6 @@ import java.util.List;
 public final class ConfigGroup {
     private final String id;
     private String name;
-    private int color;
     private boolean system;
     private boolean hidden;
     private boolean collapsed;
@@ -15,10 +14,9 @@ public final class ConfigGroup {
     private int y;
     private final List<GroupItem> items = new ArrayList<>();
 
-    ConfigGroup(String id, String name, int color, boolean system) {
+    ConfigGroup(String id, String name, boolean system) {
         this.id = id;
         this.name = name;
-        this.color = color;
         this.system = system;
     }
 
@@ -28,10 +26,6 @@ public final class ConfigGroup {
 
     public String name() {
         return this.name;
-    }
-
-    public int color() {
-        return this.color;
     }
 
     public boolean system() {

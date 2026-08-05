@@ -18,7 +18,7 @@ public record GroupWindowLayout(
         List<Row> rows
 ) {
     public static final int SAFE_MARGIN = 20;
-    public static final int DESIRED_WIDTH = 212;
+    public static final int DESIRED_WIDTH = 196;
     public static final int MIN_SAFE_WIDTH = 180;
     public static final int HEADER_HEIGHT = 20;
 

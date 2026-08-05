@@ -60,12 +60,12 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private static final int ROW_HEIGHT = 30;
     private static final int ROW_GAP = 3;
     private static final int BUTTON_HEIGHT = 20;
-    private static final int COLOR_ROW = 0xA0201820;
-    private static final int COLOR_ROW_HOVER = 0xC02A1D25;
-    private static final int COLOR_BORDER = 0xFF6A344B;
-    private static final int COLOR_ACCENT = 0xFFE6397C;
-    private static final int COLOR_TEXT = 0xFFFFEAF2;
-    private static final int COLOR_MUTED = 0xFFCFA4B7;
+    private static final int COLOR_ROW = FastMasaMenuPalette.SURFACE_TRANSLUCENT;
+    private static final int COLOR_ROW_HOVER = FastMasaMenuPalette.ROW_HOVER_TRANSLUCENT;
+    private static final int COLOR_BORDER = FastMasaMenuPalette.BORDER;
+    private static final int COLOR_ACCENT = FastMasaMenuPalette.ACCENT;
+    private static final int COLOR_TEXT = FastMasaMenuPalette.TEXT;
+    private static final int COLOR_MUTED = FastMasaMenuPalette.MUTED;
     private static final int SCROLLBAR_WIDTH = 3;
     private static final int NUMERIC_VALUE_WIDTH = 50;
     private static final int NUMERIC_SLIDER_WIDTH = 68;
@@ -110,10 +110,23 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
      * suppressKeys 是进入全屏页那一刻仍被按住的打开热键，用于防止它们进入搜索框。
      */
     public FastMasaConfigGui(Screen parent, Set<Integer> suppressKeys) {
+        this(parent, suppressKeys, null);
+    }
+
+    /** 打开完整配置页并预选指定的浮动分组。 */
+    public FastMasaConfigGui(Screen parent, Set<Integer> suppressKeys, String targetGroupId) {
         super();
         this.setParent(parent);
         this.setTitle(StringUtils.translate("fast-masa-config.gui.title.configs"));
         this.inputSuppressor = new HeldKeyInputSuppressor(suppressKeys);
+        if (targetGroupId != null) {
+            tab = ConfigGuiTab.ALL_CONFIGS;
+            this.selectedGroupId = targetGroupId;
+        }
+    }
+
+    static String recoveryTargetGroupId() {
+        return "default";
     }
 
     @Override
@@ -514,7 +527,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private void drawGenericControl(GuiContext context, IConfigBase config, int x, int y, int mouseX, int mouseY) {
         if (config instanceof IConfigBoolean booleanConfig) {
             boolean enabled = booleanConfig.getBooleanValue();
-            int bg = enabled ? 0xFF256D45 : 0xFF4A2A2A;
+            int bg = enabled ? COLOR_ACCENT : FastMasaMenuPalette.NEUTRAL;
             this.drawSmallButton(context, x, y, 64, StringUtils.translate(enabled
                     ? "fast-masa-config.gui.boolean.on" : "fast-masa-config.gui.boolean.off"), bg,
                     GuiHitTest.isInside(mouseX, mouseY, x, y, 64, BUTTON_HEIGHT));
@@ -577,12 +590,12 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.drawString(context, fitText(entry.displayName(), buttonX - x - 16), x + 8, y + 6, COLOR_TEXT);
         this.drawString(context, fitText(meta, buttonX - x - 16), x + 8, y + 18, COLOR_MUTED);
         if (selected) {
-            this.drawSmallButton(context, buttonX - 48, y + 5, 20, "↑", 0xFF303030,
+            this.drawSmallButton(context, buttonX - 48, y + 5, 20, "↑", FastMasaMenuPalette.CONTROL_DARK,
                     GuiHitTest.isInside(mouseX, mouseY, buttonX - 48, y + 5, 20, BUTTON_HEIGHT));
-            this.drawSmallButton(context, buttonX - 24, y + 5, 20, "↓", 0xFF303030,
+            this.drawSmallButton(context, buttonX - 24, y + 5, 20, "↓", FastMasaMenuPalette.CONTROL_DARK,
                     GuiHitTest.isInside(mouseX, mouseY, buttonX - 24, y + 5, 20, BUTTON_HEIGHT));
         }
-        this.drawSmallButton(context, buttonX, y + 5, 64, selected ? "-" : "+", selected ? 0xFF5A2525 : 0xFF303030,
+        this.drawSmallButton(context, buttonX, y + 5, 64, selected ? "-" : "+", selected ? COLOR_ACCENT : FastMasaMenuPalette.ROW,
                 GuiHitTest.isInside(mouseX, mouseY, buttonX, y + 5, 64, BUTTON_HEIGHT));
     }
 
@@ -616,7 +629,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int thumbY = top + (height - thumbHeight) * this.scrollOffset / maxOffset;
         int x = this.width - MARGIN - SCROLLBAR_WIDTH;
 
-        RenderUtils.drawRect(context, x, top, SCROLLBAR_WIDTH, height, 0x552C2C2C);
+        RenderUtils.drawRect(context, x, top, SCROLLBAR_WIDTH, height, FastMasaMenuPalette.SCROLLBAR);
         RenderUtils.drawRect(context, x, thumbY, SCROLLBAR_WIDTH, thumbHeight, COLOR_ACCENT);
     }
 
@@ -629,7 +642,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private void drawValueBox(GuiContext context, int x, int y, int width, String text) {
-        RenderUtils.drawRect(context, x, y, width, BUTTON_HEIGHT, 0xFF161616);
+        RenderUtils.drawRect(context, x, y, width, BUTTON_HEIGHT, FastMasaMenuPalette.BUTTON);
         this.drawString(context, fitText(text, width - 8), x + 4, y + 6, COLOR_TEXT);
     }
 
@@ -647,7 +660,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int fillWidth = (int) Math.round(width * clampRatio(ratio));
         int knobX = x + Math.max(0, fillWidth - 2);
 
-        RenderUtils.drawRect(context, x, trackY, width, 3, hovered ? 0xFF404040 : 0xFF2A2A2A);
+        RenderUtils.drawRect(context, x, trackY, width, 3,
+                hovered ? FastMasaMenuPalette.NUMERIC_TRACK_HOVER : FastMasaMenuPalette.NUMERIC_TRACK);
         RenderUtils.drawRect(context, x, trackY, fillWidth, 3, COLOR_ACCENT);
         RenderUtils.drawRect(context, knobX, y + 3, 4, BUTTON_HEIGHT - 6, COLOR_TEXT);
     }
@@ -655,7 +669,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private void drawResetButton(GuiContext context, IConfigBase config, int x, int y, int width, int mouseX, int mouseY) {
         boolean modified = config instanceof IConfigResettable resettable && resettable.isModified();
         this.drawSmallButton(context, x, y, width, StringUtils.translate("malilib.gui.button.reset.caps"),
-                modified ? 0xFF303030 : 0xFF202020,
+                modified ? FastMasaMenuPalette.RESET_MODIFIED : FastMasaMenuPalette.RESET_DEFAULT,
                 modified && GuiHitTest.isInside(mouseX, mouseY, x, y, width, BUTTON_HEIGHT));
     }
 
@@ -806,7 +820,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         if (this.groupNameField == null || this.groupNameField.getValue().trim().isBlank()) {
             return;
         }
-        ConfigGroup group = ConfigGroupStore.create(this.groupNameField.getValue().trim(), 0xFFE6397C);
+        ConfigGroup group = ConfigGroupStore.create(this.groupNameField.getValue().trim());
         this.selectedGroupId = group.id();
         this.groupNameField.setValue("");
         this.afterGroupChanged();
@@ -1055,7 +1069,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     static String normalizedTargetGroupId(String selectedGroupId, List<String> groupIds) {
         return groupIds.contains(selectedGroupId) ? selectedGroupId
-                : (groupIds.isEmpty() ? "" : groupIds.getFirst());
+                : (groupIds.contains("default") ? "default" : "");
     }
 
     @Nullable
@@ -1220,6 +1234,13 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         }
 
         String ellipsis = "...";
+        if (this.font.width(ellipsis) > maxWidth) {
+            int end = text.length();
+            while (end > 0 && this.font.width(text.substring(0, end)) > maxWidth) {
+                end--;
+            }
+            return text.substring(0, end);
+        }
         int end = text.length();
 
         while (end > 0 && this.font.width(text.substring(0, end) + ellipsis) > maxWidth) {
@@ -1319,10 +1340,11 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             int iconSize = 18;
             int x = this.x;
             int y = this.y;
-            int edgeColor = this.keybind.areSettingsModified() ? 0xFFFFBB33 : (this.hovered ? COLOR_TEXT : 0xFFFFFFFF);
+            int edgeColor = this.keybind.areSettingsModified() ? FastMasaMenuPalette.KEYBIND_MODIFIED
+                    : (this.hovered ? COLOR_TEXT : FastMasaMenuPalette.KEYBIND_DEFAULT);
 
             RenderUtils.drawRect(ctx, x, y, 20, 20, edgeColor);
-            RenderUtils.drawRect(ctx, x + 1, y + 1, 18, 18, 0xFF000000);
+            RenderUtils.drawRect(ctx, x + 1, y + 1, 18, 18, FastMasaMenuPalette.BLACK);
             RenderUtils.drawTexturedRect(ctx, TEXTURE, x + 1, y + 1, 0,
                     settings.getActivateOn().ordinal() * iconSize, iconSize, iconSize, 0);
             RenderUtils.drawTexturedRect(ctx, TEXTURE, x + 1, y + 1, 18,

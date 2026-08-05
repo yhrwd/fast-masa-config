@@ -109,7 +109,7 @@ public final class QuickConfigScreen extends Screen {
             this.panel.raiseFloatingGroup(floating.groupId());
             if (hit.target() == GroupWindowHitTest.Target.HEADER) {
                 if (floating.isFullConfigHit(x, y)) {
-                    Minecraft.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes()));
+                    Minecraft.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes(), floating.groupId()));
                 } else if (floating.isHideHit(x, y)) {
                     if (floating.hide()) {
                         persistRuntimeGroupState();
@@ -125,6 +125,10 @@ public final class QuickConfigScreen extends Screen {
                 return true;
             }
 
+            if (shouldOpenSystemConfigRow(hit.target(), floating.isSystemConfigRow(hit.itemIndex()))) {
+                Minecraft.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes(), floating.groupId()));
+                return true;
+            }
             ResolvedShortcut shortcut = floating.shortcutAt(hit.itemIndex());
             if (shortcut == null) {
                 return true;
@@ -135,7 +139,7 @@ public final class QuickConfigScreen extends Screen {
                 return true;
             }
             if (hit.target() == GroupWindowHitTest.Target.ROW || hit.target() == GroupWindowHitTest.Target.EXPAND) {
-                toggleExpanded(floating.groupId(), hit.itemIndex());
+                toggleExpanded(floating.groupId(), floating.groupItemIndexAt(hit.itemIndex()));
                 return true;
             }
             if (hit.target() == GroupWindowHitTest.Target.SLIDER) {
@@ -147,7 +151,8 @@ public final class QuickConfigScreen extends Screen {
             return true;
         }
         if (this.panel.isRecoveryHit(x, y)) {
-            Minecraft.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes()));
+            Minecraft.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes(),
+                    FastMasaConfigGui.recoveryTargetGroupId()));
             return true;
         }
         return false;
@@ -236,7 +241,7 @@ public final class QuickConfigScreen extends Screen {
 
     private void toggleExpanded(String groupId, int itemIndex) {
         ConfigGroupStore.get(groupId).ifPresent(group -> {
-            if (itemIndex >= 0 && itemIndex < group.items().size()) {
+            if (isValidToggleItemIndex(itemIndex, group.items().size())) {
                 GroupItem item = group.items().get(itemIndex);
                 if (ConfigGroupStore.setItemExpanded(group.id(), itemIndex, !item.expanded())) {
                     persistRuntimeGroupState();
@@ -258,6 +263,14 @@ public final class QuickConfigScreen extends Screen {
 
     static boolean shouldFlushPendingDrag(boolean positionChanged) {
         return positionChanged;
+    }
+
+    static boolean shouldOpenSystemConfigRow(GroupWindowHitTest.Target target, boolean systemConfigRow) {
+        return target == GroupWindowHitTest.Target.ROW && systemConfigRow;
+    }
+
+    static boolean isValidToggleItemIndex(int itemIndex, int itemCount) {
+        return itemIndex >= 0 && itemIndex < itemCount;
     }
 
     private static MovementKeyPassthrough createMovementPassthrough(Minecraft mc) {

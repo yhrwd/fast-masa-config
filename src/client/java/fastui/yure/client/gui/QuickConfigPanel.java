@@ -4,7 +4,6 @@ import fastui.yure.client.index.ConfigIndexService;
 import fastui.yure.config.ConfigGroupStore;
 import fi.dy.masa.malilib.render.GuiContext;
 import fi.dy.masa.malilib.render.RenderUtils;
-import fi.dy.masa.malilib.util.StringUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 
@@ -18,8 +17,7 @@ public final class QuickConfigPanel {
     private final Font font;
     private final Map<String, FloatingGroupPanel> floatingPanels = new HashMap<>();
     private final List<String> floatingOrder = new ArrayList<>();
-    private int recoveryX;
-    private int recoveryY;
+    private RecoveryActionLayout recoveryLayout = RecoveryActionLayout.calculate(0, 0);
     private boolean recoveryVisible;
 
     public QuickConfigPanel(Minecraft client) {
@@ -47,12 +45,14 @@ public final class QuickConfigPanel {
             }
         }
         if (this.recoveryVisible) {
-            int width = Math.min(180, Math.max(120, screenWidth - 40));
-            this.recoveryX = Math.max(0, (screenWidth - width) / 2);
-            this.recoveryY = Math.max(0, Math.min(screenHeight - 24, 20));
-            RenderUtils.drawRect(context, this.recoveryX, this.recoveryY, width, 24, 0xE81A1A1D);
-            context.drawString(this.font, StringUtils.translate("fast-masa-config.gui.recovery.open"),
-                    this.recoveryX + 8, this.recoveryY + 8, 0xFFFFEAF2, false);
+            this.recoveryLayout = RecoveryActionLayout.calculate(screenWidth, screenHeight);
+            RenderUtils.drawRect(context, this.recoveryLayout.x(), this.recoveryLayout.y(), this.recoveryLayout.width(),
+                    this.recoveryLayout.height(), HoloPanelVisuals.withAlpha(FastMasaMenuPalette.SURFACE, 0xEE));
+            RenderUtils.drawRect(context, this.recoveryLayout.x(), this.recoveryLayout.y(), this.recoveryLayout.width(), 1,
+                    FastMasaMenuPalette.ACCENT);
+            context.drawString(this.font, "*", this.recoveryLayout.x() + 7, this.recoveryLayout.y() + 6,
+                    FastMasaMenuPalette.TEXT,
+                    false);
         }
     }
 
@@ -72,7 +72,7 @@ public final class QuickConfigPanel {
     }
 
     public boolean isRecoveryHit(int mouseX, int mouseY) {
-        return this.recoveryVisible && GuiHitTest.isInside(mouseX, mouseY, this.recoveryX, this.recoveryY,
-                Math.min(180, Math.max(120, Minecraft.getInstance().getWindow().getGuiScaledWidth() - 40)), 24);
+        return this.recoveryVisible && GuiHitTest.isInside(mouseX, mouseY, this.recoveryLayout.x(), this.recoveryLayout.y(),
+                this.recoveryLayout.width(), this.recoveryLayout.height());
     }
 }

@@ -18,7 +18,7 @@ class QuickConfigGroupGeometryTest {
         GroupWindowLayout layout = GroupWindowLayout.calculate(800, 600, 100, 100, true,
                 new int[]{0, -1});
 
-        assertEquals(212, layout.width());
+        assertEquals(196, layout.width());
         assertEquals(0, layout.rows().size());
         assertEquals(layout.headerHeight(), layout.height());
         assertEquals(GroupWindowHitTest.Target.NONE, GroupWindowHitTest.hitTest(layout, 0, 120,
@@ -52,9 +52,24 @@ class QuickConfigGroupGeometryTest {
     }
 
     @Test
-    void normalizesMissingTargetToFirstAvailableGroupBeforeControlsRender() {
+    void normalizesMissingTargetToTheProtectedDefaultGroupBeforeControlsRender() {
         assertEquals("default", FastMasaConfigGui.normalizedTargetGroupId("", List.of("default", "building")));
         assertEquals("building", FastMasaConfigGui.normalizedTargetGroupId("building", List.of("default", "building")));
+        assertEquals("", FastMasaConfigGui.normalizedTargetGroupId("missing", List.of("building")));
+    }
+
+    @Test
+    void exposesTheSystemConfigEntryOnlyForTheProtectedDefaultGroup() {
+        assertTrue(FloatingGroupPanel.hasSystemConfigEntry("default"));
+        assertFalse(FloatingGroupPanel.hasSystemConfigEntry("building"));
+    }
+
+    @Test
+    void keepsDefaultSystemRowsBeforeExternalItems() {
+        assertEquals(3, FloatingGroupPanel.systemRowCount("default"));
+        assertEquals(0, FloatingGroupPanel.groupItemIndexForRow("default", 3));
+        assertEquals(-1, FloatingGroupPanel.groupItemIndexForRow("default", 0));
+        assertEquals(-1, FloatingGroupPanel.groupItemIndexForRow("default", 2));
     }
 
     @Test

@@ -11,8 +11,8 @@ class GroupWindowLayoutTest {
     void clampsRequestedPositionAndUsesSafeWidth() {
         GroupWindowLayout layout = GroupWindowLayout.calculate(800, 600, 900, 900, false, new int[]{25, 51});
 
-        assertEquals(212, layout.width());
-        assertEquals(568, layout.x());
+        assertEquals(196, layout.width());
+        assertEquals(584, layout.x());
         assertEquals(484, layout.y());
         assertEquals(20, layout.safeMargin());
     }
@@ -32,8 +32,8 @@ class GroupWindowLayoutTest {
 
         assertEquals(20, layout.headerHeight());
         assertEquals(2, layout.rows().size());
-        assertEquals(new GroupWindowLayout.Row(0, 40, 70, 212, 25), layout.rows().get(0));
-        assertEquals(new GroupWindowLayout.Row(1, 40, 95, 212, 51), layout.rows().get(1));
+        assertEquals(new GroupWindowLayout.Row(0, 40, 70, 196, 25), layout.rows().get(0));
+        assertEquals(new GroupWindowLayout.Row(1, 40, 95, 196, 51), layout.rows().get(1));
         assertEquals(96, layout.height());
     }
 
@@ -79,5 +79,15 @@ class GroupWindowLayoutTest {
         assertTrue(layout.x() + layout.width() <= 30);
         assertTrue(layout.y() + layout.height() <= 35);
         assertTrue(layout.headerHeight() <= layout.height());
+    }
+
+    @Test
+    void keepsNormalHeaderAndContentInsideTheirWindowOnAnOrdinaryViewport() {
+        GroupWindowLayout layout = GroupWindowLayout.calculate(800, 600, 40, 50, false, new int[]{25});
+
+        assertEquals(196, layout.width());
+        assertEquals(20, layout.headerHeight());
+        assertTrue(layout.rows().getFirst().y() >= layout.y() + layout.headerHeight());
+        assertTrue(layout.rows().getFirst().y() + layout.rows().getFirst().height() <= layout.y() + layout.height());
     }
 }
