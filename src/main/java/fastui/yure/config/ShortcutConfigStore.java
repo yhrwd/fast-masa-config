@@ -18,6 +18,10 @@ public final class ShortcutConfigStore {
     }
 
     public static boolean add(ShortcutEntry entry) {
+        if (entry == null || !entry.hasValidTarget()) {
+            return false;
+        }
+
         if (containsTarget(entry.modId(), entry.groupId(), entry.configName())) {
             return false;
         }
@@ -64,12 +68,20 @@ public final class ShortcutConfigStore {
     public static void replaceWithManualIds(List<String> manualIds) {
         ENTRIES.clear();
 
+        if (manualIds == null) {
+            return;
+        }
+
         for (String manualId : manualIds) {
             if (manualId == null || manualId.isBlank()) {
                 continue;
             }
 
-            add(ShortcutEntry.fromManualId(manualId));
+            try {
+                add(ShortcutEntry.fromManualId(manualId));
+            } catch (IllegalArgumentException ignored) {
+                // Keep the remaining valid entries when an edited MaLiLib string list contains an invalid ID.
+            }
         }
     }
 
@@ -89,6 +101,10 @@ public final class ShortcutConfigStore {
 
     public static void fromJson(JsonArray array) {
         ENTRIES.clear();
+
+        if (array == null) {
+            return;
+        }
 
         for (JsonElement element : array) {
             if (element.isJsonObject()) {

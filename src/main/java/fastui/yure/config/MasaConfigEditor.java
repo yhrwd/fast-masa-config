@@ -49,15 +49,6 @@ public final class MasaConfigEditor {
         return ConfigEditResult.failure(config, "该配置不支持重置");
     }
 
-    public ConfigEditResult commit(String modId, ConfigCommitter committer) {
-        if (modId == null || modId.isBlank()) {
-            return ConfigEditResult.failure("<commit>", "modId 不能为空");
-        }
-
-        committer.commit(modId);
-        return ConfigEditResult.success("<commit>");
-    }
-
     private ConfigEditResult applyBoolean(IConfigBase config, String rawValue) {
         String normalized = rawValue.trim().toLowerCase(Locale.ROOT);
 

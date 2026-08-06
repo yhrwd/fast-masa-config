@@ -22,6 +22,7 @@ import fi.dy.masa.malilib.render.RenderUtils;
 import fi.dy.masa.malilib.util.StringUtils;
 import net.minecraft.client.gui.Font;
 import fi.dy.masa.malilib.config.IConfigBase;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,11 +32,39 @@ import java.util.function.ToIntFunction;
 public final class FloatingGroupPanel {
     private static final int TEXT = FastMasaMenuPalette.TEXT;
     private static final int MUTED = FastMasaMenuPalette.MUTED;
-    private static final int BASE = FastMasaMenuPalette.SURFACE;
+    private static final int BASE = FastMasaMenuPalette.WINDOW_BACKGROUND;
     private static final int TRACK = FastMasaMenuPalette.TRACK;
-    private static final int ROW_HEIGHT = 25;
-    private static final int EXPANDED_HEIGHT = 42;
-    private static final int SLIDER_WIDTH = 88;
+    /**
+     * 普通行总高。改大可增加所有非展开项的上下留白；展开项的标题区也固定使用此值。
+     * 建议保留至少默认字体高度 9px，再额外保留约 4~5px 上下留白。
+     */
+    private static final int ROW_HEIGHT = 16;
+    /**
+     * 数值项展开后的总高。它由标题区、2px 间隔、滑条/数值控件区和底部间隔共同组成。
+     * 改大时，sliderBounds() 会自动让滑条在新增空间内垂直居中。
+     */
+    private static final int EXPANDED_HEIGHT = 38;
+    /** 窗口左右内边距，同时决定标签和滑条左起点。改大可增加留白，但会缩短滑条。 */
+    private static final int ROW_PADDING = 10;
+    /** 所有悬浮窗口的最小内容宽度。改大将同时加宽收起和展开状态。 */
+    private static final int MIN_CONTENT_WIDTH = 60;
+    /**
+     * 长标题/选项可撑开的内容宽度上限。超过此宽度的标签交给跑马灯，窗口不再继续加宽。
+     * 要整体加宽悬浮菜单优先调这里；窗口最终还会额外加 GroupWindowLayout.WINDOW_PADDING * 2。
+     */
+    private static final int EXPANDED_MAX_CONTENT_WIDTH = 105;
+    /** 滑条右端与数值文本之间的空隙。改小可给滑条让出宽度，最小建议保留 2px。 */
+    private static final int SLIDER_VALUE_GAP = 3;
+    /**
+     * 数值文本预留宽度。改小可加长滑条；应至少容纳当前常用数值格式。
+     * 值显示被 fitText() 截断时应增大此值，而不是继续压缩滑条。
+     */
+    private static final int VALUE_WIDTH = 22;
+    /**
+     * 跑马灯速度，单位 px/s。当前 30 约为每 33ms 前进 1px；调小更慢，调大更快。
+     * GuiContext 文本坐标是整数像素，因此实际位置变化频率约等于该数值，不能独立强制提高帧率。
+     */
+    private static final double MARQUEE_PIXELS_PER_SECOND = 30.0;
 
     private final Font font;
     private final String groupId;
@@ -58,28 +87,14 @@ public final class FloatingGroupPanel {
     public int width() { return this.layout == null ? 0 : this.layout.width(); }
 
     public boolean isCollapseHit(int mouseX, int mouseY) {
-        return this.layout != null && this.layout.headerHeight() >= 18 && this.layout.width() >= 20 && GuiHitTest.isInside(mouseX, mouseY,
-                this.layout.x() + this.layout.width() - 20, this.layout.y(), 20, this.layout.headerHeight());
-    }
-
-    public boolean isHideHit(int mouseX, int mouseY) {
-        return this.layout != null && this.layout.headerHeight() >= 18 && this.layout.width() >= 40 && GuiHitTest.isInside(mouseX, mouseY,
-                this.layout.x() + this.layout.width() - 40, this.layout.y(), 20, this.layout.headerHeight());
-    }
-
-    public boolean isFullConfigHit(int mouseX, int mouseY) {
-        return this.layout != null && this.layout.headerHeight() >= 18 && hasSystemConfigEntry(this.groupId) && this.layout.width() >= 60
-                && GuiHitTest.isInside(mouseX, mouseY,
-                this.layout.x() + this.layout.width() - 60, this.layout.y(), 20, this.layout.headerHeight());
+        return this.layout != null && this.layout.headerHeight() >= 16 && this.layout.width() >= 20
+                && GuiHitTest.isInside(mouseX, mouseY, this.layout.x() + this.layout.width() - 20,
+                this.layout.y(), 20, this.layout.headerHeight());
     }
 
     public void toggleCollapsed() {
         ConfigGroupStore.get(this.groupId).ifPresent(group -> ConfigGroupStore.setWindowState(group.id(),
                 !group.collapsed(), group.x(), group.y()));
-    }
-
-    public boolean hide() {
-        return ConfigGroupStore.hide(this.groupId, true);
     }
 
     public boolean moveTo(int requestedX, int requestedY, int screenWidth, int screenHeight) {
@@ -126,17 +141,18 @@ public final class FloatingGroupPanel {
             this.layout = null;
             return;
         }
-
+        // 先建行模型、测内容宽度、再算窗口坐标，最后才生成命中矩形。
+        // 这个顺序不能颠倒：命中区必须使用与渲染相同的最终 row 坐标。
+        // 收起只隐藏内容，不改变参与测宽的行，保证窗口前后宽度一致。
+        this.rows = buildRows(group, index);
         if (group.collapsed()) {
-            this.rows = List.of();
             this.controls = List.of();
             this.layout = GroupWindowLayout.calculate(screenWidth, screenHeight, group.x(), group.y(), true,
-                    new int[0]);
+                    new int[0], measureContentWidth(group.name()));
         } else {
-            this.rows = buildRows(group, index);
             int[] rowHeights = this.rows.stream().mapToInt(RowModel::height).toArray();
             this.layout = GroupWindowLayout.calculate(screenWidth, screenHeight, group.x(), group.y(), false,
-                    rowHeights);
+                    rowHeights, measureContentWidth(group.name()));
             this.controls = buildControls();
         }
         this.scrollOffset = this.layout.clampScrollOffset(this.scrollOffset);
@@ -146,40 +162,42 @@ public final class FloatingGroupPanel {
         }
 
         int accent = FastMasaMenuPalette.ACCENT;
-        RenderUtils.drawRect(context, this.layout.x(), this.layout.y(), this.layout.width(), this.layout.height(),
-                HoloPanelVisuals.withAlpha(BASE, 0xE8));
+        int backgroundAlpha = FastMasaConfigs.Generic.FLOATING_BACKGROUND_ALPHA.getIntegerValue();
+        RenderUtils.drawRect(context, this.layout.x(), this.layout.y() + this.layout.headerHeight(), this.layout.width(),
+                Math.max(0, this.layout.height() - this.layout.headerHeight()),
+                HoloPanelVisuals.withAlpha(BASE, backgroundAlpha));
         RenderUtils.drawRect(context, this.layout.x(), this.layout.y(), this.layout.width(), this.layout.headerHeight(),
-                HoloPanelVisuals.withAlpha(accent, 0xD8));
-        int headerControlsWidth = hasSystemConfigEntry(this.groupId) ? 60 : 40;
-        boolean hasHeaderTextSpace = this.layout.headerHeight() >= 18;
-        if (hasHeaderTextSpace && this.layout.width() > headerControlsWidth + 18) {
-            context.drawString(this.font, fitText(group.name(), this.layout.width() - headerControlsWidth - 8),
-                    this.layout.x() + 7, this.layout.y() + 6, TEXT, false);
-        }
-        if (hasHeaderTextSpace && hasSystemConfigEntry(this.groupId) && this.layout.width() >= 60) {
-            context.drawString(this.font, "*", this.layout.x() + this.layout.width() - 54, this.layout.y() + 6, TEXT, false);
-        }
-        if (hasHeaderTextSpace && this.layout.width() >= 40) {
-            context.drawString(this.font, StringUtils.translate("fast-masa-config.gui.floating.hide"),
-                    this.layout.x() + this.layout.width() - 34, this.layout.y() + 5, TEXT, false);
+                HoloPanelVisuals.withAlpha(accent, backgroundAlpha));
+        int headerControlsWidth = this.font.width("+") + ROW_PADDING * 2;
+        boolean hasHeaderTextSpace = this.layout.headerHeight() >= 16;
+        String title = fitText(group.name(), this.layout.width() - headerControlsWidth - ROW_PADDING * 2);
+        if (hasHeaderTextSpace && this.layout.width() > headerControlsWidth + ROW_PADDING * 2) {
+            context.drawString(this.font, title,
+                    this.layout.x() + ROW_PADDING,
+                    FloatingTextLayout.centeredTextY(this.layout.y(), this.layout.headerHeight(), this.font.lineHeight),
+                    TEXT, false);
         }
         if (hasHeaderTextSpace && this.layout.width() >= 20) {
-            context.drawString(this.font, StringUtils.translate(group.collapsed() ? "fast-masa-config.gui.floating.expand"
-                    : "fast-masa-config.gui.floating.collapse"), this.layout.x() + this.layout.width() - 14,
-                    this.layout.y() + 5, TEXT, false);
+            String control = group.collapsed() ? "+" : "-";
+            int controlX = this.layout.x() + this.layout.width() - headerControlsWidth + ROW_PADDING;
+            context.drawString(this.font, control, FloatingTextLayout.centeredTextX(controlX,
+                    headerControlsWidth - ROW_PADDING * 2, this.font.width(control)),
+                    FloatingTextLayout.centeredTextY(this.layout.y(), this.layout.headerHeight(), this.font.lineHeight),
+                    TEXT, false);
         }
 
         if (group.collapsed()) {
             return;
         }
 
+        // 滚动只改变绘制位置；layout.rows() 始终保存未滚动坐标，供 hitTest 复用。
         for (int indexInRows = 0; indexInRows < this.rows.size(); indexInRows++) {
             GroupWindowLayout.Row row = this.layout.rows().get(indexInRows);
             if (!this.layout.isRowFullyVisible(row, this.scrollOffset)) {
                 continue;
             }
             int y = row.y() - this.scrollOffset;
-            drawRow(context, this.rows.get(indexInRows), row.x(), y, row.width(), mouseX, mouseY, accent);
+            drawRow(context, this.rows.get(indexInRows), indexInRows, row.x(), y, row.width(), mouseX, mouseY, accent);
         }
 
         if (this.layout.maxScrollOffset() > 0) {
@@ -269,6 +287,10 @@ public final class FloatingGroupPanel {
         return item != null && shortcut != null;
     }
 
+    /**
+     * 将持久化的 GroupItem 解析为当前帧可绘制的行。
+     * 系统行的 item 允许为 null，失效的外部配置则 shortcut 为 null；后续代码必须区分这两种情况。
+     */
     private List<RowModel> buildRows(ConfigGroup group, List<ConfigIndexEntry> index) {
         List<RowModel> result = new ArrayList<>();
         if (hasSystemConfigEntry(group.id())) {
@@ -296,6 +318,10 @@ public final class FloatingGroupPanel {
         return new RowModel(null, new ResolvedShortcut(shortcut, entry), true, ROW_HEIGHT);
     }
 
+    /**
+     * 为每行生成交互矩形。绘制使用 expandBounds/sliderBounds，同一组函数也在这里使用，
+     * 因此调整控件位置时只改 bounds 函数，不要在 QuickConfigScreen 里写第二套坐标。
+     */
     private List<GroupWindowHitTest.ItemControls> buildControls() {
         if (this.layout == null) {
             return List.of();
@@ -315,52 +341,66 @@ public final class FloatingGroupPanel {
         return List.copyOf(result);
     }
 
-    private void drawRow(GuiContext context, RowModel row, int x, int y, int width, int mouseX, int mouseY, int accent) {
+    private void drawRow(GuiContext context, RowModel row, int rowIndex, int x, int y, int width, int mouseX,
+            int mouseY, int accent) {
+        int backgroundAlpha = FastMasaConfigs.Generic.FLOATING_BACKGROUND_ALPHA.getIntegerValue();
         if (row.shortcut() == null) {
             if (!row.systemConfig()) {
-                drawUnavailableRow(context, row, x, y, width);
+                drawUnavailableRow(context, row, rowIndex, x, y, width);
                 return;
             }
-            RenderUtils.drawRect(context, x, y, width, ROW_HEIGHT, HoloPanelVisuals.withAlpha(FastMasaMenuPalette.SYSTEM_ROW, 0xD8));
+            RenderUtils.drawRect(context, x, y, width, row.height(),
+                    HoloPanelVisuals.withAlpha(FastMasaMenuPalette.SYSTEM_ROW, backgroundAlpha));
+            drawMarqueeLabel(context, StringUtils.translate("fast-masa-config.gui.system.open_full_config"), x, y,
+                    width, ROW_HEIGHT, width - 12, 0, TEXT);
             RenderUtils.drawRect(context, x, y, 2, ROW_HEIGHT, accent);
-            context.drawString(this.font, fitText(StringUtils.translate("fast-masa-config.gui.system.open_full_config"), width - 12),
-                    x + 6, y + 8, TEXT, false);
             return;
         }
         boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, width, row.height());
         boolean toggle = ShortcutControl.getControlType(row.shortcut().configEntry().config()) == ShortcutControlType.TOGGLE;
         boolean enabled = toggle && ShortcutControl.getBooleanValue(row.shortcut().configEntry().config());
-        int rowColor = enabled ? accent : (hovered ? FastMasaMenuPalette.ROW_HOVER : FastMasaMenuPalette.ROW);
-        RenderUtils.drawRect(context, x, y, width, row.height(), HoloPanelVisuals.withAlpha(rowColor, enabled ? 0xD8 : 0xC8));
-        RenderUtils.drawRect(context, x, y, 2, row.height(), enabled ? accent
-                : FastMasaMenuPalette.NEUTRAL);
+        int rowColor = enabled ? FastMasaMenuPalette.MODULE_BACKGROUND
+                : (hovered ? FastMasaMenuPalette.ROW_HOVER : FastMasaMenuPalette.ROW);
+        // 非激活行也保留极轻的底色，避免文字与窗口背景融为一体；激活行再使用更强的模块色。
+        RenderUtils.drawRect(context, x, y, width, row.height(),
+                HoloPanelVisuals.withAlpha(rowColor, backgroundAlpha));
         String label = row.shortcut().configEntry().displayName();
-        context.drawString(this.font, fitText(label, width - 34), x + 6, y + 4, TEXT, false);
+        drawMarqueeLabel(context, label, x, y, width, ROW_HEIGHT, row.numeric() ? width - 28 : width - 8,
+                rowIndex, TEXT);
+        if (enabled) {
+            RenderUtils.drawRect(context, x, y, 2, row.height(), accent);
+        }
         if (!row.numeric()) {
             return;
         } else if (row.item().expanded()) {
-            double ratio = ShortcutControl.getSliderRatio(row.shortcut().configEntry().config());
+            drawExpandedBorder(context, x, y, width, row.height());
+            double ratio = ShortcutControl.getSliderRatio(row.shortcut());
             GroupWindowHitTest.Bounds slider = sliderBounds(new GroupWindowLayout.Row(0, x, y, width, row.height()));
             int fillWidth = (int) Math.round(slider.width() * ratio);
-            RenderUtils.drawRect(context, slider.x(), slider.y() + 3, slider.width(), 3, TRACK);
-            RenderUtils.drawRect(context, slider.x(), slider.y() + 3, fillWidth, 3, accent);
-            RenderUtils.drawRect(context, slider.x() + Math.max(0, fillWidth - 2), slider.y(), 4, slider.height(), TEXT);
+            int trackY = slider.y() + Math.max(0, (slider.height() - 3) / 2);
+            RenderUtils.drawRect(context, slider.x(), trackY, slider.width(), 3, TRACK);
+            RenderUtils.drawRect(context, slider.x(), trackY, fillWidth, 3, FastMasaMenuPalette.SLIDER_LEFT);
+            int handleY = slider.y() + Math.max(0, (slider.height() - 4) / 2);
+            drawSliderHandle(context, slider.x() + fillWidth - 2, handleY, TEXT);
             GroupWindowHitTest.Bounds value = valueBounds(new GroupWindowLayout.Row(0, x, y, width, row.height()));
-            context.drawString(this.font, fitText(ShortcutControl.getValueText(row.shortcut().configEntry().config()),
-                    value.width()), value.x(), value.y() + 1, MUTED, false);
-            drawExpandButton(context, expandBounds(new GroupWindowLayout.Row(0, x, y, width, row.height())), true, accent);
+            String valueText = fitText(ShortcutControl.getValueText(row.shortcut().configEntry().config()), value.width());
+            context.drawString(this.font, valueText,
+                    value.x() + Math.max(0, value.width() - this.font.width(valueText)),
+                    FloatingTextLayout.centeredTextY(value.y(), value.height(), this.font.lineHeight), MUTED, false);
+            drawExpandButton(context, expandBounds(new GroupWindowLayout.Row(0, x, y, width, row.height())),
+                    true, accent);
         } else {
-            drawExpandButton(context, expandBounds(new GroupWindowLayout.Row(0, x, y, width, row.height())), false, accent);
+            drawExpandButton(context, expandBounds(new GroupWindowLayout.Row(0, x, y, width, row.height())),
+                    false, accent);
         }
     }
 
-    private void drawUnavailableRow(GuiContext context, RowModel row, int x, int y, int width) {
-        RenderUtils.drawRect(context, x, y, width, row.height(), HoloPanelVisuals.withAlpha(FastMasaMenuPalette.ROW, 0xC8));
-        RenderUtils.drawRect(context, x, y, 2, row.height(), FastMasaMenuPalette.UNAVAILABLE_STRIP);
-        context.drawString(this.font, fitText(row.item().configName(), width - 34), x + 6, y + 4,
-                FastMasaMenuPalette.UNAVAILABLE_TEXT, false);
-        context.drawString(this.font, StringUtils.translate("fast-masa-config.gui.floating.unavailable"), x + 6,
-                y + 15, FastMasaMenuPalette.UNAVAILABLE_MUTED, false);
+    private void drawUnavailableRow(GuiContext context, RowModel row, int rowIndex, int x, int y, int width) {
+        int backgroundAlpha = FastMasaConfigs.Generic.FLOATING_BACKGROUND_ALPHA.getIntegerValue();
+        RenderUtils.drawRect(context, x, y, width, row.height(),
+                HoloPanelVisuals.withAlpha(FastMasaMenuPalette.ROW, backgroundAlpha));
+        drawMarqueeLabel(context, row.item().configName(), x, y, width, ROW_HEIGHT, width - 8, rowIndex,
+                FastMasaMenuPalette.UNAVAILABLE_TEXT);
     }
 
     private String fitText(String text, int maxWidth) {
@@ -393,29 +433,136 @@ public final class FloatingGroupPanel {
         return text.substring(0, end);
     }
 
+    /**
+     * 数值行右侧 +/- 的绘制和点击区域。16px 是按钮目标宽高，右侧 2px、上下 1px 是窗口留白。
+     * 改这里会同时影响 drawExpandButton() 和鼠标命中，不需要到 QuickConfigScreen 再改一份坐标。
+     */
     static GroupWindowHitTest.Bounds expandBounds(GroupWindowLayout.Row row) {
-        int width = Math.min(16, Math.max(0, row.width() - 8));
-        return new GroupWindowHitTest.Bounds(row.x() + Math.max(0, row.width() - 22), row.y() + 2, width,
-                Math.min(16, Math.max(0, row.height() - 4)));
+        int width = Math.min(16, Math.max(0, row.width() - 4));
+        return new GroupWindowHitTest.Bounds(row.x() + Math.max(0, row.width() - width - 2), row.y() + 1, width,
+                Math.min(16, Math.max(0, row.height() - 2)));
     }
 
+    /**
+     * 展开控件从左到右为：滑条、SLIDER_VALUE_GAP、VALUE_WIDTH 数值。标题行的 +/- 不占用下方控件宽度。
+     * 标题区下方的 2px 和底部的 4px 来自 EXPANDED_HEIGHT 的控件区边距；10px 是轨道命中高度。
+     */
     static GroupWindowHitTest.Bounds sliderBounds(GroupWindowLayout.Row row) {
-        int width = Math.min(SLIDER_WIDTH, Math.max(0, row.width() - 64));
-        int x = row.x() + Math.max(0, row.width() - SLIDER_WIDTH - 64);
-        return new GroupWindowHitTest.Bounds(x, row.y() + ROW_HEIGHT + 8, width,
-                Math.min(10, Math.max(0, row.height() - ROW_HEIGHT - 8)));
+        int detailTop = row.y() + ROW_HEIGHT + 2;
+        int detailHeight = Math.max(0, row.height() - ROW_HEIGHT - 4);
+        int x = row.x() + ROW_PADDING;
+        int end = row.x() + row.width() - ROW_PADDING;
+        int width = Math.max(0, end - x - SLIDER_VALUE_GAP - VALUE_WIDTH);
+        int sliderHeight = Math.min(10, detailHeight);
+        int sliderY = detailTop + Math.max(0, (detailHeight - sliderHeight) / 2);
+        return new GroupWindowHitTest.Bounds(x, sliderY, width, sliderHeight);
     }
 
+    /** 数值文本紧跟轨道右侧，并占用到窗口右内边距；展开按钮位于上一行，不会遮挡这里。 */
     static GroupWindowHitTest.Bounds valueBounds(GroupWindowLayout.Row row) {
         GroupWindowHitTest.Bounds slider = sliderBounds(row);
-        int x = slider.x() + slider.width() + 6;
-        int width = Math.max(0, expandBounds(row).x() - x - 4);
+        int x = slider.x() + slider.width() + SLIDER_VALUE_GAP;
+        int width = Math.max(0, row.x() + row.width() - ROW_PADDING - x);
         return new GroupWindowHitTest.Bounds(x, slider.y(), width, slider.height());
     }
 
     private void drawExpandButton(GuiContext context, GroupWindowHitTest.Bounds bounds, boolean expanded, int accent) {
-        RenderUtils.drawRect(context, bounds.x(), bounds.y(), bounds.width(), bounds.height(), expanded ? accent : TRACK);
-        context.drawString(this.font, expanded ? "v" : ">", bounds.x() + 5, bounds.y() + 4, TEXT, false);
+        String control = expanded ? "-" : "+";
+        context.drawString(this.font, control,
+                FloatingTextLayout.centeredTextX(bounds.x(), bounds.width(), this.font.width(control)),
+                // +/- 的字形重心比普通文字高，centeredSymbolY() 已额外向下补 1px。
+                FloatingTextLayout.centeredSymbolY(bounds.y(), bounds.height(), this.font.lineHeight),
+                expanded ? accent : MUTED,
+                false);
+    }
+
+    /**
+     * 展开区边框。起点的 2px 和总高度公式须与 sliderBounds() 保持一致，否则滑条会跑出边框。
+     * 若只想加大边框内部高度，优先调 EXPANDED_HEIGHT。
+     */
+    private void drawExpandedBorder(GuiContext context, int x, int y, int width, int height) {
+        int top = y + ROW_HEIGHT + 2;
+        int borderHeight = Math.max(0, height - ROW_HEIGHT - 4);
+        if (borderHeight <= 1 || width <= 1) {
+            return;
+        }
+        RenderUtils.drawRect(context, x, top, width, 1, FastMasaMenuPalette.NEUTRAL);
+        RenderUtils.drawRect(context, x, top + borderHeight - 1, width, 1, FastMasaMenuPalette.NEUTRAL);
+        RenderUtils.drawRect(context, x, top, 1, borderHeight, FastMasaMenuPalette.NEUTRAL);
+        RenderUtils.drawRect(context, x + width - 1, top, 1, borderHeight, FastMasaMenuPalette.NEUTRAL);
+    }
+
+
+    /** 4x4px 菱形滑块把手。改尺寸时也要同步调整 drawRow() 中的 handleY 和横向 -2px 偏移。 */
+    private void drawSliderHandle(GuiContext context, int x, int y, int color) {
+        RenderUtils.drawRect(context, x + 1, y, 2, 1, color);
+        RenderUtils.drawRect(context, x, y + 1, 4, 2, color);
+        RenderUtils.drawRect(context, x + 1, y + 3, 2, 1, color);
+    }
+
+    /**
+     * 这是悬浮窗口宽度的唯一测量入口。改最大宽度、标题栏按钮或行右侧控件时，
+     * 必须同步调整这里的预留宽度，否则文本会在渲染时被意外截断。
+     */
+    private int measureContentWidth(String groupName) {
+        int collapseControlWidth = this.font.width("+");
+        int width = this.font.width(groupName) + collapseControlWidth + ROW_PADDING * 2 - 10;
+        for (RowModel row : this.rows) {
+            String label = measureRowLabel(row);
+            // 数值项额外预留 56px 给 +/-、数值和间距；布尔项只预留右侧呼吸空间 12px。
+            int rowWidth = this.font.width(label) + ROW_PADDING * 2 + (row.numeric() ? 50 : 12);
+            // 长选项不撑大窗口，交给 drawMarqueeLabel 在固定文本区内滚动；标题则始终优先完整显示。
+            width = Math.max(width, Math.min(EXPANDED_MAX_CONTENT_WIDTH, rowWidth));
+        }
+        return Math.max(MIN_CONTENT_WIDTH, width);
+    }
+
+    /**
+     * 按像素偏移绘制完整文本，并用 GuiContext scissor 裁掉标签区域外的内容。
+     * 这条路径不调用 fitText，因此长名称不会出现省略号。
+     */
+    private void drawMarqueeLabel(GuiContext context, String text, int rowX, int rowY, int rowWidth,
+            int labelHeight, int maxWidth, int rowIndex, int textColor) {
+        int labelX = rowX + ROW_PADDING;
+        int labelWidth = Math.max(0, Math.min(maxWidth, rowWidth - ROW_PADDING));
+        int baseline = FloatingTextLayout.centeredTextY(rowY, labelHeight, this.font.lineHeight);
+        if (text == null || labelWidth <= 0) {
+            return;
+        }
+
+        int textWidth = this.font.width(text);
+        String renderedText = text;
+        int drawX = labelX;
+        if (textWidth > labelWidth) {
+            // 三个空格决定两轮文本之间的停顿距离；调大可增加分隔空白。
+            String gap = "   ";
+            int cycleWidth = textWidth + this.font.width(gap);
+            double elapsedSeconds = System.nanoTime() / 1_000_000_000.0;
+            // 17px 只是让每行错开起始相位；调为 0 可让所有跑马灯完全同步。
+            double offset = (elapsedSeconds * MARQUEE_PIXELS_PER_SECOND + rowIndex * 17.0) % cycleWidth;
+            renderedText = text + gap + text;
+            int pixelOffset = (int) Math.floor(offset);
+            drawX -= pixelOffset;
+        }
+
+        context.pushScissor(new ScreenRectangle(labelX, rowY, labelWidth, labelHeight));
+        try {
+            context.drawString(this.font, renderedText, drawX, baseline, textColor, false);
+        } finally {
+            context.popScissor();
+        }
+    }
+
+    private String measureRowLabel(RowModel row) {
+        if (row.systemConfig()) {
+            return row.shortcut() == null
+                    ? StringUtils.translate("fast-masa-config.gui.system.open_full_config")
+                    : row.shortcut().configEntry().displayName();
+        }
+        if (row.shortcut() != null) {
+            return row.shortcut().configEntry().displayName();
+        }
+        return row.item().configName();
     }
 
     private record RowModel(GroupItem item, ResolvedShortcut shortcut, boolean systemConfig, int height) {

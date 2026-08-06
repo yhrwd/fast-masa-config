@@ -5,6 +5,7 @@ import fastui.yure.FastMasaConfig;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.options.ConfigBoolean;
 import fi.dy.masa.malilib.config.options.ConfigHotkey;
+import fi.dy.masa.malilib.config.options.ConfigInteger;
 import fi.dy.masa.malilib.hotkeys.IHotkey;
 import fi.dy.masa.malilib.hotkeys.KeyAction;
 import fi.dy.masa.malilib.hotkeys.KeybindSettings;
@@ -28,6 +29,9 @@ public final class FastMasaConfigs {
                 public static final ConfigBoolean CLOSE_ON_INVENTORY_KEY = new ConfigBoolean("closeOnInventoryKey",
                                 true,
                                 "按背包键或 ESC 时关闭快捷配置面板。", "Close On Inventory Key").apply(GENERIC_KEY);
+                public static final ConfigInteger FLOATING_BACKGROUND_ALPHA = new ConfigInteger(
+                                "floatingBackgroundAlpha", 216, 0, 255, true,
+                                "悬浮菜单背景透明度。", "Floating Menu Background Opacity").apply(GENERIC_KEY);
 
                 @SuppressWarnings("nullness")
                 private static final @org.jetbrains.annotations.NotNull IConfigBase[] OPTION_ARRAY = createOptionArray();
@@ -37,7 +41,8 @@ public final class FastMasaConfigs {
                         return new @org.jetbrains.annotations.NotNull IConfigBase[] {
                                         OPEN_QUICK_CONFIG,
                                         RELEASE_TO_CLOSE,
-                                        CLOSE_ON_INVENTORY_KEY
+                                        CLOSE_ON_INVENTORY_KEY,
+                                        FLOATING_BACKGROUND_ALPHA
                         };
                 }
 

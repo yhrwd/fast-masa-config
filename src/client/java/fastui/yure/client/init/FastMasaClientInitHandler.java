@@ -3,6 +3,7 @@ package fastui.yure.client.init;
 import fastui.yure.FastMasaConfig;
 import fastui.yure.client.gui.FastMasaConfigGui;
 import fastui.yure.client.input.FastMasaInputHandler;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import fastui.yure.config.FastMasaConfigHandler;
 import fi.dy.masa.malilib.config.ConfigManager;
 import fi.dy.masa.malilib.event.InputEventHandler;
@@ -17,5 +18,6 @@ public final class FastMasaClientInitHandler implements IInitializationHandler {
         Registry.CONFIG_SCREEN.registerConfigScreenFactory(new ModInfo(FastMasaConfig.MOD_ID, "Fast Masa Config", FastMasaConfigGui::new));
         InputEventHandler.getKeybindManager().registerKeybindProvider(FastMasaInputHandler.getInstance());
         FastMasaInputHandler.getInstance().initCallbacks();
+        ClientTickEvents.END_CLIENT_TICK.register(client -> FastMasaInputHandler.getInstance().tick());
     }
 }

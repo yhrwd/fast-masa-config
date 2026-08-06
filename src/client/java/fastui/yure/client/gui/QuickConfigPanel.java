@@ -3,7 +3,6 @@ package fastui.yure.client.gui;
 import fastui.yure.client.index.ConfigIndexService;
 import fastui.yure.config.ConfigGroupStore;
 import fi.dy.masa.malilib.render.GuiContext;
-import fi.dy.masa.malilib.render.RenderUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 
@@ -17,8 +16,6 @@ public final class QuickConfigPanel {
     private final Font font;
     private final Map<String, FloatingGroupPanel> floatingPanels = new HashMap<>();
     private final List<String> floatingOrder = new ArrayList<>();
-    private RecoveryActionLayout recoveryLayout = RecoveryActionLayout.calculate(0, 0);
-    private boolean recoveryVisible;
 
     public QuickConfigPanel(Minecraft client) {
         this.font = client.font;
@@ -37,22 +34,11 @@ public final class QuickConfigPanel {
         }
         this.floatingPanels.keySet().removeIf(id -> ConfigGroupStore.get(id).map(group -> group.hidden()).orElse(true));
         this.floatingOrder.removeIf(id -> !this.floatingPanels.containsKey(id));
-        this.recoveryVisible = this.floatingOrder.isEmpty() && !ConfigGroupStore.getGroups().isEmpty();
         for (String groupId : this.floatingOrder) {
             FloatingGroupPanel panel = this.floatingPanels.get(groupId);
             if (panel != null) {
                 panel.render(context, screenWidth, screenHeight, mouseX, mouseY, configIndex);
             }
-        }
-        if (this.recoveryVisible) {
-            this.recoveryLayout = RecoveryActionLayout.calculate(screenWidth, screenHeight);
-            RenderUtils.drawRect(context, this.recoveryLayout.x(), this.recoveryLayout.y(), this.recoveryLayout.width(),
-                    this.recoveryLayout.height(), HoloPanelVisuals.withAlpha(FastMasaMenuPalette.SURFACE, 0xEE));
-            RenderUtils.drawRect(context, this.recoveryLayout.x(), this.recoveryLayout.y(), this.recoveryLayout.width(), 1,
-                    FastMasaMenuPalette.ACCENT);
-            context.drawString(this.font, "*", this.recoveryLayout.x() + 7, this.recoveryLayout.y() + 6,
-                    FastMasaMenuPalette.TEXT,
-                    false);
         }
     }
 
@@ -71,8 +57,4 @@ public final class QuickConfigPanel {
         }
     }
 
-    public boolean isRecoveryHit(int mouseX, int mouseY) {
-        return this.recoveryVisible && GuiHitTest.isInside(mouseX, mouseY, this.recoveryLayout.x(), this.recoveryLayout.y(),
-                this.recoveryLayout.width(), this.recoveryLayout.height());
-    }
 }

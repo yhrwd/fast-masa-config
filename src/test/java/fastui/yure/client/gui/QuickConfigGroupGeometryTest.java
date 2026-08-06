@@ -1,6 +1,7 @@
 package fastui.yure.client.gui;
 
 import fastui.yure.config.GroupItem;
+import fastui.yure.client.index.ConfigIndexEntry;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -96,6 +97,23 @@ class QuickConfigGroupGeometryTest {
     }
 
     @Test
+    void usesPersistedGroupItemOrderForTheGroupEditorList() {
+        List<GroupItem> items = List.of(
+                new GroupItem("tweakeroo", "Generic", "fastBlockPlacement", false),
+                new GroupItem("minihud", "Renderer", "overlayLightLevel", false));
+        ConfigIndexEntry first = new ConfigIndexEntry("tweakeroo", "Tweakeroo", "Generic", "Generic",
+                "fastBlockPlacement", "Fast Block Placement", null);
+        ConfigIndexEntry second = new ConfigIndexEntry("minihud", "MiniHUD", "Renderer", "Renderer",
+                "overlayLightLevel", "Overlay Light Level", null);
+        ConfigIndexEntry missing = new ConfigIndexEntry("minihud", "MiniHUD", "Renderer", "Renderer",
+                "infoLines", "Info Lines", null);
+
+        assertEquals(0, FastMasaConfigGui.groupItemOrder(items, first));
+        assertEquals(1, FastMasaConfigGui.groupItemOrder(items, second));
+        assertEquals(Integer.MAX_VALUE, FastMasaConfigGui.groupItemOrder(items, missing));
+    }
+
+    @Test
     void normalizesDuplicateAndUnboundMovementCodes() {
         assertEquals(Set.of(17, 30), QuickConfigScreen.normalizeMovementKeyCodes(Arrays.asList(17, null, 17, 30)));
     }
@@ -105,6 +123,14 @@ class QuickConfigGroupGeometryTest {
         FastMasaConfigGui.GroupActionLayout layout = FastMasaConfigGui.GroupActionLayout.calculate(260);
 
         assertTrue(layout.rightEdge() <= 260 - 12);
+    }
+
+    @Test
+    void centersTextAgainstTheActualControlBounds() {
+        assertEquals(15, FloatingTextLayout.centeredTextY(10, 18, 9));
+        assertEquals(27, FloatingTextLayout.centeredTextY(20, 22, 9));
+        assertEquals(5, FloatingTextLayout.centeredSymbolY(0, 16, 9));
+        assertEquals(16, FloatingTextLayout.centeredTextX(10, 16, 4));
     }
 
 }

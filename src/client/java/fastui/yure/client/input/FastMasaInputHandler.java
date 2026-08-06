@@ -11,9 +11,12 @@ import fi.dy.masa.malilib.hotkeys.KeyAction;
 import net.minecraft.client.Minecraft;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public final class FastMasaInputHandler implements IKeybindProvider {
     private static final FastMasaInputHandler INSTANCE = new FastMasaInputHandler();
+    private final HotkeyReleaseGate quickConfigReleaseGate = new HotkeyReleaseGate();
 
     private FastMasaInputHandler() {
     }
@@ -43,24 +46,41 @@ public final class FastMasaInputHandler implements IKeybindProvider {
         return FastMasaConfigs.Generic.HOTKEY_LIST;
     }
 
+    public void tick() {
+        this.quickConfigReleaseGate.refresh(QuickConfigCallback.getHeldOpenHotkeyCodes());
+    }
+
     private static final class QuickConfigCallback implements IHotkeyCallback {
         @Override
         public boolean onKeyAction(KeyAction action, IKeybind key) {
             Minecraft client = Minecraft.getInstance();
+            Set<Integer> heldKeys = getHeldOpenHotkeyCodes();
 
             if (action == KeyAction.PRESS && client.screen instanceof QuickConfigScreen screen) {
                 if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() == false) {
                     screen.onClose();
                     return true;
                 }
+                return true;
             }
 
             if (action == KeyAction.PRESS && client.screen instanceof QuickConfigScreen == false) {
+                if (INSTANCE.quickConfigReleaseGate.isBlocked(heldKeys)) {
+                    return true;
+                }
+                INSTANCE.quickConfigReleaseGate.arm(Set.copyOf(
+                        FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys()));
                 client.setScreen(new QuickConfigScreen());
                 return true;
             }
 
             return false;
+        }
+
+        private static Set<Integer> getHeldOpenHotkeyCodes() {
+            return FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys().stream()
+                    .filter(fi.dy.masa.malilib.hotkeys.KeybindMulti::isKeyDown)
+                    .collect(Collectors.toSet());
         }
     }
 }

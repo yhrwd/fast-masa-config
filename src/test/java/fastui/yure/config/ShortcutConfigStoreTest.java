@@ -6,6 +6,9 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ShortcutConfigStoreTest {
@@ -103,5 +106,33 @@ class ShortcutConfigStoreTest {
         ShortcutConfigStore.move(1, -1);
 
         assertEquals(List.of("minihud/Renderer/overlayLightLevel", "tweakeroo/Generic/fastBlockPlacement"), ShortcutConfigStore.toManualIds());
+    }
+
+    @Test
+    void ignoresInvalidPersistedAndManualEntries() {
+        ShortcutConfigStore.clear();
+
+        assertFalse(ShortcutConfigStore.add(null));
+        assertFalse(ShortcutConfigStore.add(new ShortcutEntry(null, null, null, null, null,
+                Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)));
+        ShortcutConfigStore.replaceWithManualIds(List.of("tweakeroo/Generic/fastBlockPlacement", "invalid", "mod//config"));
+
+        assertEquals(List.of("tweakeroo/Generic/fastBlockPlacement"), ShortcutConfigStore.toManualIds());
+        assertThrows(IllegalArgumentException.class, () -> ShortcutEntry.fromManualId(null));
+        assertThrows(IllegalArgumentException.class, () -> ShortcutEntry.fromManualId("mod//config"));
+    }
+
+    @Test
+    void normalizesOptionalShortcutMetadata() {
+        ShortcutEntry entry = new ShortcutEntry(" mod ", null, " config ", null, null,
+                Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY);
+
+        assertEquals("mod", entry.modId());
+        assertEquals("", entry.groupId());
+        assertEquals("config", entry.configName());
+        assertEquals(ShortcutControlType.TOGGLE, entry.controlType());
+        assertEquals(1.0, entry.sliderStep());
+        assertNull(entry.minOverride());
+        assertNull(entry.maxOverride());
     }
 }

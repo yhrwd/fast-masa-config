@@ -43,6 +43,7 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -78,6 +79,10 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     private GuiTextFieldGeneric searchField;
     private GuiTextFieldGeneric groupNameField;
+    private int searchFieldWidth;
+    private boolean searchFieldFocused;
+    private int groupNameFieldWidth;
+    private boolean groupNameFieldFocused;
     private ConfigButtonKeybind activeKeybindButton;
     private ConfigButtonKeybind openQuickConfigButton;
     private ButtonGeneric hotkeySettingsButton;
@@ -155,6 +160,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.drawButtons(ctx, mouseX, mouseY, partialTicks);
         this.drawTextFields(ctx, mouseX, mouseY);
         this.drawWidgets(ctx, mouseX, mouseY);
+        this.drawSearchSuggestion(ctx);
         this.drawHoveredWidget(ctx, mouseX, mouseY);
         this.drawButtonHoverTexts(ctx, mouseX, mouseY, partialTicks);
         this.drawGuiMessages(ctx);
@@ -168,6 +174,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     public boolean onMouseClicked(net.minecraft.client.input.MouseButtonEvent click, boolean doubleClick) {
         int mouseX = (int) click.x();
         int mouseY = (int) click.y();
+        this.searchFieldFocused = this.isSearchFieldHit(mouseX, mouseY);
+        this.groupNameFieldFocused = this.isGroupNameFieldHit(mouseX, mouseY);
 
         if (super.onMouseClicked(click, doubleClick)) {
             return true;
@@ -268,12 +276,16 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     @Override
     protected void drawScreenBackground(GuiContext ctx, int mouseX, int mouseY) {
-        super.drawScreenBackground(ctx, mouseX, mouseY);
+        RenderUtils.drawRect(ctx, 0, 0, this.width, this.height, FastMasaMenuPalette.SCREEN_BACKGROUND);
+        RenderUtils.drawRect(ctx, 0, 0, this.width, 26, FastMasaMenuPalette.SCREEN_HEADER);
+        RenderUtils.drawRect(ctx, 0, 25, this.width, 1, FastMasaMenuPalette.BORDER);
     }
 
     @Override
     protected void drawTitle(GuiContext ctx, int mouseX, int mouseY, float partialTicks) {
-        super.drawTitle(ctx, mouseX, mouseY, partialTicks);
+        this.drawString(ctx, StringUtils.translate("fast-masa-config.gui.title.configs"), MARGIN, 9,
+                FastMasaMenuPalette.TEXT);
+        RenderUtils.drawRect(ctx, MARGIN, 24, 40, 2, FastMasaMenuPalette.ACCENT);
     }
 
     @Override
@@ -395,6 +407,9 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     private void createTabInputs() {
         this.searchField = null;
+        this.groupNameField = null;
+        this.searchFieldFocused = false;
+        this.groupNameFieldFocused = false;
 
         boolean compactFilters = this.isCompactFilterLayout();
         boolean wrapFilters = tab != ConfigGuiTab.GENERIC && filterControlsWrap(this.width);
@@ -405,8 +420,9 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int searchWidth = wrapFilters ? Math.max(80, this.width - MARGIN * 2) : Math.min(220,
                 Math.max(80, this.width - MARGIN * 2 - filterButtonWidth - modButtonWidth - groupButtonWidth - 18));
         this.searchField = new GuiTextFieldGeneric(MARGIN, SEARCH_Y, searchWidth, 18, this.font);
+        this.searchFieldWidth = searchWidth;
         this.searchField.setMaxLength(128);
-        this.searchField.setSuggestion(StringUtils.translate("fast-masa-config.gui.full.search"));
+        this.searchField.setSuggestion("");
         this.addTextField(this.searchField, field -> {
             this.scrollOffset = 0;
             this.refreshVisibleRows();
@@ -478,11 +494,13 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             List<ConfigIndexEntry> index = ConfigIndexService.scanSupportedConfigs();
             this.normalizeSelectedFilters(index);
             this.normalizeSelectedGroup();
+            ConfigGroup selectedGroup = this.getSelectedGroup();
+            List<GroupItem> selectedItems = selectedGroup == null ? List.of() : selectedGroup.items();
             this.filteredConfigs = index.stream()
                     .filter(this::matchesSelectedFilters)
                     .filter(entry -> this.matchesConfig(entry, filter))
                     .filter(this::matchesConfigFilterMode)
-                    .sorted((left, right) -> Boolean.compare(this.isInSelectedGroup(right), this.isInSelectedGroup(left)))
+                    .sorted(Comparator.comparingInt(entry -> groupItemOrder(selectedItems, entry)))
                     .toList();
         }
 
@@ -508,7 +526,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             IConfigBase config = this.filteredGenericConfigs.get(i);
             int y = LIST_Y + (i - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP);
             boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT);
-            this.drawRowBase(context, x, y, width, hovered);
+            this.drawRowBase(context, x, y, width, hovered, false);
             this.drawString(context, fitText(config.getConfigGuiDisplayName(), controlX - x - 24), x + 8, y + 6,
                     COLOR_TEXT);
             this.drawString(context, fitText(config.getComment() == null ? "" : config.getComment(), controlX - x - 24),
@@ -581,12 +599,12 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int x = MARGIN;
         int y = this.getListTop() + visibleIndex * (ROW_HEIGHT + ROW_GAP);
         int width = this.width - MARGIN * 2;
-        int buttonX = x + width - 68;
+        int buttonX = x + width - 76;
         boolean selected = this.isInSelectedGroup(entry);
         boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT);
         String meta = entry.modName() + " / " + entry.groupName() + " / " + entry.manualId();
 
-        this.drawRowBase(context, x, y, width, hovered);
+        this.drawRowBase(context, x, y, width, hovered, selected);
         this.drawString(context, fitText(entry.displayName(), buttonX - x - 16), x + 8, y + 6, COLOR_TEXT);
         this.drawString(context, fitText(meta, buttonX - x - 16), x + 8, y + 18, COLOR_MUTED);
         if (selected) {
@@ -595,13 +613,39 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             this.drawSmallButton(context, buttonX - 24, y + 5, 20, "↓", FastMasaMenuPalette.CONTROL_DARK,
                     GuiHitTest.isInside(mouseX, mouseY, buttonX - 24, y + 5, 20, BUTTON_HEIGHT));
         }
-        this.drawSmallButton(context, buttonX, y + 5, 64, selected ? "-" : "+", selected ? COLOR_ACCENT : FastMasaMenuPalette.ROW,
+        this.drawSmallButton(context, buttonX, y + 5, 64, selected ? "-" : "+", selected
+                        ? FastMasaMenuPalette.ACTION_REMOVE : FastMasaMenuPalette.ACTION_ADD,
                 GuiHitTest.isInside(mouseX, mouseY, buttonX, y + 5, 64, BUTTON_HEIGHT));
     }
 
     private void drawListHeader(GuiContext context, int visibleCount, int totalCount) {
         String text = visibleCount + " / " + totalCount;
-        this.drawString(context, text, this.width - MARGIN - this.font.width(text), SEARCH_Y + 5, COLOR_MUTED);
+        this.drawString(context, text, this.width - MARGIN - this.getStringWidth(text), SEARCH_Y + 5, COLOR_MUTED);
+    }
+
+    private void drawSearchSuggestion(GuiContext context) {
+        if (this.searchField != null && !this.searchFieldFocused && this.searchField.getValue().isBlank()) {
+            this.drawString(context, StringUtils.translate("fast-masa-config.gui.full.search"), MARGIN + 4,
+                    SEARCH_Y + 5, COLOR_MUTED);
+        }
+        if (this.groupNameField != null && !this.groupNameFieldFocused && this.groupNameField.getValue().isBlank()) {
+            int y = this.getGroupControlsY() + BUTTON_HEIGHT + 4;
+            this.drawString(context, StringUtils.translate("fast-masa-config.gui.groups.name"), MARGIN + 4,
+                    y + 5, COLOR_MUTED);
+        }
+    }
+
+    private boolean isSearchFieldHit(int mouseX, int mouseY) {
+        return this.searchField != null && GuiHitTest.isInside(mouseX, mouseY, MARGIN, SEARCH_Y,
+                this.searchFieldWidth, 18);
+    }
+
+    private boolean isGroupNameFieldHit(int mouseX, int mouseY) {
+        if (this.groupNameField == null || tab != ConfigGuiTab.ALL_CONFIGS) {
+            return false;
+        }
+        int y = this.getGroupControlsY() + BUTTON_HEIGHT + 4;
+        return GuiHitTest.isInside(mouseX, mouseY, MARGIN, y, this.groupNameFieldWidth, 18);
     }
 
     private void drawEmptyText(GuiContext context, String text) {
@@ -609,9 +653,11 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                 COLOR_MUTED);
     }
 
-    private void drawRowBase(GuiContext context, int x, int y, int width, boolean hovered) {
-        RenderUtils.drawRect(context, x, y, width, ROW_HEIGHT, hovered ? COLOR_ROW_HOVER : COLOR_ROW);
-        RenderUtils.drawRect(context, x, y, 2, ROW_HEIGHT, hovered ? COLOR_ACCENT : COLOR_BORDER);
+    private void drawRowBase(GuiContext context, int x, int y, int width, boolean hovered, boolean active) {
+        int background = active ? FastMasaMenuPalette.MODULE_BACKGROUND : (hovered ? COLOR_ROW_HOVER : COLOR_ROW);
+        RenderUtils.drawRect(context, x, y, width, ROW_HEIGHT, background);
+        RenderUtils.drawRect(context, x, y, width, 1, hovered ? FastMasaMenuPalette.BORDER_HOVER : COLOR_BORDER);
+        RenderUtils.drawRect(context, x, y, 2, ROW_HEIGHT, active || hovered ? COLOR_ACCENT : COLOR_BORDER);
     }
 
     private void drawScrollBar(GuiContext context, int rowCount) {
@@ -637,7 +683,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             boolean hovered) {
         RenderUtils.drawRect(context, x, y, width, BUTTON_HEIGHT, hovered ? lighten(color) : color);
         RenderUtils.drawRect(context, x, y, width, 1, COLOR_BORDER);
-        int textX = x + (width - this.font.width(text)) / 2;
+        int textX = x + (width - this.getStringWidth(text)) / 2;
         this.drawString(context, text, textX, y + 6, COLOR_TEXT);
     }
 
@@ -735,7 +781,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int x = MARGIN;
         int width = this.width - MARGIN * 2;
         int rowY = this.getListTop() + (index - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP) + 5;
-        int buttonX = x + width - 68;
+        int buttonX = x + width - 76;
 
         if (this.isInSelectedGroup(entry)) {
             int itemIndex = this.getSelectedGroupItemIndex(entry);
@@ -844,8 +890,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int actionX = actionLayout.actionX();
         ConfigGroup selected = this.getSelectedGroup();
         String targetLabel = StringUtils.translate("fast-masa-config.gui.group.target")
-                + (selected == null ? StringUtils.translate("fast-masa-config.gui.group.none") : selected.name())
-                + (selected != null && selected.hidden() ? StringUtils.translate("fast-masa-config.gui.group.hidden") : "");
+                + (selected == null ? StringUtils.translate("fast-masa-config.gui.group.none") : selected.name());
         this.addButton(new ButtonGeneric(MARGIN, controlsY, selectorWidth, BUTTON_HEIGHT, targetLabel),
                 (button, mouseButton) -> this.selectNextTargetGroup());
         this.addButton(new ButtonGeneric(actionX, controlsY, 30, BUTTON_HEIGHT,
@@ -878,8 +923,9 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int nameY = controlsY + BUTTON_HEIGHT + 4;
         int nameWidth = Math.max(60, this.width - MARGIN * 2 - 68);
         this.groupNameField = new GuiTextFieldGeneric(MARGIN, nameY, nameWidth, 18, this.font);
+        this.groupNameFieldWidth = nameWidth;
         this.groupNameField.setMaxLength(128);
-        this.groupNameField.setSuggestion(StringUtils.translate("fast-masa-config.gui.groups.name"));
+        this.groupNameField.setSuggestion("");
         this.addTextField(this.groupNameField, field -> true);
         ButtonGeneric createButton = new ButtonGeneric(MARGIN + nameWidth + 4, nameY - 1, 30, BUTTON_HEIGHT, "+");
         createButton.setHoverStrings("fast-masa-config.gui.group.create");
@@ -975,11 +1021,17 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     private int getSelectedGroupItemIndex(ConfigIndexEntry entry) {
         ConfigGroup selected = this.getSelectedGroup();
-        if (selected == null) {
-            return -1;
-        }
-        for (int index = 0; index < selected.items().size(); index++) {
-            GroupItem item = selected.items().get(index);
+        return selected == null ? -1 : groupItemIndex(selected.items(), entry);
+    }
+
+    static int groupItemOrder(List<GroupItem> items, ConfigIndexEntry entry) {
+        int index = groupItemIndex(items, entry);
+        return index < 0 ? Integer.MAX_VALUE : index;
+    }
+
+    private static int groupItemIndex(List<GroupItem> items, ConfigIndexEntry entry) {
+        for (int index = 0; index < items.size(); index++) {
+            GroupItem item = items.get(index);
             if (item.isSameTarget(entry.modId(), entry.groupId(), entry.configName())) {
                 return index;
             }
@@ -1040,7 +1092,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     static record GroupActionLayout(int selectorWidth, int actionX, int rightEdge) {
         static GroupActionLayout calculate(int screenWidth) {
             int actionsWidth = 120;
-            int selectorWidth = Math.min(130, Math.max(60, screenWidth - MARGIN * 2 - actionsWidth - 4));
+            int selectorWidth = Math.min(180, Math.max(80, screenWidth - MARGIN * 2 - actionsWidth - 4));
             int actionX = MARGIN + selectorWidth + 4;
             return new GroupActionLayout(selectorWidth, actionX, actionX + actionsWidth);
         }
@@ -1229,21 +1281,21 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             return "";
         }
 
-        if (this.font.width(text) <= maxWidth) {
+        if (this.getStringWidth(text) <= maxWidth) {
             return text;
         }
 
         String ellipsis = "...";
-        if (this.font.width(ellipsis) > maxWidth) {
+        if (this.getStringWidth(ellipsis) > maxWidth) {
             int end = text.length();
-            while (end > 0 && this.font.width(text.substring(0, end)) > maxWidth) {
+            while (end > 0 && this.getStringWidth(text.substring(0, end)) > maxWidth) {
                 end--;
             }
             return text.substring(0, end);
         }
         int end = text.length();
 
-        while (end > 0 && this.font.width(text.substring(0, end) + ellipsis) > maxWidth) {
+        while (end > 0 && this.getStringWidth(text.substring(0, end) + ellipsis) > maxWidth) {
             end--;
         }
 

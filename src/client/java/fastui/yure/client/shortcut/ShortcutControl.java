@@ -1,6 +1,5 @@
 package fastui.yure.client.shortcut;
 
-import fastui.yure.config.MaLiLibConfigCommitter;
 import fastui.yure.config.MasaConfigEditor;
 import fastui.yure.config.ShortcutControlType;
 import fi.dy.masa.malilib.config.ConfigType;
@@ -12,7 +11,6 @@ import fi.dy.masa.malilib.config.IConfigInteger;
 
 public final class ShortcutControl {
     private static final MasaConfigEditor EDITOR = new MasaConfigEditor();
-    private static final MaLiLibConfigCommitter COMMITTER = new MaLiLibConfigCommitter();
 
     private ShortcutControl() {
     }
@@ -36,37 +34,36 @@ public final class ShortcutControl {
     }
 
     public static double getSliderRatio(IConfigBase config) {
-        double min = getMin(config);
-        double max = getMax(config);
+        return getSliderRatio(config, rangeFor(config));
+    }
 
-        if (max <= min) {
-            return 0.0;
-        }
-
-        return Math.max(0.0, Math.min(1.0, (getValue(config) - min) / (max - min)));
+    public static double getSliderRatio(ResolvedShortcut shortcut) {
+        IConfigBase config = shortcut.configEntry().config();
+        return getSliderRatio(config, rangeFor(shortcut, config));
     }
 
     public static void toggle(ResolvedShortcut shortcut) {
         IConfigBase config = shortcut.configEntry().config();
 
         if (config instanceof IConfigBoolean booleanConfig) {
-            // 直接写目标 mod 的 MaLiLib 配置对象，再用目标 modId 提交通知，保证目标配置页和配置文件同步。
+            // Keep the same runtime semantics as MaLiLib's native toggle hotkeys.
             EDITOR.apply(config, Boolean.toString(booleanConfig.getBooleanValue() == false));
-            EDITOR.commit(shortcut.configEntry().modId(), COMMITTER);
         }
     }
 
     public static void setSliderValue(ResolvedShortcut shortcut, double ratio) {
         IConfigBase config = shortcut.configEntry().config();
-        double min = shortcut.shortcut().minOverride() == null ? getMin(config) : shortcut.shortcut().minOverride();
-        double max = shortcut.shortcut().maxOverride() == null ? getMax(config) : shortcut.shortcut().maxOverride();
+        if (!isNumeric(config)) {
+            return;
+        }
+
+        NumericRange range = rangeFor(shortcut, config);
         double step = Math.max(0.000001, shortcut.shortcut().sliderStep());
-        double rawValue = min + (Math.max(0.0, Math.min(1.0, ratio)) * (max - min));
+        double rawValue = range.min() + (clampRatio(ratio) * range.width());
         double steppedValue = Math.round(rawValue / step) * step;
 
-        // 滑条同样提交到目标 modId，而不是 fast-masa-config 自己，避免各 mod 之间状态不同步。
-        EDITOR.apply(config, formatValue(config, Math.max(min, Math.min(max, steppedValue))));
-        EDITOR.commit(shortcut.configEntry().modId(), COMMITTER);
+        // Avoid ConfigManager.onConfigsChanged(): its default handler saves and reloads the target mod's config.
+        EDITOR.apply(config, formatValue(config, range.clamp(steppedValue)));
     }
 
     private static double getValue(IConfigBase config) {
@@ -96,7 +93,44 @@ public final class ShortcutControl {
         };
     }
 
+    private static NumericRange rangeFor(IConfigBase config) {
+        return new NumericRange(getMin(config), getMax(config));
+    }
+
+    private static NumericRange rangeFor(ResolvedShortcut shortcut, IConfigBase config) {
+        NumericRange configRange = rangeFor(config);
+        Double minOverride = shortcut.shortcut().minOverride();
+        Double maxOverride = shortcut.shortcut().maxOverride();
+        double min = minOverride == null ? configRange.min() : Math.max(configRange.min(), minOverride);
+        double max = maxOverride == null ? configRange.max() : Math.min(configRange.max(), maxOverride);
+
+        return min <= max ? new NumericRange(min, max) : configRange;
+    }
+
+    private static double getSliderRatio(IConfigBase config, NumericRange range) {
+        return range.width() <= 0.0 ? 0.0 : clampRatio((getValue(config) - range.min()) / range.width());
+    }
+
+    private static boolean isNumeric(IConfigBase config) {
+        return config.getType() == ConfigType.INTEGER || config.getType() == ConfigType.FLOAT
+                || config.getType() == ConfigType.DOUBLE;
+    }
+
+    private static double clampRatio(double ratio) {
+        return Math.max(0.0, Math.min(1.0, ratio));
+    }
+
     private static String formatValue(IConfigBase config, double value) {
         return config.getType() == ConfigType.INTEGER ? Integer.toString((int) Math.round(value)) : Double.toString(value);
+    }
+
+    private record NumericRange(double min, double max) {
+        double width() {
+            return this.max - this.min;
+        }
+
+        double clamp(double value) {
+            return Math.max(this.min, Math.min(this.max, value));
+        }
     }
 }

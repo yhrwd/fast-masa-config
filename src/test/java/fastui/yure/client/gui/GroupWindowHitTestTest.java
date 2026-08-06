@@ -53,7 +53,7 @@ class GroupWindowHitTestTest {
     void resolvesTheCorrectRowAfterScrolling() {
         GroupWindowLayout layout = GroupWindowLayout.calculate(300, 100, 20, 20, false, new int[]{25, 51});
 
-        assertEquals(new GroupWindowHitTest.Result(GroupWindowHitTest.Target.NONE, -1),
+        assertEquals(new GroupWindowHitTest.Result(GroupWindowHitTest.Target.ROW, 1),
                 GroupWindowHitTest.hitTest(layout, 25, 30, 50, null, List.of()));
     }
 
@@ -72,7 +72,7 @@ class GroupWindowHitTestTest {
 
     @Test
     void rejectsPartiallyScrolledRowsAndControls() {
-        GroupWindowLayout layout = GroupWindowLayout.calculate(300, 100, 20, 20, false, new int[]{25, 25});
+        GroupWindowLayout layout = GroupWindowLayout.calculate(300, 50, 20, 20, false, new int[]{25, 25});
         GroupWindowHitTest.ItemControls controls = new GroupWindowHitTest.ItemControls(0,
                 new GroupWindowHitTest.Bounds(50, 40, 18, 20),
                 new GroupWindowHitTest.Bounds(100, 40, 60, 8));
@@ -132,11 +132,15 @@ class GroupWindowHitTestTest {
         GroupWindowHitTest.Bounds slider = FloatingGroupPanel.sliderBounds(row);
         GroupWindowHitTest.Bounds value = FloatingGroupPanel.valueBounds(row);
 
-        assertEquals(new GroupWindowHitTest.Bounds(214, 62, 16, 16), expand);
-        assertEquals(new GroupWindowHitTest.Bounds(84, 93, 88, 9), slider);
-        assertEquals(new GroupWindowHitTest.Bounds(178, 93, 32, 9), value);
+        assertTrue(expand.x() >= row.x());
+        assertTrue(expand.x() + expand.width() <= row.x() + row.width());
         assertTrue(slider.x() > row.x());
+        assertTrue(slider.y() > row.y() + expand.height());
+        assertTrue(slider.width() > 0);
         assertTrue(slider.x() + slider.width() <= value.x());
-        assertTrue(value.x() + value.width() <= expand.x());
+        assertEquals(slider.y(), value.y());
+        assertEquals(slider.height(), value.height());
+        assertTrue(value.x() + value.width() <= row.x() + row.width());
+        assertTrue(value.x() + value.width() > expand.x());
     }
 }

@@ -34,6 +34,7 @@ public final class QuickConfigScreen extends Screen {
     private String activeFloatingSliderGroupId;
     private int activeFloatingSliderIndex = -1;
     private boolean floatingDragDirty;
+    private boolean redirectToFullConfig;
 
     public QuickConfigScreen() {
         super(CommonComponents.EMPTY);
@@ -46,12 +47,23 @@ public final class QuickConfigScreen extends Screen {
     @Override
     public void added() {
         ConfigGroupStore.ensureDefaultGroup();
+        if (ConfigGroupStore.getGroups().stream().noneMatch(group -> !group.hidden())) {
+            // Screen.added() 仍处于 Fabric 事件初始化阶段，不能在这里直接 setScreen。
+            // 延迟到首个 tick()，既保留“全隐藏时打开完整配置”的入口，也不会触发未初始化崩溃。
+            this.redirectToFullConfig = true;
+            return;
+        }
         this.movementKeyPassthrough = createMovementPassthrough(Minecraft.getInstance());
         syncHeldMovementKeys();
     }
 
     @Override
     public void tick() {
+        if (this.redirectToFullConfig) {
+            this.redirectToFullConfig = false;
+            Minecraft.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes()));
+            return;
+        }
         syncHeldMovementKeys();
         if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() && !isOpenHotkeyPhysicallyHeld()) {
             this.onClose();
@@ -108,13 +120,7 @@ public final class QuickConfigScreen extends Screen {
             }
             this.panel.raiseFloatingGroup(floating.groupId());
             if (hit.target() == GroupWindowHitTest.Target.HEADER) {
-                if (floating.isFullConfigHit(x, y)) {
-                    Minecraft.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes(), floating.groupId()));
-                } else if (floating.isHideHit(x, y)) {
-                    if (floating.hide()) {
-                        persistRuntimeGroupState();
-                    }
-                } else if (floating.isCollapseHit(x, y)) {
+                if (floating.isCollapseHit(x, y)) {
                     floating.toggleCollapsed();
                     persistRuntimeGroupState();
                 } else {
@@ -148,11 +154,6 @@ public final class QuickConfigScreen extends Screen {
                 ShortcutControl.setSliderValue(shortcut, floating.sliderRatioAt(hit.itemIndex(), x));
                 return true;
             }
-            return true;
-        }
-        if (this.panel.isRecoveryHit(x, y)) {
-            Minecraft.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes(),
-                    FastMasaConfigGui.recoveryTargetGroupId()));
             return true;
         }
         return false;
