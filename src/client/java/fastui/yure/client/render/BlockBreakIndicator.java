@@ -68,6 +68,7 @@ public final class BlockBreakIndicator {
         int line = ARGB.srgbLerp(normalized,
                 FastMasaConfigs.Generic.BLOCK_BREAK_START_LINE.getColor().toVanillaArgb(),
                 FastMasaConfigs.Generic.BLOCK_BREAK_END_LINE.getColor().toVanillaArgb());
+        line = ARGB.color(255, ARGB.red(line), ARGB.green(line), ARGB.blue(line));
         int fill = ARGB.srgbLerp(normalized,
                 FastMasaConfigs.Generic.BLOCK_BREAK_START_SIDE.getColor().toVanillaArgb(),
                 FastMasaConfigs.Generic.BLOCK_BREAK_END_SIDE.getColor().toVanillaArgb());
@@ -88,7 +89,7 @@ public final class BlockBreakIndicator {
         Gizmos.cuboid(box, style, false).setAlwaysOnTop();
         if (line != 0) {
             addCornerPoints(box, line, FastMasaConfigs.Generic.BLOCK_BREAK_LINE_WIDTH.getIntegerValue());
-            addMeteorTrail(box, line, FastMasaConfigs.Generic.BLOCK_BREAK_LINE_WIDTH.getIntegerValue());
+            addMeteorTrail(box, FastMasaConfigs.Generic.BLOCK_BREAK_LINE_WIDTH.getIntegerValue());
         }
     }
 
@@ -106,27 +107,72 @@ public final class BlockBreakIndicator {
         }
     }
 
-    private static void addMeteorTrail(AABB box, int color, int lineWidth) {
+    private static void addMeteorTrail(AABB box, int lineWidth) {
         Vec3[] corners = corners(box);
-        long cycleMillis = 1100L;
+        long cycleMillis = 650L;
         long elapsed = System.currentTimeMillis();
-        int pair = (int) ((elapsed / cycleMillis) & 3L);
-        float progress = (elapsed % cycleMillis) / (float) cycleMillis;
-        Vec3 start = corners[pair];
-        Vec3 end = corners[pair ^ 7];
-        Vec3 meteor = lerp(start, end, progress);
-
-        int trailSegments = 7;
-        for (int i = trailSegments; i >= 1; i--) {
-            float from = Math.max(0.0F, progress - i * 0.055F);
-            Vec3 tail = lerp(start, end, from);
-            int alpha = Math.max(12, 150 - i * 18);
-            int trailColor = ARGB.color(alpha, ARGB.red(color), ARGB.green(color), ARGB.blue(color));
-            Gizmos.line(tail, meteor, trailColor, Math.max(1.0F, lineWidth * (1.2F - i * 0.08F)))
-                    .setAlwaysOnTop();
+        long cycle = elapsed / cycleMillis;
+        float cycleProgress = (elapsed % cycleMillis) / (float) cycleMillis;
+        for (int meteorIndex = 0; meteorIndex < 3; meteorIndex++) {
+            int pair = (int) ((cycle + meteorIndex) & 3L);
+            float jitter = pseudoOffset(box, cycle, meteorIndex);
+            float progress = cycleProgress + meteorIndex / 3.0F + jitter;
+            progress -= (float) Math.floor(progress);
+            Vec3[] path = borderPath(corners, pair);
+            Vec3 meteor = pathPosition(path, progress);
+            int meteorColor = rainbowColor((elapsed / 1000.0F) * 0.8F + meteorIndex * 0.18F);
+            int trailSegments = 6;
+            for (int i = trailSegments; i >= 1; i--) {
+                float from = progress - i * 0.045F;
+                if (from < 0.0F) {
+                    continue;
+                }
+                Vec3 tail = pathPosition(path, from);
+                int alpha = Math.max(24, 190 - i * 26);
+                int trailColor = ARGB.color(alpha, ARGB.red(meteorColor), ARGB.green(meteorColor),
+                        ARGB.blue(meteorColor));
+                Gizmos.line(tail, meteor, trailColor, Math.max(1.0F, lineWidth * (1.25F - i * 0.08F)))
+                        .setAlwaysOnTop();
+            }
+            Gizmos.point(meteor, meteorColor, Math.max(3.0F, lineWidth * 2.4F)).setAlwaysOnTop();
         }
-        int glowColor = ARGB.color(255, ARGB.red(color), ARGB.green(color), ARGB.blue(color));
-        Gizmos.point(meteor, glowColor, Math.max(3.0F, lineWidth * 2.2F)).setAlwaysOnTop();
+    }
+
+    private static float pseudoOffset(AABB box, long cycle, int index) {
+        long bits = Double.doubleToLongBits(box.minX * 31.0 + box.minY * 17.0 + box.minZ * 7.0);
+        long value = bits ^ (cycle * 0x9E3779B97F4A7C15L) ^ (index * 0xBF58476D1CE4E5B9L);
+        return (float) ((value & 0xFFFFL) / 65535.0 * 0.12 - 0.06);
+    }
+
+    private static Vec3[] borderPath(Vec3[] corners, int start) {
+        int firstBit = 1;
+        int secondBit = 2;
+        int thirdBit = 4;
+        return new Vec3[] {corners[start], corners[start ^ firstBit],
+                corners[start ^ firstBit ^ secondBit], corners[start ^ firstBit ^ secondBit ^ thirdBit]};
+    }
+
+    private static Vec3 pathPosition(Vec3[] path, float progress) {
+        float scaled = Math.clamp(progress, 0.0F, 0.9999F) * (path.length - 1);
+        int segment = (int) scaled;
+        return lerp(path[segment], path[segment + 1], scaled - segment);
+    }
+
+    private static int rainbowColor(float hue) {
+        hue -= (float) Math.floor(hue);
+        float scaled = hue * 6.0F;
+        int sector = (int) scaled;
+        float fraction = scaled - sector;
+        int r = 255, g = 255, b = 255;
+        switch (sector % 6) {
+            case 0 -> { g = (int) (fraction * 255.0F); b = 0; }
+            case 1 -> { r = (int) ((1.0F - fraction) * 255.0F); b = 0; }
+            case 2 -> { r = 0; b = (int) (fraction * 255.0F); }
+            case 3 -> { r = 0; g = (int) ((1.0F - fraction) * 255.0F); }
+            case 4 -> { r = (int) (fraction * 255.0F); g = 0; }
+            default -> { g = 0; b = (int) ((1.0F - fraction) * 255.0F); }
+        }
+        return ARGB.color(255, r, g, b);
     }
 
     private static Vec3[] corners(AABB box) {
