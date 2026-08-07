@@ -56,7 +56,7 @@ public final class BlockBreakIndicator {
         AABB bounds = shape.bounds();
         // Keep a small stable core near completion so the cuboid does not
         // collapse into a degenerate, flickering line on the final frames.
-        double scale = Math.max(0.25, 1.0 - normalized);
+        double scale = Math.max(0.08, 1.0 - normalized);
         double cx = position.getX() + (bounds.minX + bounds.maxX) / 2.0;
         double cy = position.getY() + (bounds.minY + bounds.maxY) / 2.0;
         double cz = position.getZ() + (bounds.minZ + bounds.maxZ) / 2.0;
@@ -83,25 +83,34 @@ public final class BlockBreakIndicator {
             return;
         }
 
-        GizmoStyle style = GizmoStyle.strokeAndFill(line,
-                FastMasaConfigs.Generic.BLOCK_BREAK_LINE_WIDTH.getIntegerValue(), fill);
-        Gizmos.cuboid(box, style, false).setAlwaysOnTop();
+        if (fill != 0) {
+            Gizmos.cuboid(box, GizmoStyle.fill(fill), false).setAlwaysOnTop();
+        }
         if (line != 0) {
-            addCornerPoints(box, line, FastMasaConfigs.Generic.BLOCK_BREAK_LINE_WIDTH.getIntegerValue());
+            addBoxEdges(box, line, FastMasaConfigs.Generic.BLOCK_BREAK_LINE_WIDTH.getIntegerValue());
         }
     }
 
-    private static void addCornerPoints(AABB box, int color, int lineWidth) {
-        float pointSize = Math.max(2.0F, lineWidth * 1.35F);
-        double[] xs = {box.minX, box.maxX};
-        double[] ys = {box.minY, box.maxY};
-        double[] zs = {box.minZ, box.maxZ};
-        for (double x : xs) {
-            for (double y : ys) {
-                for (double z : zs) {
-                    Gizmos.point(new Vec3(x, y, z), color, pointSize).setAlwaysOnTop();
-                }
-            }
+    private static void addBoxEdges(AABB box, int color, int lineWidth) {
+        Vec3[] c = corners(box);
+        int[][] edges = {
+                {0, 1}, {0, 2}, {0, 4}, {1, 3}, {1, 5}, {2, 3},
+                {2, 6}, {3, 7}, {4, 5}, {4, 6}, {5, 7}, {6, 7}
+        };
+        for (int[] edge : edges) {
+            Vec3 start = c[edge[0]];
+            Vec3 end = c[edge[1]];
+            Vec3 direction = end.subtract(start).normalize().scale(0.012);
+            Gizmos.line(start.subtract(direction), end.add(direction), color, lineWidth).setAlwaysOnTop();
         }
+    }
+
+    private static Vec3[] corners(AABB box) {
+        return new Vec3[] {
+                new Vec3(box.minX, box.minY, box.minZ), new Vec3(box.minX, box.minY, box.maxZ),
+                new Vec3(box.minX, box.maxY, box.minZ), new Vec3(box.minX, box.maxY, box.maxZ),
+                new Vec3(box.maxX, box.minY, box.minZ), new Vec3(box.maxX, box.minY, box.maxZ),
+                new Vec3(box.maxX, box.maxY, box.minZ), new Vec3(box.maxX, box.maxY, box.maxZ)
+        };
     }
 }
