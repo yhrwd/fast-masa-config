@@ -17,6 +17,7 @@ classes/
 # local
 docs/
 run/
+log/
 *.log
 *.ipr
 *.iws
