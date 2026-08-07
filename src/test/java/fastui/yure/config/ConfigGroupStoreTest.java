@@ -91,6 +91,7 @@ class ConfigGroupStoreTest {
 
         assertFalse(saved.has("floating"));
         assertFalse(saved.has("color"));
+        assertEquals("FastUI", loaded.name());
         assertTrue(loaded.collapsed());
         assertEquals(40, loaded.x());
         assertEquals(60, loaded.y());
@@ -162,7 +163,7 @@ class ConfigGroupStoreTest {
         assertEquals(1, ConfigGroupStore.getGroups().size());
         ConfigGroup defaultGroup = ConfigGroupStore.getGroups().getFirst();
         assertEquals("default", defaultGroup.id());
-        assertEquals("Fast Masa Config", defaultGroup.name());
+        assertEquals("FastUI", defaultGroup.name());
         assertFalse(ConfigGroupStore.remove(defaultGroup.id()));
 
         List<ShortcutEntry> shortcuts = List.of(

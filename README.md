@@ -11,6 +11,7 @@ English summary: Fast Masa Config is a Fabric client-side helper for quickly acc
 - 默认分组包含完整配置入口；用户分组可隐藏、拖拽、折叠和排序。
 - 在完整配置界面的“全部配置”页选择目标分组后搜索、筛选、添加或移除配置项。
 - 当前目标分组已添加的配置会优先显示，方便维护多个工作流。
+- 可选的动态挖掘进度显示：用渐变方块描边和半透明填充替换原版裂纹动画，并支持远程挖掘进度。
 - 打开快捷面板时不暂停游戏，并尽量透传移动键，减少操作中断。
 - 提供配置扫描命令和 CSV 导出，便于排查兼容性问题。
 
@@ -18,9 +19,9 @@ English summary: Fast Masa Config is a Fabric client-side helper for quickly acc
 
 当前主线面向以下环境开发：
 
-- Minecraft `1.21.7`
+- Minecraft `26.1.2`
 - Fabric Loader `0.19.3` 或更高版本
-- Java `21` 或更高版本
+- Java `25` 或更高版本
 - Fabric API
 - MaLiLib `0.25.x`
 
@@ -55,6 +56,7 @@ English summary: Fast Masa Config is a Fabric client-side helper for quickly acc
 - 默认分组被隐藏后，任意可见窗口仍保留完整配置入口；全部隐藏时会显示恢复配置入口。
 - 分组窗口通过标题栏拖拽，右侧按钮分别用于折叠和隐藏。窗口位置、折叠状态和已展开的数值项会保存。
 - 布尔项的强调色表示 `true`；数值项点击行或箭头即可展开滑条，步长固定为 `1`。
+- 在“通用”设置中可以启用动态挖掘进度显示，并分别调整描边、填充、远程进度和描边宽度；颜色项可直接打开 HSV 编辑器。
 
 ## 命令
 
@@ -82,8 +84,9 @@ Fast Masa Config 主要依赖 MaLiLib 配置界面暴露出来的信息。大多
 
 - 布尔值：显示为开关。
 - 整数、浮点数和双精度数值：显示为滑条。
+- 颜色：在完整配置界面中显示色块并支持 HSV 编辑。
 
-字符串、颜色、选项列表和复杂热键配置暂不作为快捷面板的主要操作目标。
+字符串、选项列表和复杂热键配置暂不作为快捷面板的主要操作目标；颜色配置目前仅在完整配置界面中编辑。
 
 ## 本地开发
 
@@ -99,11 +102,18 @@ Fast Masa Config 主要依赖 MaLiLib 配置界面暴露出来的信息。大多
 ./gradlew test
 ```
 
+编译客户端源码（包括 Fabric 客户端入口和 Mixin）：
+
+```bash
+./gradlew compileClientJava
+```
+
 Windows 环境可以使用：
 
 ```powershell
 .\gradlew.bat build
 .\gradlew.bat test
+.\gradlew.bat compileClientJava
 ```
 
 本地开发时主要关注这些配置文件：

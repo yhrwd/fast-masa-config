@@ -38,28 +38,28 @@ public final class FloatingGroupPanel {
      * 普通行总高。改大可增加所有非展开项的上下留白；展开项的标题区也固定使用此值。
      * 建议保留至少默认字体高度 9px，再额外保留约 4~5px 上下留白。
      */
-    private static final int ROW_HEIGHT = 16;
+    private static final int ROW_HEIGHT = 15;
     /**
      * 数值项展开后的总高。它由标题区、2px 间隔、滑条/数值控件区和底部间隔共同组成。
      * 改大时，sliderBounds() 会自动让滑条在新增空间内垂直居中。
      */
-    private static final int EXPANDED_HEIGHT = 38;
+    private static final int EXPANDED_HEIGHT = 34;
     /** 窗口左右内边距，同时决定标签和滑条左起点。改大可增加留白，但会缩短滑条。 */
-    private static final int ROW_PADDING = 10;
+    private static final int ROW_PADDING = 8;
     /** 所有悬浮窗口的最小内容宽度。改大将同时加宽收起和展开状态。 */
-    private static final int MIN_CONTENT_WIDTH = 60;
+    private static final int MIN_CONTENT_WIDTH = 56;
     /**
      * 长标题/选项可撑开的内容宽度上限。超过此宽度的标签交给跑马灯，窗口不再继续加宽。
      * 要整体加宽悬浮菜单优先调这里；窗口最终还会额外加 GroupWindowLayout.WINDOW_PADDING * 2。
      */
-    private static final int EXPANDED_MAX_CONTENT_WIDTH = 105;
+    private static final int EXPANDED_MAX_CONTENT_WIDTH = 92;
     /** 滑条右端与数值文本之间的空隙。改小可给滑条让出宽度，最小建议保留 2px。 */
-    private static final int SLIDER_VALUE_GAP = 3;
+    private static final int SLIDER_VALUE_GAP = 2;
     /**
      * 数值文本预留宽度。改小可加长滑条；应至少容纳当前常用数值格式。
      * 值显示被 fitText() 截断时应增大此值，而不是继续压缩滑条。
      */
-    private static final int VALUE_WIDTH = 22;
+    private static final int VALUE_WIDTH = 20;
     /**
      * 跑马灯速度，单位 px/s。当前 30 约为每 33ms 前进 1px；调小更慢，调大更快。
      * GuiContext 文本坐标是整数像素，因此实际位置变化频率约等于该数值，不能独立强制提高帧率。

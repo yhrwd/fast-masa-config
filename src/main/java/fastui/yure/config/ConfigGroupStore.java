@@ -12,7 +12,7 @@ import java.util.UUID;
 
 public final class ConfigGroupStore {
     private static final String DEFAULT_GROUP_ID = "default";
-    private static final String DEFAULT_GROUP_NAME = "Fast Masa Config";
+    private static final String DEFAULT_GROUP_NAME = "FastUI";
     private static final List<ConfigGroup> GROUPS = new ArrayList<>();
 
     private ConfigGroupStore() {

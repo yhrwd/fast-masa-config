@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "package": "fastui.yure.client.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "ClientLevelRendererAccessor",
+    "ClientPlayerInteractionManagerAccessor",
+    "LevelRendererBlockBreakOverlayMixin",
+    "ShaderManagerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
