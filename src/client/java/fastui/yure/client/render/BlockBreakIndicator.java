@@ -56,7 +56,7 @@ public final class BlockBreakIndicator {
         AABB bounds = shape.bounds();
         // Keep a small stable core near completion so the cuboid does not
         // collapse into a degenerate, flickering line on the final frames.
-        double scale = Math.max(0.08, 1.0 - normalized);
+        double scale = Math.max(0.08, 1.0 - normalized * 0.92);
         double cx = position.getX() + (bounds.minX + bounds.maxX) / 2.0;
         double cy = position.getY() + (bounds.minY + bounds.maxY) / 2.0;
         double cz = position.getZ() + (bounds.minZ + bounds.maxZ) / 2.0;
@@ -100,8 +100,7 @@ public final class BlockBreakIndicator {
         for (int[] edge : edges) {
             Vec3 start = c[edge[0]];
             Vec3 end = c[edge[1]];
-            Vec3 direction = end.subtract(start).normalize().scale(0.012);
-            Gizmos.line(start.subtract(direction), end.add(direction), color, lineWidth).setAlwaysOnTop();
+            Gizmos.line(start, end, color, lineWidth).setAlwaysOnTop();
         }
     }
 
