@@ -12,6 +12,7 @@ import net.minecraft.gizmos.Gizmos;
 import net.minecraft.util.ARGB;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 /** Minecraft 26.2 implementation backed by the vanilla Gizmo collector. */
@@ -85,5 +86,22 @@ public final class BlockBreakIndicator {
         GizmoStyle style = GizmoStyle.strokeAndFill(line,
                 FastMasaConfigs.Generic.BLOCK_BREAK_LINE_WIDTH.getIntegerValue(), fill);
         Gizmos.cuboid(box, style, false).setAlwaysOnTop();
+        if (line != 0) {
+            addCornerPoints(box, line, FastMasaConfigs.Generic.BLOCK_BREAK_LINE_WIDTH.getIntegerValue());
+        }
+    }
+
+    private static void addCornerPoints(AABB box, int color, int lineWidth) {
+        float pointSize = Math.max(2.0F, lineWidth * 1.35F);
+        double[] xs = {box.minX, box.maxX};
+        double[] ys = {box.minY, box.maxY};
+        double[] zs = {box.minZ, box.maxZ};
+        for (double x : xs) {
+            for (double y : ys) {
+                for (double z : zs) {
+                    Gizmos.point(new Vec3(x, y, z), color, pointSize).setAlwaysOnTop();
+                }
+            }
+        }
     }
 }
