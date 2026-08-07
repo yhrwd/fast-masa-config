@@ -53,7 +53,9 @@ public final class BlockBreakIndicator {
 
         float normalized = Math.clamp(progress, 0.0F, 1.0F);
         AABB bounds = shape.bounds();
-        double scale = 1.0 - normalized;
+        // Keep a small stable core near completion so the cuboid does not
+        // collapse into a degenerate, flickering line on the final frames.
+        double scale = Math.max(0.08, 1.0 - normalized);
         double cx = position.getX() + (bounds.minX + bounds.maxX) / 2.0;
         double cy = position.getY() + (bounds.minY + bounds.maxY) / 2.0;
         double cz = position.getZ() + (bounds.minZ + bounds.maxZ) / 2.0;
