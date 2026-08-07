@@ -19,7 +19,7 @@ English summary: Fast Masa Config is a Fabric client-side helper for quickly acc
 
 当前主线面向以下环境开发：
 
-- Minecraft `26.1.2`
+- Minecraft `26.2`
 - Fabric Loader `0.19.3` 或更高版本
 - Java `25` 或更高版本
 - Fabric API
