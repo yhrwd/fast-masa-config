@@ -56,7 +56,8 @@ public final class FastMasaInputHandler implements IKeybindProvider {
             Minecraft client = Minecraft.getInstance();
             Set<Integer> heldKeys = getHeldOpenHotkeyCodes();
 
-            if (action == KeyAction.PRESS && client.screen instanceof QuickConfigScreen screen) {
+            Object currentScreen = getCurrentScreen(client);
+            if (action == KeyAction.PRESS && currentScreen instanceof QuickConfigScreen screen) {
                 if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() == false) {
                     screen.onClose();
                     return true;
@@ -64,17 +65,25 @@ public final class FastMasaInputHandler implements IKeybindProvider {
                 return true;
             }
 
-            if (action == KeyAction.PRESS && client.screen instanceof QuickConfigScreen == false) {
+            if (action == KeyAction.PRESS && currentScreen instanceof QuickConfigScreen == false) {
                 if (INSTANCE.quickConfigReleaseGate.isBlocked(heldKeys)) {
                     return true;
                 }
                 INSTANCE.quickConfigReleaseGate.arm(Set.copyOf(
                         FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys()));
-                client.setScreen(new QuickConfigScreen());
+                client.setScreenAndShow(new QuickConfigScreen());
                 return true;
             }
 
             return false;
+        }
+
+        private static Object getCurrentScreen(Minecraft client) {
+            try {
+                return Minecraft.class.getMethod("screen").invoke(client);
+            } catch (ReflectiveOperationException ignored) {
+                return null;
+            }
         }
 
         private static Set<Integer> getHeldOpenHotkeyCodes() {

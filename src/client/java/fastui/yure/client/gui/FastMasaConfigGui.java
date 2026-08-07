@@ -378,7 +378,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                     if (currentSelection != null) {
                         var screenSupplier = currentSelection.configScreenSupplier();
                         if (screenSupplier != null) {
-                            mc.setScreen(screenSupplier.get());
+                            mc.setScreenAndShow(screenSupplier.get());
                         }
                     }
                 }

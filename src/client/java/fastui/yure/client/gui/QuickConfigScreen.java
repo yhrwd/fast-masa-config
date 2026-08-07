@@ -61,7 +61,7 @@ public final class QuickConfigScreen extends Screen {
     public void tick() {
         if (this.redirectToFullConfig) {
             this.redirectToFullConfig = false;
-            Minecraft.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes()));
+            Minecraft.getInstance().setScreenAndShow(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes()));
             return;
         }
         syncHeldMovementKeys();
@@ -132,7 +132,7 @@ public final class QuickConfigScreen extends Screen {
             }
 
             if (shouldOpenSystemConfigRow(hit.target(), floating.isSystemConfigRow(hit.itemIndex()))) {
-                Minecraft.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes(), floating.groupId()));
+                Minecraft.getInstance().setScreenAndShow(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes(), floating.groupId()));
                 return true;
             }
             ResolvedShortcut shortcut = floating.shortcutAt(hit.itemIndex());
