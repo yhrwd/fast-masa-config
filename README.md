@@ -6,7 +6,7 @@ English summary: Fast Masa Config is a Fabric client-side helper for quickly acc
 
 ## 功能
 
-- 按住热键打开 Meteor 风格的悬浮分组菜单，默认热键为 `Left Alt + C`。
+- 按住热键打开 Meteor 风格的悬浮分组菜单，默认热键为 `Right Shift`。
 - 在悬浮窗口中直接切换布尔配置；点击数值项展开步长为 `1` 的滑条。
 - 默认分组包含完整配置入口；用户分组可隐藏、拖拽、折叠和排序。
 - 在完整配置界面的“全部配置”页选择目标分组后搜索、筛选、添加或移除配置项。
@@ -43,7 +43,7 @@ English summary: Fast Masa Config is a Fabric client-side helper for quickly acc
 
 ## 使用
 
-默认按住 `Left Alt + C` 打开悬浮分组菜单。窗口不会暂停游戏；按住移动键后再打开菜单时，前进、后退、跳跃等按键会持续同步。
+默认按住 `Right Shift` 打开悬浮分组菜单。窗口不会暂停游戏；按住移动键后再打开菜单时，前进、后退、跳跃等按键会持续同步。
 
 完整界面中有两个主要页签：
 

@@ -22,7 +22,7 @@ public final class FastMasaConfigs {
                 private static final KeybindSettings QUICK_CONFIG_KEY_SETTINGS = KeybindSettings
                                 .create(KeybindSettings.Context.INGAME, KeyAction.PRESS, true, true, false, true);
 
-                public static final ConfigHotkey OPEN_QUICK_CONFIG = new ConfigHotkey("openQuickConfig", "LEFT_ALT,C",
+                public static final ConfigHotkey OPEN_QUICK_CONFIG = new ConfigHotkey("openQuickConfig", "RIGHT_SHIFT",
                                 QUICK_CONFIG_KEY_SETTINGS,
                                 "按住时显示 Fast Masa Config 快捷配置面板。", "Open Quick Config").apply(GENERIC_KEY);
                 public static final ConfigBoolean RELEASE_TO_CLOSE = new ConfigBoolean("releaseToClose", true,
