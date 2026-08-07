@@ -5,8 +5,7 @@
   "client": [
     "ClientLevelRendererAccessor",
     "ClientPlayerInteractionManagerAccessor",
-    "LevelRendererBlockBreakOverlayMixin",
-    "ShaderManagerMixin"
+    "LevelRendererBlockBreakOverlayMixin"
   ],
   "injectors": {
     "defaultRequire": 1
