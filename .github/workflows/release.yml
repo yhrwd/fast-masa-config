@@ -44,6 +44,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          git for-each-ref --format='%(contents)' "refs/tags/${GITHUB_REF_NAME}" > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            printf 'Automated release for %s\n' "${GITHUB_REF_NAME}" > release-notes.md
+          fi
           gh release create "${GITHUB_REF_NAME}" release/*.jar \
             --title "${GITHUB_REF_NAME}" \
-            --notes "Automated release for ${GITHUB_REF_NAME}"
+            --notes-file release-notes.md
