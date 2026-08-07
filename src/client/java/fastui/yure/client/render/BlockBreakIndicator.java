@@ -82,6 +82,6 @@ public final class BlockBreakIndicator {
 
         GizmoStyle style = GizmoStyle.strokeAndFill(line,
                 FastMasaConfigs.Generic.BLOCK_BREAK_LINE_WIDTH.getIntegerValue(), fill);
-        Gizmos.cuboid(box, style, true).setAlwaysOnTop().persistForMillis(75);
+        Gizmos.cuboid(box, style, false).setAlwaysOnTop();
     }
 }
