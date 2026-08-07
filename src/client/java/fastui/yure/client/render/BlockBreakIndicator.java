@@ -56,7 +56,7 @@ public final class BlockBreakIndicator {
         AABB bounds = shape.bounds();
         // Keep a small stable core near completion so the cuboid does not
         // collapse into a degenerate, flickering line on the final frames.
-        double scale = Math.max(0.25, 1.0 - normalized);
+        double scale = Math.max(0.10, 1.0 - normalized);
         double cx = position.getX() + (bounds.minX + bounds.maxX) / 2.0;
         double cy = position.getY() + (bounds.minY + bounds.maxY) / 2.0;
         double cz = position.getZ() + (bounds.minZ + bounds.maxZ) / 2.0;
@@ -88,6 +88,7 @@ public final class BlockBreakIndicator {
         Gizmos.cuboid(box, style, false).setAlwaysOnTop();
         if (line != 0) {
             addCornerPoints(box, line, FastMasaConfigs.Generic.BLOCK_BREAK_LINE_WIDTH.getIntegerValue());
+            addMeteorTrail(box, line, FastMasaConfigs.Generic.BLOCK_BREAK_LINE_WIDTH.getIntegerValue());
         }
     }
 
@@ -103,5 +104,48 @@ public final class BlockBreakIndicator {
                 }
             }
         }
+    }
+
+    private static void addMeteorTrail(AABB box, int color, int lineWidth) {
+        Vec3[] corners = corners(box);
+        long cycleMillis = 1100L;
+        long elapsed = System.currentTimeMillis();
+        int pair = (int) ((elapsed / cycleMillis) & 3L);
+        float progress = (elapsed % cycleMillis) / (float) cycleMillis;
+        Vec3 start = corners[pair];
+        Vec3 end = corners[pair ^ 7];
+        Vec3 meteor = lerp(start, end, progress);
+
+        int trailSegments = 7;
+        for (int i = trailSegments; i >= 1; i--) {
+            float from = Math.max(0.0F, progress - i * 0.055F);
+            Vec3 tail = lerp(start, end, from);
+            int alpha = Math.max(12, 150 - i * 18);
+            int trailColor = ARGB.color(alpha, ARGB.red(color), ARGB.green(color), ARGB.blue(color));
+            Gizmos.line(tail, meteor, trailColor, Math.max(1.0F, lineWidth * (1.2F - i * 0.08F)))
+                    .setAlwaysOnTop();
+        }
+        int glowColor = ARGB.color(255, ARGB.red(color), ARGB.green(color), ARGB.blue(color));
+        Gizmos.point(meteor, glowColor, Math.max(3.0F, lineWidth * 2.2F)).setAlwaysOnTop();
+    }
+
+    private static Vec3[] corners(AABB box) {
+        return new Vec3[] {
+                new Vec3(box.minX, box.minY, box.minZ),
+                new Vec3(box.minX, box.minY, box.maxZ),
+                new Vec3(box.minX, box.maxY, box.minZ),
+                new Vec3(box.minX, box.maxY, box.maxZ),
+                new Vec3(box.maxX, box.minY, box.minZ),
+                new Vec3(box.maxX, box.minY, box.maxZ),
+                new Vec3(box.maxX, box.maxY, box.minZ),
+                new Vec3(box.maxX, box.maxY, box.maxZ)
+        };
+    }
+
+    private static Vec3 lerp(Vec3 start, Vec3 end, float progress) {
+        return new Vec3(
+                start.x + (end.x - start.x) * progress,
+                start.y + (end.y - start.y) * progress,
+                start.z + (end.z - start.z) * progress);
     }
 }
