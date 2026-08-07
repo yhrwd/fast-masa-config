@@ -1,8 +1,28 @@
 # Fast Masa Config
 
-Fast Masa Config 是一个 Fabric 客户端 Mod，用来给 MaLiLib 系 Mod 提供更快的配置访问方式。它会扫描已注册的 MaLiLib 配置界面，把常用的布尔值和数值配置整理到一个游戏内快捷面板里。
+## English
 
-English summary: Fast Masa Config is a Fabric client-side helper for quickly accessing MaLiLib-based mod configs.
+Fast Masa Config was created for a practical reason: Minecraft has a limited number of convenient keybinds, and rarely used shortcuts are easy to forget. The mod scans configuration options exposed by MaLiLib-based mods and lets you place frequently used settings in a compact in-game quick panel. Switches, modes, and supported sliders can then be adjusted without repeatedly navigating through full configuration screens.
+
+This is a client-side Fabric mod. Before installing it, check the Minecraft version and dependency requirements listed on the relevant version page, especially the required MaLiLib version. For a complete compatibility list, refer to the corresponding version page on Modrinth.
+
+## 中文
+
+Fast Masa Config 的设计初衷很直接：Minecraft 中便于使用的按键数量有限，而不常用的快捷键也很容易遗忘。该 Mod 会扫描基于 MaLiLib 的 Mod 所公开的配置项，并将常用设置整理到紧凑的游戏内快捷面板中。这样无需反复打开完整配置界面，即可快速调整开关、模式以及受支持的数值滑条。
+
+这是一个客户端 Fabric Mod。安装前请确认对应版本页面列出的 Minecraft 版本和依赖要求，尤其是 MaLiLib 的版本。完整的兼容性信息请以 Modrinth 对应版本页为准。
+
+## 截图说明
+
+以下截图展示的是旧版用户界面，仅用于说明功能和交互方式；当前版本的界面布局与视觉样式可能有所不同。
+
+![旧版快捷面板](https://cdn.modrinth.com/data/cached_images/f0539a0eb95e5877f503e5cf3af1f2d63f23362f.png)
+
+![旧版快捷面板](https://cdn.modrinth.com/data/cached_images/2fcc46a9a05af551c4221e2f52e53923a2cb2aea.png)
+
+![旧版配置界面](https://cdn.modrinth.com/data/cached_images/d4c389f366599a8d2ac70d5c2aa2738312a25590.png)
+
+![旧版配置界面](https://cdn.modrinth.com/data/cached_images/089d26ffc01f85774d5e6c6c92c73d22a8ce5045.png)
 
 ## 功能
 
@@ -23,7 +43,7 @@ English summary: Fast Masa Config is a Fabric client-side helper for quickly acc
 - Fabric Loader `0.19.3` 或更高版本
 - Java `25` 或更高版本
 - Fabric API
-- MaLiLib `0.25.x`
+- MaLiLib `0.29.x`
 
 不同 Minecraft 版本对应的 Fabric API、MaLiLib、Mod Menu 和 Yarn mappings 版本不同，请以对应分支的 `gradle.properties` 和 `fabric.mod.json` 为准。
 
