@@ -21,6 +21,6 @@ public final class FastMasaClientInitHandler implements IInitializationHandler {
         InputEventHandler.getKeybindManager().registerKeybindProvider(FastMasaInputHandler.getInstance());
         FastMasaInputHandler.getInstance().initCallbacks();
         ClientTickEvents.END_CLIENT_TICK.register(client -> FastMasaInputHandler.getInstance().tick());
-        LevelRenderEvents.END_MAIN.register(context -> BlockBreakIndicator.render());
+        LevelRenderEvents.END_MAIN.register(context -> BlockBreakIndicator.render(context.levelState()));
     }
 }

@@ -1,15 +1,14 @@
 package fastui.yure.client.render;
 
 import fastui.yure.config.FastMasaConfigs;
-import fastui.yure.client.mixin.ClientLevelRendererAccessor;
 import fastui.yure.client.mixin.ClientPlayerInteractionManagerAccessor;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.client.renderer.state.level.BlockBreakingRenderState;
+import net.minecraft.client.renderer.state.level.LevelRenderState;
 import net.minecraft.gizmos.GizmoStyle;
 import net.minecraft.gizmos.Gizmos;
-import net.minecraft.server.level.BlockDestructionProgress;
 import net.minecraft.util.ARGB;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
@@ -20,7 +19,7 @@ public final class BlockBreakIndicator {
     private BlockBreakIndicator() {
     }
 
-    public static void render() {
+    public static void render(LevelRenderState renderState) {
         if (!FastMasaConfigs.Generic.BLOCK_BREAK_INDICATOR.getBooleanValue()) {
             return;
         }
@@ -37,11 +36,9 @@ public final class BlockBreakIndicator {
         }
 
         if (FastMasaConfigs.Generic.BLOCK_BREAK_REMOTE.getBooleanValue()) {
-            Int2ObjectMap<BlockDestructionProgress> remote =
-                    ((ClientLevelRendererAccessor) client.levelRenderer).fastui$getDestroyingBlocks();
-            for (BlockDestructionProgress progress : remote.values()) {
-                if (!progress.getPos().equals(ownPosition)) {
-                    addIndicator(client.level, progress.getPos(), (progress.getProgress() + 1) / 9.0F);
+            for (BlockBreakingRenderState progress : renderState.blockBreakingRenderStates) {
+                if (!progress.blockPos().equals(ownPosition)) {
+                    addIndicator(client.level, progress.blockPos(), (progress.progress() + 1) / 9.0F);
                 }
             }
         }
