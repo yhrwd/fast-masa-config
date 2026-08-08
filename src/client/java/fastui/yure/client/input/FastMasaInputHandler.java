@@ -71,7 +71,8 @@ public final class FastMasaInputHandler implements IKeybindProvider {
                 }
                 INSTANCE.quickConfigReleaseGate.arm(Set.copyOf(
                         FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys()));
-                client.setScreenAndShow(new QuickConfigScreen());
+                // Defer the transition to the next normal GUI frame to avoid a synchronous render here.
+                client.gui.setScreen(new QuickConfigScreen());
                 return true;
             }
 
