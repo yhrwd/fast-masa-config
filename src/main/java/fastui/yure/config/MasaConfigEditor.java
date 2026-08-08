@@ -21,6 +21,11 @@ public final class MasaConfigEditor {
     private static final Pattern COLOR_PATTERN = Pattern.compile("#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})");
 
     public ConfigEditResult apply(IConfigBase config, String rawValue) {
+        if (config instanceof IConfigBoolean) return applyBoolean(config, rawValue);
+        if (config instanceof IConfigInteger) return applyInteger(config, rawValue);
+        if (config instanceof IConfigDouble) return applyDouble(config, rawValue);
+        if (config instanceof IConfigFloat) return applyFloat(config, rawValue);
+
         return switch (config.getType()) {
             case BOOLEAN -> applyBoolean(config, rawValue);
             case INTEGER -> applyInteger(config, rawValue);

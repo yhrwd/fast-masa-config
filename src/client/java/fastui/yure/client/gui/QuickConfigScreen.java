@@ -80,6 +80,9 @@ public final class QuickConfigScreen extends Screen {
     @Override
     public void extractRenderState(net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY,
             float delta) {
+        // 透明 Screen 不会自动提取 HUD 状态；补提取一次可保留地图/信息显示器等覆盖层，
+        // 避免切屏首帧出现黑底。面板随后作为最上层绘制。
+        this.minecraft.gui.extractRenderState(this.minecraft.getDeltaTracker(), false, true);
         this.panel.render(fi.dy.masa.malilib.render.GuiContext.fromGuiGraphics(gfx), this.width, this.height, mouseX,
                 mouseY);
     }

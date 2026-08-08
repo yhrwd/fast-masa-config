@@ -3,7 +3,6 @@ package fastui.yure.client.index;
 import fastui.yure.FastMasaConfig;
 import fastui.yure.client.scan.ConfigGuiGroupScanner;
 import fastui.yure.client.scan.ConfigScreenSourceService;
-import fi.dy.masa.malilib.config.ConfigType;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.gui.GuiConfigsBase;
 
@@ -69,8 +68,10 @@ public final class ConfigIndexService {
     }
 
     public static boolean isSupported(IConfigBase config) {
-        ConfigType type = config.getType();
-        return type == ConfigType.BOOLEAN || type == ConfigType.INTEGER || type == ConfigType.FLOAT || type == ConfigType.DOUBLE;
+        return config instanceof fi.dy.masa.malilib.config.IConfigBoolean
+                || config instanceof fi.dy.masa.malilib.config.IConfigInteger
+                || config instanceof fi.dy.masa.malilib.config.IConfigFloat
+                || config instanceof fi.dy.masa.malilib.config.IConfigDouble;
     }
 
     private static String getDisplayName(IConfigBase config) {

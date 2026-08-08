@@ -2,7 +2,6 @@ package fastui.yure.client.shortcut;
 
 import fastui.yure.config.MasaConfigEditor;
 import fastui.yure.config.ShortcutControlType;
-import fi.dy.masa.malilib.config.ConfigType;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.IConfigBoolean;
 import fi.dy.masa.malilib.config.IConfigDouble;
@@ -16,17 +15,15 @@ public final class ShortcutControl {
     }
 
     public static ShortcutControlType getControlType(IConfigBase config) {
-        return config.getType() == ConfigType.BOOLEAN ? ShortcutControlType.TOGGLE : ShortcutControlType.SLIDER;
+        return config instanceof IConfigBoolean ? ShortcutControlType.TOGGLE : ShortcutControlType.SLIDER;
     }
 
     public static String getValueText(IConfigBase config) {
-        return switch (config.getType()) {
-            case BOOLEAN -> Boolean.toString(((IConfigBoolean) config).getBooleanValue());
-            case INTEGER -> Integer.toString(((IConfigInteger) config).getIntegerValue());
-            case FLOAT -> Float.toString(((IConfigFloat) config).getFloatValue());
-            case DOUBLE -> Double.toString(((IConfigDouble) config).getDoubleValue());
-            default -> "";
-        };
+        if (config instanceof IConfigBoolean value) return Boolean.toString(value.getBooleanValue());
+        if (config instanceof IConfigInteger value) return Integer.toString(value.getIntegerValue());
+        if (config instanceof IConfigFloat value) return Float.toString(value.getFloatValue());
+        if (config instanceof IConfigDouble value) return Double.toString(value.getDoubleValue());
+        return "";
     }
 
     public static boolean getBooleanValue(IConfigBase config) {
@@ -58,7 +55,7 @@ public final class ShortcutControl {
         }
 
         NumericRange range = rangeFor(shortcut, config);
-        double step = Math.max(0.000001, shortcut.shortcut().sliderStep());
+        double step = config instanceof IConfigInteger ? Math.max(1.0, shortcut.shortcut().sliderStep()) : 0.1;
         double rawValue = range.min() + (clampRatio(ratio) * range.width());
         double steppedValue = Math.round(rawValue / step) * step;
 
@@ -67,30 +64,24 @@ public final class ShortcutControl {
     }
 
     private static double getValue(IConfigBase config) {
-        return switch (config.getType()) {
-            case INTEGER -> ((IConfigInteger) config).getIntegerValue();
-            case FLOAT -> ((IConfigFloat) config).getFloatValue();
-            case DOUBLE -> ((IConfigDouble) config).getDoubleValue();
-            default -> 0.0;
-        };
+        if (config instanceof IConfigInteger value) return value.getIntegerValue();
+        if (config instanceof IConfigFloat value) return value.getFloatValue();
+        if (config instanceof IConfigDouble value) return value.getDoubleValue();
+        return 0.0;
     }
 
     private static double getMin(IConfigBase config) {
-        return switch (config.getType()) {
-            case INTEGER -> ((IConfigInteger) config).getMinIntegerValue();
-            case FLOAT -> ((IConfigFloat) config).getMinFloatValue();
-            case DOUBLE -> ((IConfigDouble) config).getMinDoubleValue();
-            default -> 0.0;
-        };
+        if (config instanceof IConfigInteger value) return value.getMinIntegerValue();
+        if (config instanceof IConfigFloat value) return value.getMinFloatValue();
+        if (config instanceof IConfigDouble value) return value.getMinDoubleValue();
+        return 0.0;
     }
 
     private static double getMax(IConfigBase config) {
-        return switch (config.getType()) {
-            case INTEGER -> ((IConfigInteger) config).getMaxIntegerValue();
-            case FLOAT -> ((IConfigFloat) config).getMaxFloatValue();
-            case DOUBLE -> ((IConfigDouble) config).getMaxDoubleValue();
-            default -> 1.0;
-        };
+        if (config instanceof IConfigInteger value) return value.getMaxIntegerValue();
+        if (config instanceof IConfigFloat value) return value.getMaxFloatValue();
+        if (config instanceof IConfigDouble value) return value.getMaxDoubleValue();
+        return 1.0;
     }
 
     private static NumericRange rangeFor(IConfigBase config) {
@@ -112,8 +103,7 @@ public final class ShortcutControl {
     }
 
     private static boolean isNumeric(IConfigBase config) {
-        return config.getType() == ConfigType.INTEGER || config.getType() == ConfigType.FLOAT
-                || config.getType() == ConfigType.DOUBLE;
+        return config instanceof IConfigInteger || config instanceof IConfigFloat || config instanceof IConfigDouble;
     }
 
     private static double clampRatio(double ratio) {
@@ -121,7 +111,7 @@ public final class ShortcutControl {
     }
 
     private static String formatValue(IConfigBase config, double value) {
-        return config.getType() == ConfigType.INTEGER ? Integer.toString((int) Math.round(value)) : Double.toString(value);
+        return config instanceof IConfigInteger ? Integer.toString((int) Math.round(value)) : Double.toString(value);
     }
 
     private record NumericRange(double min, double max) {
