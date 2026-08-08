@@ -33,6 +33,10 @@ public final class QuickConfigScreen extends Screen {
     private int floatingDragOffsetY;
     private String activeFloatingSliderGroupId;
     private int activeFloatingSliderIndex = -1;
+    private String activeNumericInputGroupId;
+    private int activeNumericInputIndex = -1;
+    private String numericInputText = "";
+    private boolean replaceNumericInputOnType;
     private boolean floatingDragDirty;
     private boolean redirectToFullConfig;
 
@@ -65,13 +69,15 @@ public final class QuickConfigScreen extends Screen {
             return;
         }
         syncHeldMovementKeys();
-        if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() && !isOpenHotkeyPhysicallyHeld()) {
+        if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() && this.activeNumericInputGroupId == null
+                && !isOpenHotkeyPhysicallyHeld()) {
             this.onClose();
         }
     }
 
     @Override
     public void removed() {
+        clearNumericInput();
         syncHeldMovementKeys();
         flushPendingDragPersistence();
         super.removed();
@@ -119,6 +125,17 @@ public final class QuickConfigScreen extends Screen {
                 continue;
             }
             this.panel.raiseFloatingGroup(floating.groupId());
+            ResolvedShortcut shortcut = floating.shortcutAt(hit.itemIndex());
+            if (hit.target() == GroupWindowHitTest.Target.VALUE && shortcut != null) {
+                beginNumericInput(floating, hit.itemIndex(), shortcut);
+                return true;
+            }
+            if (hit.target() == GroupWindowHitTest.Target.RESET && shortcut != null) {
+                commitNumericInput();
+                ShortcutControl.reset(shortcut);
+                return true;
+            }
+            commitNumericInput();
             if (hit.target() == GroupWindowHitTest.Target.HEADER) {
                 if (floating.isCollapseHit(x, y)) {
                     floating.toggleCollapsed();
@@ -135,7 +152,6 @@ public final class QuickConfigScreen extends Screen {
                 Minecraft.getInstance().setScreenAndShow(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes(), floating.groupId()));
                 return true;
             }
-            ResolvedShortcut shortcut = floating.shortcutAt(hit.itemIndex());
             if (shortcut == null) {
                 return true;
             }
@@ -145,7 +161,9 @@ public final class QuickConfigScreen extends Screen {
                 return true;
             }
             if (hit.target() == GroupWindowHitTest.Target.ROW || hit.target() == GroupWindowHitTest.Target.EXPAND) {
-                toggleExpanded(floating.groupId(), floating.groupItemIndexAt(hit.itemIndex()));
+                if (ShortcutControl.isNumeric(shortcut.configEntry().config())) {
+                    toggleExpanded(floating.groupId(), floating.groupItemIndexAt(hit.itemIndex()));
+                }
                 return true;
             }
             if (hit.target() == GroupWindowHitTest.Target.SLIDER) {
@@ -156,6 +174,7 @@ public final class QuickConfigScreen extends Screen {
             }
             return true;
         }
+        commitNumericInput();
         return false;
     }
 
@@ -202,6 +221,9 @@ public final class QuickConfigScreen extends Screen {
 
     @Override
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        if (this.activeNumericInputGroupId != null) {
+            return handleNumericInputKey(event);
+        }
         int keyCode = event.key();
         int scanCode = event.scancode();
         Minecraft mc = Minecraft.getInstance();
@@ -226,6 +248,24 @@ public final class QuickConfigScreen extends Screen {
     }
 
     @Override
+    public boolean charTyped(net.minecraft.client.input.CharacterEvent event) {
+        if (this.activeNumericInputGroupId == null) {
+            return super.charTyped(event);
+        }
+        int codepoint = event.codepoint();
+        if (codepoint >= 0 && codepoint <= Character.MAX_VALUE && isNumericInputCharacter((char) codepoint)
+                && this.numericInputText.length() < 24) {
+            if (this.replaceNumericInputOnType) {
+                this.numericInputText = "";
+                this.replaceNumericInputOnType = false;
+            }
+            this.numericInputText += (char) codepoint;
+            updateNumericInputDisplay();
+        }
+        return true;
+    }
+
+    @Override
     public void afterKeyboardAction() {
         syncHeldMovementKeys();
     }
@@ -238,6 +278,93 @@ public final class QuickConfigScreen extends Screen {
     @Override
     public boolean shouldCloseOnEsc() {
         return true;
+    }
+
+    private void beginNumericInput(FloatingGroupPanel floating, int itemIndex, ResolvedShortcut shortcut) {
+        if (this.activeNumericInputGroupId != null
+                && (!this.activeNumericInputGroupId.equals(floating.groupId()) || this.activeNumericInputIndex != itemIndex)) {
+            commitNumericInput();
+        }
+        this.activeNumericInputGroupId = floating.groupId();
+        this.activeNumericInputIndex = itemIndex;
+        this.numericInputText = ShortcutControl.getValueText(shortcut.configEntry().config());
+        this.replaceNumericInputOnType = true;
+        floating.beginEditingValue(itemIndex, this.numericInputText);
+    }
+
+    private boolean handleNumericInputKey(net.minecraft.client.input.KeyEvent event) {
+        int keyCode = event.key();
+        if (keyCode == 257 || keyCode == 335) { // Enter and keypad Enter
+            commitNumericInput();
+            return true;
+        }
+        if (keyCode == KeyCodes.KEY_ESCAPE) {
+            clearNumericInput();
+            return true;
+        }
+        if (keyCode == 259 || keyCode == 261) { // Backspace and Delete
+            if (this.replaceNumericInputOnType) {
+                this.numericInputText = "";
+                this.replaceNumericInputOnType = false;
+            } else if (!this.numericInputText.isEmpty()) {
+                this.numericInputText = this.numericInputText.substring(0, this.numericInputText.length() - 1);
+            }
+            updateNumericInputDisplay();
+        }
+        // A focused numeric field owns every key event, including configured numeric hotkeys.
+        return true;
+    }
+
+    private void commitNumericInput() {
+        ResolvedShortcut shortcut = getActiveNumericInputShortcut();
+        if (shortcut != null) {
+            ShortcutControl.setTypedValue(shortcut, this.numericInputText);
+        }
+        clearNumericInput();
+    }
+
+    private ResolvedShortcut getActiveNumericInputShortcut() {
+        if (this.activeNumericInputGroupId == null) {
+            return null;
+        }
+        for (FloatingGroupPanel floating : this.panel.floatingPanels()) {
+            if (floating.groupId().equals(this.activeNumericInputGroupId)) {
+                return floating.shortcutAt(this.activeNumericInputIndex);
+            }
+        }
+        return null;
+    }
+
+    private void updateNumericInputDisplay() {
+        if (this.activeNumericInputGroupId == null) {
+            return;
+        }
+        for (FloatingGroupPanel floating : this.panel.floatingPanels()) {
+            if (floating.groupId().equals(this.activeNumericInputGroupId)) {
+                floating.updateEditingValue(this.numericInputText);
+                return;
+            }
+        }
+    }
+
+    private void clearNumericInput() {
+        if (this.activeNumericInputGroupId != null) {
+            for (FloatingGroupPanel floating : this.panel.floatingPanels()) {
+                if (floating.groupId().equals(this.activeNumericInputGroupId)) {
+                    floating.clearEditingValue();
+                    break;
+                }
+            }
+        }
+        this.activeNumericInputGroupId = null;
+        this.activeNumericInputIndex = -1;
+        this.numericInputText = "";
+        this.replaceNumericInputOnType = false;
+    }
+
+    private static boolean isNumericInputCharacter(char value) {
+        return value >= '0' && value <= '9' || value == '-' || value == '+' || value == '.' || value == ','
+                || value == 'e' || value == 'E';
     }
 
     private void toggleExpanded(String groupId, int itemIndex) {

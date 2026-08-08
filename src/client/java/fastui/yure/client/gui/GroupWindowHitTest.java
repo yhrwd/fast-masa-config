@@ -26,6 +26,18 @@ public final class GroupWindowHitTest {
         }
 
         for (ItemControls controls : itemControls) {
+            if (isInsideContent(mouseX, mouseY, contentViewport, controls.reset(), clampedScrollOffset)) {
+                return new Result(Target.RESET, controls.itemIndex());
+            }
+        }
+
+        for (ItemControls controls : itemControls) {
+            if (isInsideContent(mouseX, mouseY, contentViewport, controls.value(), clampedScrollOffset)) {
+                return new Result(Target.VALUE, controls.itemIndex());
+            }
+        }
+
+        for (ItemControls controls : itemControls) {
             if (isInsideContent(mouseX, mouseY, contentViewport, controls.slider(), clampedScrollOffset)) {
                 return new Result(Target.SLIDER, controls.itemIndex());
             }
@@ -67,6 +79,8 @@ public final class GroupWindowHitTest {
         HEADER,
         ROW,
         EXPAND,
+        RESET,
+        VALUE,
         SLIDER,
         SCROLLBAR
     }
@@ -80,6 +94,13 @@ public final class GroupWindowHitTest {
         }
     }
 
-    public record ItemControls(int itemIndex, Bounds expand, Bounds slider) {
+    public record ItemControls(int itemIndex, Bounds expand, Bounds slider, Bounds value, Bounds reset) {
+        public ItemControls(int itemIndex, Bounds expand, Bounds slider) {
+            this(itemIndex, expand, slider, null, null);
+        }
+
+        public ItemControls(int itemIndex, Bounds expand, Bounds slider, Bounds value) {
+            this(itemIndex, expand, slider, value, null);
+        }
     }
 }

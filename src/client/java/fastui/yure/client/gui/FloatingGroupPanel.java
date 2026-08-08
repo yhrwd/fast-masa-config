@@ -43,9 +43,9 @@ public final class FloatingGroupPanel {
      * 数值项展开后的总高。它由标题区、2px 间隔、滑条/数值控件区和底部间隔共同组成。
      * 改大时，sliderBounds() 会自动让滑条在新增空间内垂直居中。
      */
-    private static final int EXPANDED_HEIGHT = 34;
+    private static final int EXPANDED_HEIGHT = 43;
     /** 窗口左右内边距，同时决定标签和滑条左起点。改大可增加留白，但会缩短滑条。 */
-    private static final int ROW_PADDING = 8;
+    private static final int ROW_PADDING = 5;
     /** 所有悬浮窗口的最小内容宽度。改大将同时加宽收起和展开状态。 */
     private static final int MIN_CONTENT_WIDTH = 56;
     /**
@@ -59,7 +59,7 @@ public final class FloatingGroupPanel {
      * 数值文本预留宽度。改小可加长滑条；应至少容纳当前常用数值格式。
      * 值显示被 fitText() 截断时应增大此值，而不是继续压缩滑条。
      */
-    private static final int VALUE_WIDTH = 20;
+    private static final int RESET_WIDTH = 12;
     /**
      * 跑马灯速度，单位 px/s。当前 30 约为每 33ms 前进 1px；调小更慢，调大更快。
      * GuiContext 文本坐标是整数像素，因此实际位置变化频率约等于该数值，不能独立强制提高帧率。
@@ -72,6 +72,9 @@ public final class FloatingGroupPanel {
     private List<RowModel> rows = List.of();
     private List<GroupWindowHitTest.ItemControls> controls = List.of();
     private int scrollOffset;
+    private int editingItemIndex = -1;
+    private String editingValue = "";
+    private boolean editingValueSelected;
 
     public FloatingGroupPanel(Font font, String groupId) {
         this.font = font;
@@ -85,6 +88,23 @@ public final class FloatingGroupPanel {
     public int x() { return this.layout == null ? 0 : this.layout.x(); }
     public int y() { return this.layout == null ? 0 : this.layout.y(); }
     public int width() { return this.layout == null ? 0 : this.layout.width(); }
+
+    public void beginEditingValue(int itemIndex, String value) {
+        this.editingItemIndex = itemIndex;
+        this.editingValue = value;
+        this.editingValueSelected = true;
+    }
+
+    public void updateEditingValue(String value) {
+        this.editingValue = value;
+        this.editingValueSelected = false;
+    }
+
+    public void clearEditingValue() {
+        this.editingItemIndex = -1;
+        this.editingValue = "";
+        this.editingValueSelected = false;
+    }
 
     public boolean isCollapseHit(int mouseX, int mouseY) {
         return this.layout != null && this.layout.headerHeight() >= 16 && this.layout.width() >= 20
@@ -303,8 +323,7 @@ public final class FloatingGroupPanel {
                     ShortcutControlType.SLIDER, 1.0, null, null);
             ResolvedShortcut resolved = ShortcutResolver.find(index, shortcut)
                     .map(entry -> new ResolvedShortcut(shortcut, entry)).orElse(null);
-            boolean numeric = resolved != null && ShortcutControl.getControlType(resolved.configEntry().config())
-                    != ShortcutControlType.TOGGLE;
+            boolean numeric = resolved != null && ShortcutControl.isNumeric(resolved.configEntry().config());
             result.add(new RowModel(item, resolved, false, numeric && item.expanded() ? EXPANDED_HEIGHT : ROW_HEIGHT));
         }
         return List.copyOf(result);
@@ -336,7 +355,9 @@ public final class FloatingGroupPanel {
             GroupWindowHitTest.Bounds slider = model.shortcut() != null && model.numeric() && model.item().expanded()
                     ? sliderBounds(row)
                     : null;
-            result.add(new GroupWindowHitTest.ItemControls(index, expand, slider));
+            GroupWindowHitTest.Bounds value = slider == null ? null : valueBounds(row);
+            GroupWindowHitTest.Bounds reset = slider == null ? null : resetBounds(row);
+            result.add(new GroupWindowHitTest.ItemControls(index, expand, slider, value, reset));
         }
         return List.copyOf(result);
     }
@@ -382,11 +403,42 @@ public final class FloatingGroupPanel {
             RenderUtils.drawRect(context, slider.x(), trackY, fillWidth, 3, FastMasaMenuPalette.SLIDER_LEFT);
             int handleY = slider.y() + Math.max(0, (slider.height() - 4) / 2);
             drawSliderHandle(context, slider.x() + fillWidth - 2, handleY, TEXT);
-            GroupWindowHitTest.Bounds value = valueBounds(new GroupWindowLayout.Row(0, x, y, width, row.height()));
-            String valueText = fitText(ShortcutControl.getValueText(row.shortcut().configEntry().config()), value.width());
+            GroupWindowLayout.Row expandedRow = new GroupWindowLayout.Row(0, x, y, width, row.height());
+            GroupWindowHitTest.Bounds value = valueBounds(expandedRow);
+            boolean editing = rowIndex == this.editingItemIndex;
+            String rawValue = editing ? this.editingValue : ShortcutControl.getValueText(row.shortcut().configEntry().config());
+            boolean showCursor = editing && (System.currentTimeMillis() / 500L) % 2L == 0L;
+            String valueText = fitText(rawValue + (showCursor ? "|" : ""), value.width() - 4);
+            RenderUtils.drawRect(context, value.x(), value.y(), value.width(), value.height(),
+                    editing ? FastMasaMenuPalette.ROW_HOVER : FastMasaMenuPalette.TRACK);
+            if (editing && this.editingValueSelected) {
+                RenderUtils.drawRect(context, value.x() + 2, value.y() + 2,
+                        Math.max(0, Math.min(value.width() - 4, this.font.width(rawValue))),
+                        Math.max(0, value.height() - 4), FastMasaMenuPalette.ACCENT);
+            }
+            RenderUtils.drawRect(context, value.x(), value.y(), value.width(), 1,
+                    editing ? accent : FastMasaMenuPalette.NEUTRAL);
+            RenderUtils.drawRect(context, value.x(), value.y() + Math.max(0, value.height() - 1), value.width(), 1,
+                    editing ? accent : FastMasaMenuPalette.NEUTRAL);
+            RenderUtils.drawRect(context, value.x(), value.y(), 1, value.height(), editing ? accent : FastMasaMenuPalette.NEUTRAL);
+            RenderUtils.drawRect(context, value.x() + Math.max(0, value.width() - 1), value.y(), 1, value.height(),
+                    editing ? accent : FastMasaMenuPalette.NEUTRAL);
             context.drawString(this.font, valueText,
-                    value.x() + Math.max(0, value.width() - this.font.width(valueText)),
-                    FloatingTextLayout.centeredTextY(value.y(), value.height(), this.font.lineHeight), MUTED, false);
+                    value.x() + 2,
+                    FloatingTextLayout.centeredTextY(value.y(), value.height(), this.font.lineHeight),
+                    editing ? TEXT : MUTED, false);
+            GroupWindowHitTest.Bounds reset = resetBounds(expandedRow);
+            RenderUtils.drawRect(context, reset.x(), reset.y(), reset.width(), reset.height(), FastMasaMenuPalette.TRACK);
+            RenderUtils.drawRect(context, reset.x(), reset.y(), reset.width(), 1, FastMasaMenuPalette.NEUTRAL);
+            RenderUtils.drawRect(context, reset.x(), reset.y() + Math.max(0, reset.height() - 1), reset.width(), 1,
+                    FastMasaMenuPalette.NEUTRAL);
+            RenderUtils.drawRect(context, reset.x(), reset.y(), 1, reset.height(), FastMasaMenuPalette.NEUTRAL);
+            RenderUtils.drawRect(context, reset.x() + Math.max(0, reset.width() - 1), reset.y(), 1, reset.height(),
+                    FastMasaMenuPalette.NEUTRAL);
+            String resetLabel = "R";
+            context.drawString(this.font, resetLabel,
+                    FloatingTextLayout.centeredTextX(reset.x(), reset.width(), this.font.width(resetLabel)),
+                    FloatingTextLayout.centeredTextY(reset.y(), reset.height(), this.font.lineHeight), MUTED, false);
             drawExpandButton(context, expandBounds(new GroupWindowLayout.Row(0, x, y, width, row.height())),
                     true, accent);
         } else {
@@ -443,27 +495,26 @@ public final class FloatingGroupPanel {
                 Math.min(16, Math.max(0, row.height() - 2)));
     }
 
-    /**
-     * 展开控件从左到右为：滑条、SLIDER_VALUE_GAP、VALUE_WIDTH 数值。标题行的 +/- 不占用下方控件宽度。
-     * 标题区下方的 2px 和底部的 4px 来自 EXPANDED_HEIGHT 的控件区边距；10px 是轨道命中高度。
-     */
+    /** The slider occupies its own line beneath the title. */
     static GroupWindowHitTest.Bounds sliderBounds(GroupWindowLayout.Row row) {
         int detailTop = row.y() + ROW_HEIGHT + 2;
-        int detailHeight = Math.max(0, row.height() - ROW_HEIGHT - 4);
         int x = row.x() + ROW_PADDING;
         int end = row.x() + row.width() - ROW_PADDING;
-        int width = Math.max(0, end - x - SLIDER_VALUE_GAP - VALUE_WIDTH);
-        int sliderHeight = Math.min(10, detailHeight);
-        int sliderY = detailTop + Math.max(0, (detailHeight - sliderHeight) / 2);
-        return new GroupWindowHitTest.Bounds(x, sliderY, width, sliderHeight);
+        return new GroupWindowHitTest.Bounds(x, detailTop, Math.max(0, end - x), 8);
     }
 
-    /** 数值文本紧跟轨道右侧，并占用到窗口右内边距；展开按钮位于上一行，不会遮挡这里。 */
+    /** The editable value field occupies the third line of an expanded numeric row. */
     static GroupWindowHitTest.Bounds valueBounds(GroupWindowLayout.Row row) {
-        GroupWindowHitTest.Bounds slider = sliderBounds(row);
-        int x = slider.x() + slider.width() + SLIDER_VALUE_GAP;
-        int width = Math.max(0, row.x() + row.width() - ROW_PADDING - x);
-        return new GroupWindowHitTest.Bounds(x, slider.y(), width, slider.height());
+        int x = row.x() + ROW_PADDING;
+        int end = row.x() + row.width() - ROW_PADDING;
+        return new GroupWindowHitTest.Bounds(x, row.y() + ROW_HEIGHT + 13,
+                Math.max(0, end - x - SLIDER_VALUE_GAP - RESET_WIDTH), 10);
+    }
+
+    static GroupWindowHitTest.Bounds resetBounds(GroupWindowLayout.Row row) {
+        GroupWindowHitTest.Bounds value = valueBounds(row);
+        return new GroupWindowHitTest.Bounds(value.x() + value.width() + SLIDER_VALUE_GAP, value.y(), RESET_WIDTH,
+                value.height());
     }
 
     private void drawExpandButton(GuiContext context, GroupWindowHitTest.Bounds bounds, boolean expanded, int accent) {
@@ -510,7 +561,7 @@ public final class FloatingGroupPanel {
         for (RowModel row : this.rows) {
             String label = measureRowLabel(row);
             // 数值项额外预留 56px 给 +/-、数值和间距；布尔项只预留右侧呼吸空间 12px。
-            int rowWidth = this.font.width(label) + ROW_PADDING * 2 + (row.numeric() ? 50 : 12);
+            int rowWidth = this.font.width(label) + ROW_PADDING * 2 + (row.numeric() ? 72 : 12);
             // 长选项不撑大窗口，交给 drawMarqueeLabel 在固定文本区内滚动；标题则始终优先完整显示。
             width = Math.max(width, Math.min(EXPANDED_MAX_CONTENT_WIDTH, rowWidth));
         }
@@ -567,8 +618,7 @@ public final class FloatingGroupPanel {
 
     private record RowModel(GroupItem item, ResolvedShortcut shortcut, boolean systemConfig, int height) {
         boolean numeric() {
-            return this.shortcut != null && ShortcutControl.getControlType(this.shortcut.configEntry().config())
-                    != ShortcutControlType.TOGGLE;
+            return this.shortcut != null && ShortcutControl.isNumeric(this.shortcut.configEntry().config());
         }
     }
 }

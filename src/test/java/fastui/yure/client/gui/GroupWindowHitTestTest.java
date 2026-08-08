@@ -37,6 +37,18 @@ class GroupWindowHitTestTest {
     }
 
     @Test
+    void editableValueFieldWinsOverTheSlider() {
+        GroupWindowLayout layout = GroupWindowLayout.calculate(400, 300, 40, 40, false, new int[]{51});
+        GroupWindowHitTest.ItemControls controls = new GroupWindowHitTest.ItemControls(0,
+                new GroupWindowHitTest.Bounds(50, 65, 20, 20),
+                new GroupWindowHitTest.Bounds(100, 70, 60, 15),
+                new GroupWindowHitTest.Bounds(130, 70, 30, 15));
+
+        assertEquals(new GroupWindowHitTest.Result(GroupWindowHitTest.Target.VALUE, 0),
+                GroupWindowHitTest.hitTest(layout, 0, 140, 75, null, List.of(controls)));
+    }
+
+    @Test
     void recognizesScrollbarAndExcludesRightAndBottomBounds() {
         GroupWindowLayout layout = GroupWindowLayout.calculate(400, 300, 40, 40, false, new int[]{25});
         GroupWindowHitTest.Bounds scrollbar = new GroupWindowHitTest.Bounds(layout.x() + layout.width() - 6, 60, 6, 25);
@@ -131,16 +143,18 @@ class GroupWindowHitTestTest {
         GroupWindowHitTest.Bounds expand = FloatingGroupPanel.expandBounds(row);
         GroupWindowHitTest.Bounds slider = FloatingGroupPanel.sliderBounds(row);
         GroupWindowHitTest.Bounds value = FloatingGroupPanel.valueBounds(row);
+        GroupWindowHitTest.Bounds reset = FloatingGroupPanel.resetBounds(row);
 
         assertTrue(expand.x() >= row.x());
         assertTrue(expand.x() + expand.width() <= row.x() + row.width());
         assertTrue(slider.x() > row.x());
         assertTrue(slider.y() > row.y() + expand.height());
         assertTrue(slider.width() > 0);
-        assertTrue(slider.x() + slider.width() <= value.x());
-        assertEquals(slider.y(), value.y());
-        assertEquals(slider.height(), value.height());
+        assertTrue(value.y() > slider.y() + slider.height());
         assertTrue(value.x() + value.width() <= row.x() + row.width());
-        assertTrue(value.x() + value.width() > expand.x());
+        assertEquals(value.y(), reset.y());
+        assertEquals(value.height(), reset.height());
+        assertEquals(value.x() + value.width() + 2, reset.x());
+        assertTrue(reset.x() + reset.width() <= row.x() + row.width());
     }
 }

@@ -63,6 +63,39 @@ public final class ShortcutControl {
         EDITOR.apply(config, formatValue(config, range.clamp(steppedValue)));
     }
 
+    public static boolean setTypedValue(ResolvedShortcut shortcut, String rawValue) {
+        IConfigBase config = shortcut.configEntry().config();
+        if (!isNumeric(config)) {
+            return false;
+        }
+
+        double value;
+        try {
+            value = Double.parseDouble(rawValue.trim().replace(',', '.'));
+        } catch (NumberFormatException ignored) {
+            return false;
+        }
+        if (!Double.isFinite(value)) {
+            return false;
+        }
+
+        NumericRange range = rangeFor(shortcut, config);
+        value = range.clamp(value);
+        String normalized;
+        if (config instanceof IConfigInteger) {
+            normalized = Integer.toString((int) value);
+        } else if (config instanceof IConfigFloat) {
+            normalized = Float.toString((float) value);
+        } else {
+            normalized = Double.toString(value);
+        }
+        return EDITOR.apply(config, normalized).success();
+    }
+
+    public static boolean reset(ResolvedShortcut shortcut) {
+        return EDITOR.reset(shortcut.configEntry().config()).success();
+    }
+
     private static double getValue(IConfigBase config) {
         if (config instanceof IConfigInteger value) return value.getIntegerValue();
         if (config instanceof IConfigFloat value) return value.getFloatValue();
@@ -102,7 +135,7 @@ public final class ShortcutControl {
         return range.width() <= 0.0 ? 0.0 : clampRatio((getValue(config) - range.min()) / range.width());
     }
 
-    private static boolean isNumeric(IConfigBase config) {
+    public static boolean isNumeric(IConfigBase config) {
         return config instanceof IConfigInteger || config instanceof IConfigFloat || config instanceof IConfigDouble;
     }
 
