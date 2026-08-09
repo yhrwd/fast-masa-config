@@ -16,12 +16,14 @@ import fi.dy.masa.malilib.config.ConfigManager;
 import fi.dy.masa.malilib.config.ConfigType;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.IConfigBoolean;
+import fi.dy.masa.malilib.config.IConfigColor;
 import fi.dy.masa.malilib.config.IConfigDouble;
 import fi.dy.masa.malilib.config.IConfigInteger;
 import fi.dy.masa.malilib.config.IConfigResettable;
 import fi.dy.masa.malilib.config.gui.ButtonPressDirtyListenerSimple;
 import fi.dy.masa.malilib.event.InputEventHandler;
 import fi.dy.masa.malilib.gui.GuiBase;
+import fi.dy.masa.malilib.gui.GuiColorEditorHSV;
 import fi.dy.masa.malilib.gui.GuiConfigsBase.ConfigOptionWrapper;
 import fi.dy.masa.malilib.gui.GuiKeybindSettings;
 import fi.dy.masa.malilib.gui.GuiTextFieldGeneric;
@@ -90,6 +92,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private IConfigBase activeNumericSliderConfig;
     private KeybindSettings lastObservedOpenQuickConfigSettings;
     private String activeKeybindValueBeforeCapture;
+    private int lastGenericColorFingerprint;
 
     private List<IConfigBase> filteredGenericConfigs = List.of();
     private List<ConfigIndexEntry> filteredConfigs = List.of();
@@ -135,6 +138,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.createTabInputs();
         this.refreshVisibleRows();
         this.observeOpenQuickConfigSettings();
+        this.lastGenericColorFingerprint = this.getGenericColorFingerprint();
     }
 
     @Override
@@ -160,6 +164,12 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     public void tick() {
         if (this.statusTicks > 0) {
             this.statusTicks--;
+        }
+
+        int currentColorFingerprint = this.getGenericColorFingerprint();
+        if (currentColorFingerprint != this.lastGenericColorFingerprint) {
+            this.lastGenericColorFingerprint = currentColorFingerprint;
+            this.notifyOwnConfigChanged(false);
         }
     }
 
@@ -552,7 +562,19 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         } else if (config instanceof IConfigDouble doubleConfig) {
             this.drawNumericControl(context, config, x, y, mouseX, mouseY, formatDouble(doubleConfig.getDoubleValue()),
                     this.getDoubleRatio(doubleConfig));
+        } else if (config instanceof IConfigColor colorConfig) {
+            this.drawColorControl(context, config, colorConfig, x, y, mouseX, mouseY);
         }
+    }
+
+    private void drawColorControl(DrawContext context, IConfigBase config, IConfigColor colorConfig, int x, int y,
+            int mouseX, int mouseY) {
+        boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, 124, BUTTON_HEIGHT);
+        int color = colorConfig.getIntegerValue();
+        int buttonColor = hovered ? 0xFF3D2B3B : 0xFF2A1D29;
+        this.drawSmallButton(context, x, y, 124, String.format("#%08X", color), buttonColor, hovered);
+        RenderUtils.drawRect(context, x + 4, y + 4, 12, 12, color);
+        this.drawResetButton(context, config, x + NUMERIC_RESET_X_OFFSET, y, mouseX, mouseY);
     }
 
     private void positionOpenQuickConfigButton(int y) {
@@ -769,6 +791,15 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             if (this.handleResetClick(config, mouseX, mouseY, controlX + NUMERIC_RESET_X_OFFSET, y)) {
                 return true;
             }
+        } else if (config instanceof IConfigColor colorConfig) {
+            if (GuiHitTest.isInside(mouseX, mouseY, controlX, y, 124, BUTTON_HEIGHT)) {
+                GuiBase.openGui(new GuiColorEditorHSV(colorConfig, null, this));
+                return true;
+            }
+
+            if (this.handleResetClick(config, mouseX, mouseY, controlX + NUMERIC_RESET_X_OFFSET, y)) {
+                return true;
+            }
         }
 
         return false;
@@ -927,6 +958,16 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             InputEventHandler.getKeybindManager().updateUsedKeys();
             this.updateKeybindButtons();
         }
+    }
+
+    private int getGenericColorFingerprint() {
+        int fingerprint = 1;
+        for (IConfigBase config : FastMasaConfigs.Generic.OPTIONS) {
+            if (config instanceof IConfigColor colorConfig) {
+                fingerprint = 31 * fingerprint + colorConfig.getIntegerValue();
+            }
+        }
+        return fingerprint;
     }
 
     private void flushPendingKeybindChange() {

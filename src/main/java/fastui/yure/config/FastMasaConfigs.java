@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import fastui.yure.FastMasaConfig;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.options.ConfigBoolean;
+import fi.dy.masa.malilib.config.options.ConfigColor;
 import fi.dy.masa.malilib.config.options.ConfigDouble;
 import fi.dy.masa.malilib.config.options.ConfigHotkey;
 import fi.dy.masa.malilib.config.options.ConfigInteger;
@@ -40,6 +41,24 @@ public final class FastMasaConfigs {
                 public static final ConfigBoolean CLOSE_ON_INVENTORY_KEY = new ConfigBoolean("closeOnInventoryKey",
                                 true,
                                 "按背包键或 ESC 时关闭快捷配置面板。", "Close On Inventory Key").apply(GENERIC_KEY);
+                public static final ConfigBoolean BLOCK_BREAK_INDICATOR = new ConfigBoolean("blockBreakIndicator", true,
+                                "用动态方块描边替换原版挖掘裂纹动画。", "Replace Block Break Overlay").apply(GENERIC_KEY);
+                public static final ConfigBoolean BLOCK_BREAK_LINES = new ConfigBoolean("blockBreakLines", true,
+                                "显示挖掘动画的方块描边。", "Render Break Outline").apply(GENERIC_KEY);
+                public static final ConfigBoolean BLOCK_BREAK_SIDES = new ConfigBoolean("blockBreakSides", true,
+                                "显示挖掘动画的半透明填充面。", "Render Break Sides").apply(GENERIC_KEY);
+                public static final ConfigBoolean BLOCK_BREAK_REMOTE = new ConfigBoolean("blockBreakRemote", true,
+                                "显示多人游戏中服务器同步的其它玩家挖掘进度。", "Render Remote Break Progress").apply(GENERIC_KEY);
+                public static final ConfigInteger BLOCK_BREAK_LINE_WIDTH = new ConfigInteger("blockBreakLineWidth", 3, 1,
+                                8, "挖掘动画描边宽度。", "Break Outline Width").apply(GENERIC_KEY);
+                public static final ConfigColor BLOCK_BREAK_START_LINE = new ConfigColor("blockBreakStartLine", "#9619FC19",
+                                "挖掘开始时的描边颜色。", "Start Outline Color").apply(GENERIC_KEY);
+                public static final ConfigColor BLOCK_BREAK_END_LINE = new ConfigColor("blockBreakEndLine", "#96FF1919",
+                                "挖掘完成时的描边颜色。", "End Outline Color").apply(GENERIC_KEY);
+                public static final ConfigColor BLOCK_BREAK_START_SIDE = new ConfigColor("blockBreakStartSide", "#9619FC19",
+                                "挖掘开始时的填充颜色。", "Start Fill Color").apply(GENERIC_KEY);
+                public static final ConfigColor BLOCK_BREAK_END_SIDE = new ConfigColor("blockBreakEndSide", "#96FF1919",
+                                "挖掘完成时的填充颜色。", "End Fill Color").apply(GENERIC_KEY);
 
                 @SuppressWarnings("nullness")
                 private static final @org.jetbrains.annotations.NotNull IConfigBase[] OPTION_ARRAY = createOptionArray();
@@ -54,7 +73,16 @@ public final class FastMasaConfigs {
                                         PANEL_OPACITY,
                                         SHOW_SCAN_SUMMARY,
                                         RELEASE_TO_CLOSE,
-                                        CLOSE_ON_INVENTORY_KEY
+                                        CLOSE_ON_INVENTORY_KEY,
+                                        BLOCK_BREAK_INDICATOR,
+                                        BLOCK_BREAK_LINES,
+                                        BLOCK_BREAK_SIDES,
+                                        BLOCK_BREAK_REMOTE,
+                                        BLOCK_BREAK_LINE_WIDTH,
+                                        BLOCK_BREAK_START_LINE,
+                                        BLOCK_BREAK_END_LINE,
+                                        BLOCK_BREAK_START_SIDE,
+                                        BLOCK_BREAK_END_SIDE
                         };
                 }
 
