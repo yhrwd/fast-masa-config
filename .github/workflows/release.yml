@@ -44,6 +44,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           git for-each-ref --format='%(contents)' "refs/tags/${GITHUB_REF_NAME}" > release-notes.md
+          # Tags created from shell strings may contain literal escaped newlines.
+          perl -0pi -e 's/\\\\n/\n/g' release-notes.md
           if [ ! -s release-notes.md ]; then
             printf 'Automated release for %s\n' "${GITHUB_REF_NAME}" > release-notes.md
           fi
@@ -87,8 +89,28 @@ jobs:
             --header 'Content-Type: application/json' \
             --data '{"title":"Fast Masa Config UI"}' \
             "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}"
-          curl --fail-with-body --request POST \
+          existing_version_id="$(curl --fail-with-body --silent \
             --header "Authorization: ${MODRINTH_TOKEN}" \
-            --form "data=${metadata};type=application/json" \
-            --form "${jar_name}=@${jar_file}" \
-            https://api.modrinth.com/v2/version
+            "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}/version" \
+            | jq -r --arg version_number "${version_number}" \
+              '.[] | select(.version_number == $version_number) | .id' | head -n 1)"
+          if [ -n "${existing_version_id}" ] && [ "${existing_version_id}" != "null" ]; then
+            update_metadata="$(jq -n \
+              --arg version_title "Fast Masa Config UI ${version_number}" \
+              --arg changelog "${changelog}" \
+              --arg game_version "${game_version}" \
+              '{name: $version_title, changelog: $changelog,
+                version_type: "release", loaders: ["fabric"],
+                game_versions: [$game_version], featured: false}')"
+            curl --fail-with-body --request PATCH \
+              --header "Authorization: ${MODRINTH_TOKEN}" \
+              --header 'Content-Type: application/json' \
+              --data "${update_metadata}" \
+              "https://api.modrinth.com/v2/version/${existing_version_id}"
+          else
+            curl --fail-with-body --request POST \
+              --header "Authorization: ${MODRINTH_TOKEN}" \
+              --form "data=${metadata};type=application/json" \
+              --form "${jar_name}=@${jar_file}" \
+              https://api.modrinth.com/v2/version
+          fi
