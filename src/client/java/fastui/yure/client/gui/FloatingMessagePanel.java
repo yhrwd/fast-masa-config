@@ -97,6 +97,8 @@ public final class FloatingMessagePanel {
                 HoloPanelVisuals.withAlpha(FastMasaMenuPalette.WINDOW_BACKGROUND, alpha));
         RenderUtils.drawRect(context, this.layout.x(), this.layout.y(), this.layout.width(), this.layout.headerHeight(),
                 HoloPanelVisuals.withAlpha(FastMasaMenuPalette.accent(), alpha));
+        HoloPanelVisuals.drawBorder(context, this.layout.x(), this.layout.y(), this.layout.width(), this.layout.height(),
+                HoloPanelVisuals.withAlpha(FastMasaMenuPalette.NEUTRAL, alpha));
         if (this.layout.headerHeight() >= 16 && this.layout.width() > headerControlsWidth + ROW_PADDING * 2) {
             context.drawString(this.font, this.renderedTitle, this.layout.x() + ROW_PADDING,
                     FloatingTextLayout.centeredTextY(this.layout.y(), this.layout.headerHeight(), this.font.lineHeight),

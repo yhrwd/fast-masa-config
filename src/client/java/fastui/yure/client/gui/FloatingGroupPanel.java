@@ -189,6 +189,8 @@ public final class FloatingGroupPanel {
                 HoloPanelVisuals.withAlpha(BASE, backgroundAlpha));
         RenderUtils.drawRect(context, this.layout.x(), this.layout.y(), this.layout.width(), this.layout.headerHeight(),
                 HoloPanelVisuals.withAlpha(accent, backgroundAlpha));
+        HoloPanelVisuals.drawBorder(context, this.layout.x(), this.layout.y(), this.layout.width(), this.layout.height(),
+                HoloPanelVisuals.withAlpha(FastMasaMenuPalette.NEUTRAL, backgroundAlpha));
         int headerControlsWidth = this.font.width("+") + ROW_PADDING * 2;
         boolean hasHeaderTextSpace = this.layout.headerHeight() >= 16;
         String title = fitText(group.name(), this.layout.width() - headerControlsWidth - ROW_PADDING * 2);
@@ -453,12 +455,7 @@ public final class FloatingGroupPanel {
                         Math.max(0, Math.min(value.width() - 4, this.font.width(rawValue))),
                         Math.max(0, value.height() - 4), accent);
             }
-            RenderUtils.drawRect(context, value.x(), value.y(), value.width(), 1,
-                    editing ? accent : FastMasaMenuPalette.NEUTRAL);
-            RenderUtils.drawRect(context, value.x(), value.y() + Math.max(0, value.height() - 1), value.width(), 1,
-                    editing ? accent : FastMasaMenuPalette.NEUTRAL);
-            RenderUtils.drawRect(context, value.x(), value.y(), 1, value.height(), editing ? accent : FastMasaMenuPalette.NEUTRAL);
-            RenderUtils.drawRect(context, value.x() + Math.max(0, value.width() - 1), value.y(), 1, value.height(),
+            HoloPanelVisuals.drawBorder(context, value.x(), value.y(), value.width(), value.height(),
                     editing ? accent : FastMasaMenuPalette.NEUTRAL);
             context.drawString(this.font, valueText,
                     value.x() + 2,
@@ -466,11 +463,7 @@ public final class FloatingGroupPanel {
                     editing ? TEXT : MUTED, false);
             GroupWindowHitTest.Bounds reset = resetBounds(expandedRow);
             RenderUtils.drawRect(context, reset.x(), reset.y(), reset.width(), reset.height(), FastMasaMenuPalette.TRACK);
-            RenderUtils.drawRect(context, reset.x(), reset.y(), reset.width(), 1, FastMasaMenuPalette.NEUTRAL);
-            RenderUtils.drawRect(context, reset.x(), reset.y() + Math.max(0, reset.height() - 1), reset.width(), 1,
-                    FastMasaMenuPalette.NEUTRAL);
-            RenderUtils.drawRect(context, reset.x(), reset.y(), 1, reset.height(), FastMasaMenuPalette.NEUTRAL);
-            RenderUtils.drawRect(context, reset.x() + Math.max(0, reset.width() - 1), reset.y(), 1, reset.height(),
+            HoloPanelVisuals.drawBorder(context, reset.x(), reset.y(), reset.width(), reset.height(),
                     FastMasaMenuPalette.NEUTRAL);
             String resetLabel = "R";
             context.drawString(this.font, resetLabel,
@@ -574,10 +567,7 @@ public final class FloatingGroupPanel {
         if (borderHeight <= 1 || width <= 1) {
             return;
         }
-        RenderUtils.drawRect(context, x, top, width, 1, FastMasaMenuPalette.NEUTRAL);
-        RenderUtils.drawRect(context, x, top + borderHeight - 1, width, 1, FastMasaMenuPalette.NEUTRAL);
-        RenderUtils.drawRect(context, x, top, 1, borderHeight, FastMasaMenuPalette.NEUTRAL);
-        RenderUtils.drawRect(context, x + width - 1, top, 1, borderHeight, FastMasaMenuPalette.NEUTRAL);
+        HoloPanelVisuals.drawBorder(context, x, top, width, borderHeight, FastMasaMenuPalette.NEUTRAL);
     }
 
 
