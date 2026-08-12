@@ -182,7 +182,7 @@ public final class FloatingGroupPanel {
             return;
         }
 
-        int accent = FastMasaMenuPalette.ACCENT;
+        int accent = FastMasaMenuPalette.accent();
         int backgroundAlpha = FastMasaConfigs.Generic.FLOATING_BACKGROUND_ALPHA.getIntegerValue();
         RenderUtils.drawRect(context, this.layout.x(), this.layout.y() + this.layout.headerHeight(), this.layout.width(),
                 Math.max(0, this.layout.height() - this.layout.headerHeight()),
@@ -437,7 +437,7 @@ public final class FloatingGroupPanel {
             int fillWidth = (int) Math.round(slider.width() * ratio);
             int trackY = slider.y() + Math.max(0, (slider.height() - 3) / 2);
             RenderUtils.drawRect(context, slider.x(), trackY, slider.width(), 3, TRACK);
-            RenderUtils.drawRect(context, slider.x(), trackY, fillWidth, 3, FastMasaMenuPalette.SLIDER_LEFT);
+            RenderUtils.drawRect(context, slider.x(), trackY, fillWidth, 3, accent);
             int handleY = slider.y() + Math.max(0, (slider.height() - 4) / 2);
             drawSliderHandle(context, slider.x() + fillWidth - 2, handleY, TEXT);
             GroupWindowLayout.Row expandedRow = new GroupWindowLayout.Row(0, x, y, width, row.height());
@@ -451,7 +451,7 @@ public final class FloatingGroupPanel {
             if (editing && this.editingValueSelected) {
                 RenderUtils.drawRect(context, value.x() + 2, value.y() + 2,
                         Math.max(0, Math.min(value.width() - 4, this.font.width(rawValue))),
-                        Math.max(0, value.height() - 4), FastMasaMenuPalette.ACCENT);
+                        Math.max(0, value.height() - 4), accent);
             }
             RenderUtils.drawRect(context, value.x(), value.y(), value.width(), 1,
                     editing ? accent : FastMasaMenuPalette.NEUTRAL);

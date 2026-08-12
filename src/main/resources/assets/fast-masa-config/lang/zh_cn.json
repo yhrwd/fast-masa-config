@@ -10,17 +10,30 @@
   "fast-masa-config.gui.full.filter.mod.compact": "模组",
   "fast-masa-config.gui.full.filter.group": "分组: %s",
   "fast-masa-config.gui.full.filter.group.compact": "分组",
+  "fast-masa-config.gui.full.group.quick_panel": "快捷菜单",
   "fast-masa-config.gui.full.hotkey_settings.hover": "左键: 高级热键设置\n右键: 重置热键设置",
   "fast-masa-config.gui.full.switch_mod": "切换模组",
   "fast-masa-config.gui.full.empty_search": "没有匹配项。可以试试模组名、分组、显示名或配置 ID。",
   "fast-masa-config.gui.tab.generic": "通用",
+  "fast-masa-config.gui.tab.generic.compact": "通用",
   "fast-masa-config.gui.tab.all_configs": "全部配置",
+  "fast-masa-config.gui.tab.all_configs.compact": "配置",
   "fast-masa-config.gui.tab.quick_messages": "快捷消息",
+  "fast-masa-config.gui.tab.quick_messages.compact": "消息",
+  "fast-masa-config.gui.tab.tools": "工具",
+  "fast-masa-config.gui.tab.tools.compact": "工具",
+  "fast-masa-config.gui.tools.entities": "实体列表",
+  "fast-masa-config.gui.tools.entities_title": "实体渲染过滤",
+  "fast-masa-config.gui.tools.entities_search": "搜索实体名称或 ID",
+  "fast-masa-config.gui.tools.entities.selected": "实体列表: %s",
+  "fast-masa-config.gui.tools.entities.add": "添加",
+  "fast-masa-config.gui.tools.entities.remove": "移除",
   "fast-masa-config.gui.quick_messages.group": "消息组: ",
   "fast-masa-config.gui.quick_messages.no_group": "尚未创建快捷消息组，请先填写组名并点击 +。",
   "fast-masa-config.gui.quick_messages.empty": "当前消息组还没有消息。",
   "fast-masa-config.gui.quick_messages.label": "备注名称（可留空）",
   "fast-masa-config.gui.quick_messages.content": "消息内容或 / 指令",
+  "fast-masa-config.gui.quick_messages.variables": "变量：${player} ${x} ${y} ${z} ${dimension}，更多变量见说明",
   "fast-masa-config.gui.quick_messages.save": "保存",
   "fast-masa-config.gui.quick_messages.clear": "清空编辑",
   "fast-masa-config.gui.groups.name": "分组名称",
@@ -47,6 +60,9 @@
   "fast-masa-config.config.generic.name.floatingBackgroundAlpha": "悬浮菜单透明度",
   "fast-masa-config.config.generic.comment.floatingBackgroundAlpha": "调整悬浮菜单背景的透明度。",
   "fast-masa-config.config.generic.prettyName.floatingBackgroundAlpha": "悬浮菜单透明度",
+  "fast-masa-config.config.generic.name.floatingAccent": "悬浮菜单主题色",
+  "fast-masa-config.config.generic.comment.floatingAccent": "自定义悬浮菜单的强调色。",
+  "fast-masa-config.config.generic.prettyName.floatingAccent": "悬浮菜单主题色",
   "fast-masa-config.config.generic.name.blockBreakIndicator": "替换挖掘动画",
   "fast-masa-config.config.generic.comment.blockBreakIndicator": "用动态方块描边替换原版挖掘裂纹动画。",
   "fast-masa-config.config.generic.prettyName.blockBreakIndicator": "替换挖掘动画",
@@ -80,4 +96,13 @@
   "fast-masa-config.config.shortcuts.name.shortcuts": "快捷方式 ID",
   "fast-masa-config.config.shortcuts.comment.shortcuts": "每行一个快捷方式目标。格式为 modId/groupId/configName 或 modId:configName。",
   "fast-masa-config.config.shortcuts.prettyName.shortcuts": "快捷方式 ID"
+  ,"fast-masa-config.config.tools.name.entityRenderFilter": "实体渲染过滤"
+  ,"fast-masa-config.config.tools.comment.entityRenderFilter": "启用实体渲染过滤。"
+  ,"fast-masa-config.config.tools.prettyName.entityRenderFilter": "实体渲染过滤"
+  ,"fast-masa-config.config.tools.name.entityRenderWhitelist": "使用白名单"
+  ,"fast-masa-config.config.tools.comment.entityRenderWhitelist": "仅渲染列表中的实体 ID；关闭时隐藏列表中的实体 ID。"
+  ,"fast-masa-config.config.tools.prettyName.entityRenderWhitelist": "使用白名单"
+  ,"fast-masa-config.config.tools.name.entityRenderEntities": "实体 ID"
+  ,"fast-masa-config.config.tools.comment.entityRenderEntities": "打开选择器，为实体渲染过滤选择实体类型。"
+  ,"fast-masa-config.config.tools.prettyName.entityRenderEntities": "实体 ID"
 }

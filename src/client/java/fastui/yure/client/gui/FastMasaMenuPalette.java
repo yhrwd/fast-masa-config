@@ -1,8 +1,10 @@
 package fastui.yure.client.gui;
 
+import fastui.yure.config.FastMasaConfigs;
+
 /** 快捷面板与完整配置页共用的颜色 token。 */
 final class FastMasaMenuPalette {
-    static final int ACCENT = 0xFF913DE2;
+    static final int DEFAULT_ACCENT = 0xFF913DE2;
     static final int SCREEN_BACKGROUND = 0xF0141414;
     static final int SCREEN_HEADER = 0xEE1E1E1E;
     static final int SURFACE = 0xFF1C1C22;
@@ -37,5 +39,9 @@ final class FastMasaMenuPalette {
     static final int MUTED = 0xFFB9B4C2;
 
     private FastMasaMenuPalette() {
+    }
+
+    static int accent() {
+        return FastMasaConfigs.Generic.FLOATING_ACCENT.getColor().toVanillaArgb();
     }
 }

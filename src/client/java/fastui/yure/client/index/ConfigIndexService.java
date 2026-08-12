@@ -3,8 +3,10 @@ package fastui.yure.client.index;
 import fastui.yure.FastMasaConfig;
 import fastui.yure.client.scan.ConfigGuiGroupScanner;
 import fastui.yure.client.scan.ConfigScreenSourceService;
+import fastui.yure.config.FastMasaConfigs;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.gui.GuiConfigsBase;
+import fi.dy.masa.malilib.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,6 +31,8 @@ public final class ConfigIndexService {
         List<ConfigIndexEntry> result = new ArrayList<>();
         Set<Target> indexedTargets = new HashSet<>();
 
+        collectTaggedOwnConfigs(result, indexedTargets);
+
         for (ConfigScreenSourceService.Source source : ConfigScreenSourceService.collectSources()) {
             if (shouldIndexMod(source.modId()) == false) {
                 continue;
@@ -45,6 +49,10 @@ public final class ConfigIndexService {
         Map<Target, ConfigIndexEntry> entriesByTarget = new HashMap<>(result.size());
         for (ConfigIndexEntry entry : result) {
             entriesByTarget.put(new Target(entry.modId(), entry.groupId(), entry.configName()), entry);
+            if (FastMasaConfig.MOD_ID.equals(entry.modId()) && "Generic".equals(entry.groupId())) {
+                entriesByTarget.put(new Target(entry.modId(), FastMasaConfigs.QuickPanel.GROUP_ID,
+                        entry.configName()), entry);
+            }
         }
         cachedEntriesByTarget = Map.copyOf(entriesByTarget);
         generation++;
@@ -75,6 +83,17 @@ public final class ConfigIndexService {
             ConfigScreenSourceService.Source source) {
         for (ConfigGuiGroupScanner.Group group : ConfigGuiGroupScanner.collectGroups(source.screen(), source.configGui())) {
             collectConfigs(result, indexedTargets, source, group.id(), group.displayName(), group.configs());
+        }
+    }
+
+    private static void collectTaggedOwnConfigs(List<ConfigIndexEntry> result, Set<Target> indexedTargets) {
+        for (IConfigBase config : FastMasaConfigs.QuickPanel.TAGGED_OPTIONS) {
+            Target target = new Target(FastMasaConfig.MOD_ID, "Generic", config.getName());
+            if (isSupported(config) && indexedTargets.add(target)) {
+                result.add(new ConfigIndexEntry(FastMasaConfig.MOD_ID, "Fast Masa Config",
+                        "Generic", "Fast Masa Config",
+                        config.getName(), getDisplayName(config), config));
+            }
         }
     }
 

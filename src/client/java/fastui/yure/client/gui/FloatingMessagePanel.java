@@ -96,7 +96,7 @@ public final class FloatingMessagePanel {
                 Math.max(0, this.layout.height() - this.layout.headerHeight()),
                 HoloPanelVisuals.withAlpha(FastMasaMenuPalette.WINDOW_BACKGROUND, alpha));
         RenderUtils.drawRect(context, this.layout.x(), this.layout.y(), this.layout.width(), this.layout.headerHeight(),
-                HoloPanelVisuals.withAlpha(FastMasaMenuPalette.ACCENT, alpha));
+                HoloPanelVisuals.withAlpha(FastMasaMenuPalette.accent(), alpha));
         if (this.layout.headerHeight() >= 16 && this.layout.width() > headerControlsWidth + ROW_PADDING * 2) {
             context.drawString(this.font, this.renderedTitle, this.layout.x() + ROW_PADDING,
                     FloatingTextLayout.centeredTextY(this.layout.y(), this.layout.headerHeight(), this.font.lineHeight),
@@ -126,7 +126,7 @@ public final class FloatingMessagePanel {
             int color = hovered ? FastMasaMenuPalette.ROW_HOVER : FastMasaMenuPalette.ROW;
             RenderUtils.drawRect(context, row.x(), y, row.width(), row.height(), HoloPanelVisuals.withAlpha(color, alpha));
             RenderUtils.drawRect(context, row.x(), y, 2, row.height(), message.isCommand()
-                    ? FastMasaMenuPalette.ACCENT : FastMasaMenuPalette.NEUTRAL);
+                    ? FastMasaMenuPalette.accent() : FastMasaMenuPalette.NEUTRAL);
             context.drawString(this.font, this.renderedNames.get(row.itemIndex()),
                     row.x() + ROW_PADDING,
                     FloatingTextLayout.centeredTextY(y, row.height(), this.font.lineHeight), FastMasaMenuPalette.TEXT,
@@ -144,7 +144,7 @@ public final class FloatingMessagePanel {
             RenderUtils.drawRect(context, this.layout.x() + this.layout.width() - 4, trackY, 2, trackHeight,
                     0x661A1A1D);
             RenderUtils.drawRect(context, this.layout.x() + this.layout.width() - 4, thumbY, 2, thumbHeight,
-                    FastMasaMenuPalette.ACCENT);
+                    FastMasaMenuPalette.accent());
         }
     }
 

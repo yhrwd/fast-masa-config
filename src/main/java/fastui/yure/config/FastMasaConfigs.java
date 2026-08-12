@@ -7,6 +7,7 @@ import fi.dy.masa.malilib.config.options.ConfigBoolean;
 import fi.dy.masa.malilib.config.options.ConfigColor;
 import fi.dy.masa.malilib.config.options.ConfigHotkey;
 import fi.dy.masa.malilib.config.options.ConfigInteger;
+import fi.dy.masa.malilib.config.options.ConfigStringList;
 import fi.dy.masa.malilib.hotkeys.IHotkey;
 import fi.dy.masa.malilib.hotkeys.KeyAction;
 import fi.dy.masa.malilib.hotkeys.KeybindSettings;
@@ -33,6 +34,8 @@ public final class FastMasaConfigs {
                 public static final ConfigInteger FLOATING_BACKGROUND_ALPHA = new ConfigInteger(
                                 "floatingBackgroundAlpha", 216, 0, 255, true,
                                 "悬浮菜单背景透明度。", "Floating Menu Background Opacity").apply(GENERIC_KEY);
+                public static final ConfigColor FLOATING_ACCENT = new ConfigColor("floatingAccent", "#FF913DE2",
+                                "悬浮菜单主题色。", "Floating Menu Theme Color").apply(GENERIC_KEY);
                 public static final ConfigBoolean BLOCK_BREAK_INDICATOR = new ConfigBoolean("blockBreakIndicator", true,
                                 "用动态方块描边替换原版挖掘裂纹动画。", "Replace Block Break Animation").apply(GENERIC_KEY);
                 public static final ConfigBoolean BLOCK_BREAK_LINES = new ConfigBoolean("blockBreakLines", true,
@@ -62,6 +65,7 @@ public final class FastMasaConfigs {
                                         RELEASE_TO_CLOSE,
                                         CLOSE_ON_INVENTORY_KEY,
                                         FLOATING_BACKGROUND_ALPHA,
+                                        FLOATING_ACCENT,
                                         BLOCK_BREAK_INDICATOR,
                                         BLOCK_BREAK_LINES,
                                         BLOCK_BREAK_SIDES,
@@ -74,11 +78,60 @@ public final class FastMasaConfigs {
                         };
                 }
 
-                public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.copyOf(OPTION_ARRAY);
+                /** Retained for loading configurations written before the Tools page existed. */
+                public static final ImmutableList<IConfigBase> PERSISTED_OPTIONS = ImmutableList.copyOf(OPTION_ARRAY);
+                public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(
+                                OPEN_QUICK_CONFIG, RELEASE_TO_CLOSE, CLOSE_ON_INVENTORY_KEY, FLOATING_BACKGROUND_ALPHA,
+                                FLOATING_ACCENT);
 
                 public static final List<IHotkey> HOTKEY_LIST = List.of(OPEN_QUICK_CONFIG);
 
                 private Generic() {
+                }
+        }
+
+        public static final class Tools {
+                private static final String TOOLS_KEY = FastMasaConfig.MOD_ID + ".config.tools";
+
+                public static final ConfigBoolean ENTITY_RENDER_FILTER = new ConfigBoolean("entityRenderFilter", false,
+                                "Enable entity rendering filtering.", "Entity Render Filter").apply(TOOLS_KEY);
+                public static final ConfigBoolean ENTITY_RENDER_WHITELIST = new ConfigBoolean("entityRenderWhitelist", false,
+                                "When enabled, only entities in the list are rendered. Otherwise list entries are hidden.",
+                                "Use Whitelist").apply(TOOLS_KEY);
+                public static final ConfigStringList ENTITY_RENDER_ENTITIES = new ConfigStringList("entityRenderEntities",
+                                ImmutableList.of(), "Choose entity types from the entity selector.",
+                                "Entity IDs").apply(TOOLS_KEY);
+
+                @SuppressWarnings("nullness")
+                public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(
+                                ENTITY_RENDER_FILTER, ENTITY_RENDER_WHITELIST, ENTITY_RENDER_ENTITIES,
+                                Generic.BLOCK_BREAK_INDICATOR, Generic.BLOCK_BREAK_LINES, Generic.BLOCK_BREAK_SIDES,
+                                Generic.BLOCK_BREAK_REMOTE, Generic.BLOCK_BREAK_LINE_WIDTH, Generic.BLOCK_BREAK_START_LINE,
+                                Generic.BLOCK_BREAK_END_LINE, Generic.BLOCK_BREAK_START_SIDE, Generic.BLOCK_BREAK_END_SIDE);
+
+                private Tools() {
+                }
+        }
+
+        /** Explicitly tagged own settings that may be added to floating shortcut groups. */
+        public static final class QuickPanel {
+                public static final String GROUP_ID = "QuickPanel";
+                public static final String GROUP_NAME_TRANSLATION_KEY = "fast-masa-config.gui.full.group.quick_panel";
+
+                @SuppressWarnings("nullness")
+                public static final ImmutableList<IConfigBase> TAGGED_OPTIONS = ImmutableList.of(
+                                Tools.ENTITY_RENDER_FILTER,
+                                Tools.ENTITY_RENDER_WHITELIST,
+                                Generic.BLOCK_BREAK_INDICATOR,
+                                Generic.BLOCK_BREAK_LINES,
+                                Generic.BLOCK_BREAK_SIDES,
+                                Generic.BLOCK_BREAK_REMOTE);
+
+                private QuickPanel() {
+                }
+
+                public static boolean isTagged(String configName) {
+                        return QuickPanelConfigTags.contains(configName);
                 }
         }
 }

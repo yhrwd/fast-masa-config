@@ -10,17 +10,30 @@
   "fast-masa-config.gui.full.filter.mod.compact": "Mod",
   "fast-masa-config.gui.full.filter.group": "Group: %s",
   "fast-masa-config.gui.full.filter.group.compact": "Group",
+  "fast-masa-config.gui.full.group.quick_panel": "Quick Panel",
   "fast-masa-config.gui.full.hotkey_settings.hover": "Left click: advanced hotkey settings\nRight click: reset hotkey settings",
   "fast-masa-config.gui.full.switch_mod": "Switch mod",
   "fast-masa-config.gui.full.empty_search": "No matching entries. Try a mod name, group, display name, or config ID.",
   "fast-masa-config.gui.tab.generic": "Generic",
+  "fast-masa-config.gui.tab.generic.compact": "General",
   "fast-masa-config.gui.tab.all_configs": "All Configs",
+  "fast-masa-config.gui.tab.all_configs.compact": "Configs",
   "fast-masa-config.gui.tab.quick_messages": "Quick Messages",
+  "fast-masa-config.gui.tab.quick_messages.compact": "Messages",
+  "fast-masa-config.gui.tab.tools": "Tools",
+  "fast-masa-config.gui.tab.tools.compact": "Tools",
+  "fast-masa-config.gui.tools.entities": "Entities",
+  "fast-masa-config.gui.tools.entities_title": "Entity Render Filter",
+  "fast-masa-config.gui.tools.entities_search": "Search entity name or ID",
+  "fast-masa-config.gui.tools.entities.selected": "Entities: %s",
+  "fast-masa-config.gui.tools.entities.add": "Add",
+  "fast-masa-config.gui.tools.entities.remove": "Remove",
   "fast-masa-config.gui.quick_messages.group": "Message Group: ",
   "fast-masa-config.gui.quick_messages.no_group": "No message group exists. Enter a group name and click + first.",
   "fast-masa-config.gui.quick_messages.empty": "This message group has no messages yet.",
   "fast-masa-config.gui.quick_messages.label": "Label (optional)",
   "fast-masa-config.gui.quick_messages.content": "Message content or / command",
+  "fast-masa-config.gui.quick_messages.variables": "Variables: ${player} ${x} ${y} ${z} ${dimension}; see the docs for more",
   "fast-masa-config.gui.quick_messages.save": "Save",
   "fast-masa-config.gui.quick_messages.clear": "Clear editor",
   "fast-masa-config.gui.groups.name": "Group name",
@@ -47,6 +60,9 @@
   "fast-masa-config.config.generic.name.floatingBackgroundAlpha": "Floating Menu Opacity",
   "fast-masa-config.config.generic.comment.floatingBackgroundAlpha": "Adjusts the opacity of the floating menu background.",
   "fast-masa-config.config.generic.prettyName.floatingBackgroundAlpha": "Floating Menu Opacity",
+  "fast-masa-config.config.generic.name.floatingAccent": "Floating Menu Theme Color",
+  "fast-masa-config.config.generic.comment.floatingAccent": "Customize the floating menu accent color.",
+  "fast-masa-config.config.generic.prettyName.floatingAccent": "Floating Menu Theme Color",
   "fast-masa-config.config.generic.name.blockBreakIndicator": "Replace Block Break Animation",
   "fast-masa-config.config.generic.comment.blockBreakIndicator": "Replaces the vanilla block break overlay with a dynamic outline.",
   "fast-masa-config.config.generic.prettyName.blockBreakIndicator": "Replace Block Break Animation",
@@ -80,4 +96,13 @@
   "fast-masa-config.config.shortcuts.name.shortcuts": "Shortcut IDs",
   "fast-masa-config.config.shortcuts.comment.shortcuts": "One shortcut target per line. Use modId/groupId/configName or modId:configName.",
   "fast-masa-config.config.shortcuts.prettyName.shortcuts": "Shortcut IDs"
+  ,"fast-masa-config.config.tools.name.entityRenderFilter": "Entity Render Filter"
+  ,"fast-masa-config.config.tools.comment.entityRenderFilter": "Enable entity rendering filtering."
+  ,"fast-masa-config.config.tools.prettyName.entityRenderFilter": "Entity Render Filter"
+  ,"fast-masa-config.config.tools.name.entityRenderWhitelist": "Use Whitelist"
+  ,"fast-masa-config.config.tools.comment.entityRenderWhitelist": "Only render the listed entity IDs. When disabled, listed IDs are hidden."
+  ,"fast-masa-config.config.tools.prettyName.entityRenderWhitelist": "Use Whitelist"
+  ,"fast-masa-config.config.tools.name.entityRenderEntities": "Entity IDs"
+  ,"fast-masa-config.config.tools.comment.entityRenderEntities": "Open the selector to choose entity types for the render filter."
+  ,"fast-masa-config.config.tools.prettyName.entityRenderEntities": "Entity IDs"
 }
