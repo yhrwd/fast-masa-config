@@ -8,6 +8,18 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityRenderFilterTest {
+    private static final List<String> IDS = List.of("minecraft:item", "minecraft:zombie");
+
+    @Test
+    void appliesTheExpectedTruthTable() {
+        assertTrue(EntityRenderFilter.shouldRender(false, false, IDS, "minecraft:item"));
+        assertTrue(EntityRenderFilter.shouldRender(false, false, IDS, "minecraft:cow"));
+        assertFalse(EntityRenderFilter.shouldRender(true, false, IDS, "minecraft:item"));
+        assertTrue(EntityRenderFilter.shouldRender(true, false, IDS, "minecraft:cow"));
+        assertTrue(EntityRenderFilter.shouldRender(true, true, IDS, "minecraft:item"));
+        assertFalse(EntityRenderFilter.shouldRender(true, true, IDS, "minecraft:cow"));
+    }
+
     @Test
     void blacklistHidesOnlyConfiguredEntityIds() {
         List<String> ids = List.of(" minecraft:item ", "minecraft:zombie");

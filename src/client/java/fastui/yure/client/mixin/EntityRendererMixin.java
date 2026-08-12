@@ -16,20 +16,14 @@ abstract class EntityRendererMixin<T extends Entity> {
     @Inject(method = "shouldRender", at = @At("HEAD"), cancellable = true)
     private void fastui$applyEntityRenderFilter(T entity, Frustum frustum, double x, double y, double z,
             CallbackInfoReturnable<Boolean> cir) {
-        EntityRenderFilter.State filter = EntityRenderFilter.State.from(
-                FastMasaConfigs.Tools.ENTITY_RENDER_FILTER.getBooleanValue(),
-                FastMasaConfigs.Tools.ENTITY_RENDER_WHITELIST.getBooleanValue(),
-                FastMasaConfigs.Tools.ENTITY_RENDER_ENTITIES.getStrings());
-        if (!filter.enabled()) {
-            // 明确结束本次判断，避免其它渲染注入或旧回调把关闭状态解释成名单过滤。
-            cir.setReturnValue(true);
-            cir.cancel();
+        if (!FastMasaConfigs.Tools.ENTITY_RENDER_FILTER.getBooleanValue()) {
             return;
         }
         String id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
-        if (!filter.shouldRender(id)) {
+        if (!EntityRenderFilter.shouldRender(true,
+                FastMasaConfigs.Tools.ENTITY_RENDER_WHITELIST.getBooleanValue(),
+                FastMasaConfigs.Tools.ENTITY_RENDER_ENTITIES.getStrings(), id)) {
             cir.setReturnValue(false);
-            cir.cancel();
         }
     }
 }
