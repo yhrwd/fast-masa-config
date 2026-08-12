@@ -48,5 +48,36 @@ jobs:
             printf 'Automated release for %s\n' "${GITHUB_REF_NAME}" > release-notes.md
           fi
           gh release create "${GITHUB_REF_NAME}" release/*.jar \
-            --title "${GITHUB_REF_NAME}" \
+            --title "Fast Masa Config UI ${GITHUB_REF_NAME}" \
             --notes-file release-notes.md
+
+      - name: publish to modrinth
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_PROJECT_ID: 4Qx0KEY6
+        run: |
+          set -euo pipefail
+          jar_file="$(find release -maxdepth 1 -type f -name '*.jar' | head -n 1)"
+          jar_name="$(basename "${jar_file}")"
+          version_number="${GITHUB_REF_NAME#mc*-v}"
+          changelog="$(cat release-notes.md)"
+          metadata="$(jq -n \
+            --arg project_id "${MODRINTH_PROJECT_ID}" \
+            --arg version_number "${version_number}" \
+            --arg version_title "Fast Masa Config UI ${version_number}" \
+            --arg changelog "${changelog}" \
+            --arg jar_name "${jar_name}" \
+            '{project_id: $project_id, version_number: $version_number,
+              version_title: $version_title, changelog: $changelog,
+              version_type: "release", loaders: ["fabric"],
+              game_versions: ["26.2"], file_parts: [$jar_name]}')"
+          curl --fail-with-body --request PATCH \
+            --header "Authorization: ${MODRINTH_TOKEN}" \
+            --header 'Content-Type: application/json' \
+            --data '{"title":"Fast Masa Config UI"}' \
+            "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}"
+          curl --fail-with-body --request POST \
+            --header "Authorization: ${MODRINTH_TOKEN}" \
+            --form "data=${metadata};type=application/json" \
+            --form "${jar_name}=@${jar_file}" \
+            https://api.modrinth.com/v2/version
