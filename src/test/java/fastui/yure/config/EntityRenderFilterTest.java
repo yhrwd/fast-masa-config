@@ -59,4 +59,12 @@ class EntityRenderFilterTest {
         assertTrue(state.shouldRender("minecraft:zombie"));
         assertTrue(state.shouldRender("minecraft:cow"));
     }
+
+    @Test
+    void emptyListHasExplicitModeSemantics() {
+        assertTrue(EntityRenderFilter.shouldRender(false, false, List.of(), "minecraft:cow"));
+        assertTrue(EntityRenderFilter.shouldRender(false, true, List.of(), "minecraft:cow"));
+        assertTrue(EntityRenderFilter.shouldRender(true, false, List.of(), "minecraft:cow"));
+        assertFalse(EntityRenderFilter.shouldRender(true, true, List.of(), "minecraft:cow"));
+    }
 }
