@@ -3,7 +3,7 @@
   "id": "fast-masa-config",
   "version": "${version}",
   "name": "Fast Masa Config",
-  "description": "给 MaLiLib 配置加一块随叫随到的快捷面板：按住热键，常用开关和滑条立刻到手边。",
+  "description": "为 MaLiLib 配置提供可自定义的悬浮快捷面板、快捷消息、实体渲染过滤和挖掘进度工具。",
   "authors": ["YureHiran"],
   "contact": {
     "sources": ""

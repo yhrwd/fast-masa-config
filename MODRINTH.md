@@ -23,6 +23,14 @@
 - 挖掘描边和填充支持起始色、完成色、透明度、描边宽度等设置，并可显示多人游戏中的其他玩家挖掘进度。
 - 提供配置扫描和 CSV 导出命令，方便排查兼容性问题。
 
+### 5.2.0 更新
+
+- 全屏配置界面改用 MaLiLib 风格半透明背景、暗色主题和高对比度控件。
+- 工具页重新整理实体渲染过滤、白名单和实体选择器，搜索输入不再每输入一个字符就失去焦点。
+- 白名单开启时只渲染列表中的实体；关闭时隐藏列表中的实体；关闭实体过滤时保留原版渲染结果。
+- 实体过滤在原版可见性判断之后执行，避免影响距离、视锥和其他渲染条件。
+- 快捷消息变量说明、悬浮菜单主题色和快捷菜单可扫描配置项均已完善。
+
 ## 使用方式
 
 安装后进入游戏，默认按住 `Right Shift` 打开快捷面板。首次使用时，可以从完整配置界面选择要加入的配置项，再按自己的习惯创建和排列分组。
@@ -68,7 +76,7 @@ This is a client-side Fabric mod that reads configuration options exposed by ins
 
 ## Features
 
-快捷消息支持发送前变量替换：`${player}`、`${x}` `${y}` `${z}`、`${px}` `${py}` `${pz}`、`${dimension}`、`${world}`，以及主世界/下界坐标变量 `${overworld_x}` `${overworld_z}` `${nether_x}` `${nether_z}`（别名 `ow_x`、`ow_z`、`nx`、`nz`）。未知变量会保持原文。
+Quick messages support variable substitution before sending: `${player}`, `${x}`, `${y}`, `${z}`, `${px}`, `${py}`, `${pz}`, `${dimension}`, and `${world}`, plus overworld and Nether coordinate variables `${overworld_x}`, `${overworld_z}`, `${nether_x}`, and `${nether_z}` (aliases: `ow_x`, `ow_z`, `nx`, `nz`). Unknown variables are preserved as written.
 
 - Automatically scans MaLiLib config screens and organizes entries by mod and config group.
 - Opens the quick panel by holding `Right Shift`; the keybind can be changed.
