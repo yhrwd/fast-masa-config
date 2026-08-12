@@ -17,6 +17,8 @@
 - 布尔值可以直接切换；整数、浮点数和双精度数值可以展开为滑条调整。
 - 完整配置界面支持按模组、分组、已添加/未添加状态搜索和筛选。
 - 可以把配置项加入或移出指定快捷分组，打造自己的工作流面板。
+- 可创建快捷消息分组，一键发送聊天消息或 `/` 指令；模板支持玩家名、坐标与维度变量，例如 `${player}`、`${x}`、`${y}`、`${z}`、`${dimension}`。
+- 工具页提供实体渲染过滤，可在黑名单模式隐藏选中的实体，或在白名单模式仅渲染选中的实体；实体选择器支持按名称或 ID 搜索。
 - 可选的动态挖掘指示器会关闭原版裂纹动画，改用随进度收缩的方块描边和半透明填充。
 - 挖掘描边和填充支持起始色、完成色、透明度、描边宽度等设置，并可显示多人游戏中的其他玩家挖掘进度。
 - 提供配置扫描和 CSV 导出命令，方便排查兼容性问题。
@@ -66,6 +68,8 @@ This is a client-side Fabric mod that reads configuration options exposed by ins
 
 ## Features
 
+快捷消息支持发送前变量替换：`${player}`、`${x}` `${y}` `${z}`、`${px}` `${py}` `${pz}`、`${dimension}`、`${world}`，以及主世界/下界坐标变量 `${overworld_x}` `${overworld_z}` `${nether_x}` `${nether_z}`（别名 `ow_x`、`ow_z`、`nx`、`nz`）。未知变量会保持原文。
+
 - Automatically scans MaLiLib config screens and organizes entries by mod and config group.
 - Opens the quick panel by holding `Right Shift`; the keybind can be changed.
 - Keeps the game running and tries to preserve movement input while the panel is open.
@@ -75,6 +79,8 @@ This is a client-side Fabric mod that reads configuration options exposed by ins
 - Toggle boolean values directly and adjust integer, float, and double values with expandable sliders.
 - Search and filter the full config list by mod, group, and added/missing state.
 - Add or remove entries from any shortcut group to build task-specific workflows.
+- Create quick-message groups and send chat messages or `/` commands with player, coordinate, and dimension variables such as `${player}`, `${x}`, `${y}`, `${z}`, and `${dimension}`.
+- The Tools tab includes entity render filtering: hide selected entities in blacklist mode or render only selected entities in whitelist mode. The entity selector is searchable by name and ID.
 - Optionally replace the vanilla block-breaking cracks with a shrinking block outline and translucent fill.
 - Configure breaking outline/fill colors, transparency, line width, and local or multiplayer progress display.
 - Includes config scanning and CSV export commands for compatibility diagnostics.

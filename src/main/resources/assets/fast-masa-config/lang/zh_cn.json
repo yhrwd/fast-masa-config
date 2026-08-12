@@ -33,7 +33,7 @@
   "fast-masa-config.gui.quick_messages.empty": "当前消息组还没有消息。",
   "fast-masa-config.gui.quick_messages.label": "备注名称（可留空）",
   "fast-masa-config.gui.quick_messages.content": "消息内容或 / 指令",
-  "fast-masa-config.gui.quick_messages.variables": "变量：${player} ${x} ${y} ${z} ${dimension}，更多变量见说明",
+  "fast-masa-config.gui.quick_messages.variables": "变量说明（发送时自动替换）：\n${player} / ${player_name}：玩家名称\n${x} ${y} ${z}：脚下方块坐标；${px} ${py} ${pz}：精确坐标\n${dimension} / ${dimension_id}：维度 ID；${world} / ${dimension_name}：维度简称\n${overworld_x} ${overworld_z}：主世界坐标；${nether_x} ${nether_z}：下界坐标（支持 ow_x、ow_z、nx、nz 别名）",
   "fast-masa-config.gui.quick_messages.save": "保存",
   "fast-masa-config.gui.quick_messages.clear": "清空编辑",
   "fast-masa-config.gui.groups.name": "分组名称",

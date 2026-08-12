@@ -33,7 +33,7 @@
   "fast-masa-config.gui.quick_messages.empty": "This message group has no messages yet.",
   "fast-masa-config.gui.quick_messages.label": "Label (optional)",
   "fast-masa-config.gui.quick_messages.content": "Message content or / command",
-  "fast-masa-config.gui.quick_messages.variables": "Variables: ${player} ${x} ${y} ${z} ${dimension}; see the docs for more",
+  "fast-masa-config.gui.quick_messages.variables": "Variable reference (resolved when sent):\n${player} / ${player_name}: player name\n${x} ${y} ${z}: block coordinates; ${px} ${py} ${pz}: precise coordinates\n${dimension} / ${dimension_id}: dimension ID; ${world} / ${dimension_name}: short dimension name\n${overworld_x} ${overworld_z}: Overworld coordinates; ${nether_x} ${nether_z}: Nether coordinates (aliases: ow_x, ow_z, nx, nz)",
   "fast-masa-config.gui.quick_messages.save": "Save",
   "fast-masa-config.gui.quick_messages.clear": "Clear editor",
   "fast-masa-config.gui.groups.name": "Group name",
