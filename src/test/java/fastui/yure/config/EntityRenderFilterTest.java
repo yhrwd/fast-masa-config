@@ -14,26 +14,26 @@ class EntityRenderFilterTest {
     void appliesTheExpectedTruthTable() {
         assertTrue(EntityRenderFilter.shouldRender(false, false, IDS, "minecraft:item"));
         assertTrue(EntityRenderFilter.shouldRender(false, false, IDS, "minecraft:cow"));
-        assertTrue(EntityRenderFilter.shouldRender(true, false, IDS, "minecraft:item"));
-        assertFalse(EntityRenderFilter.shouldRender(true, false, IDS, "minecraft:cow"));
-        assertFalse(EntityRenderFilter.shouldRender(true, true, IDS, "minecraft:item"));
-        assertTrue(EntityRenderFilter.shouldRender(true, true, IDS, "minecraft:cow"));
+        assertFalse(EntityRenderFilter.shouldRender(true, false, IDS, "minecraft:item"));
+        assertTrue(EntityRenderFilter.shouldRender(true, false, IDS, "minecraft:cow"));
+        assertTrue(EntityRenderFilter.shouldRender(true, true, IDS, "minecraft:item"));
+        assertFalse(EntityRenderFilter.shouldRender(true, true, IDS, "minecraft:cow"));
     }
 
     @Test
-    void whitelistOffRendersOnlyConfiguredEntityIds() {
+    void whitelistOffHidesOnlyConfiguredEntityIds() {
         List<String> ids = List.of(" minecraft:item ", "minecraft:zombie");
 
-        assertTrue(EntityRenderFilter.shouldRender(true, false, ids, "minecraft:item"));
-        assertFalse(EntityRenderFilter.shouldRender(true, false, ids, "minecraft:cow"));
+        assertFalse(EntityRenderFilter.shouldRender(true, false, ids, "minecraft:item"));
+        assertTrue(EntityRenderFilter.shouldRender(true, false, ids, "minecraft:cow"));
     }
 
     @Test
-    void whitelistOnHidesConfiguredEntityIds() {
+    void whitelistOnRendersOnlyConfiguredEntityIds() {
         List<String> ids = List.of("minecraft:item", "invalid");
 
-        assertFalse(EntityRenderFilter.shouldRender(true, true, ids, "MINECRAFT:ITEM"));
-        assertTrue(EntityRenderFilter.shouldRender(true, true, ids, "minecraft:cow"));
+        assertTrue(EntityRenderFilter.shouldRender(true, true, ids, "MINECRAFT:ITEM"));
+        assertFalse(EntityRenderFilter.shouldRender(true, true, ids, "minecraft:cow"));
         assertTrue(EntityRenderFilter.shouldRender(false, true, ids, "minecraft:cow"));
     }
 
@@ -64,7 +64,7 @@ class EntityRenderFilterTest {
     void emptyListHasExplicitModeSemantics() {
         assertTrue(EntityRenderFilter.shouldRender(false, false, List.of(), "minecraft:cow"));
         assertTrue(EntityRenderFilter.shouldRender(false, true, List.of(), "minecraft:cow"));
-        assertFalse(EntityRenderFilter.shouldRender(true, false, List.of(), "minecraft:cow"));
-        assertTrue(EntityRenderFilter.shouldRender(true, true, List.of(), "minecraft:cow"));
+        assertTrue(EntityRenderFilter.shouldRender(true, false, List.of(), "minecraft:cow"));
+        assertFalse(EntityRenderFilter.shouldRender(true, true, List.of(), "minecraft:cow"));
     }
 }

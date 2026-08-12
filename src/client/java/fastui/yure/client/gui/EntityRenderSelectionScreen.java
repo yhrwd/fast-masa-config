@@ -58,8 +58,8 @@ final class EntityRenderSelectionScreen extends GuiBase {
         this.searchField.setMaxLength(128);
         this.addTextField(this.searchField, field -> {
             this.filter = field.getValue();
+            this.visibleEntries = this.filterEntries();
             this.scrollOffset = 0;
-            this.initGui();
             return true;
         });
     }

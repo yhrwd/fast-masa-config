@@ -100,7 +100,7 @@
   ,"fast-masa-config.config.tools.comment.entityRenderFilter": "启用实体渲染过滤。"
   ,"fast-masa-config.config.tools.prettyName.entityRenderFilter": "实体渲染过滤"
   ,"fast-masa-config.config.tools.name.entityRenderWhitelist": "使用白名单"
-  ,"fast-masa-config.config.tools.comment.entityRenderWhitelist": "开启时隐藏列表中的实体 ID；关闭时仅渲染列表中的实体 ID。"
+  ,"fast-masa-config.config.tools.comment.entityRenderWhitelist": "开启时仅渲染列表中的实体 ID；关闭时隐藏列表中的实体 ID。"
   ,"fast-masa-config.config.tools.prettyName.entityRenderWhitelist": "使用白名单"
   ,"fast-masa-config.config.tools.name.entityRenderEntities": "实体 ID"
   ,"fast-masa-config.config.tools.comment.entityRenderEntities": "打开选择器，为实体渲染过滤选择实体类型。"
