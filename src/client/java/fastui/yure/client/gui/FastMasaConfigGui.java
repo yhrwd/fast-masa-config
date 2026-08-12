@@ -8,6 +8,9 @@ import fastui.yure.config.FastMasaConfigs;
 import fastui.yure.config.ConfigGroup;
 import fastui.yure.config.ConfigGroupStore;
 import fastui.yure.config.GroupItem;
+import fastui.yure.config.QuickMessage;
+import fastui.yure.config.QuickMessageGroup;
+import fastui.yure.config.QuickMessageStore;
 import fi.dy.masa.malilib.MaLiLib;
 import fi.dy.masa.malilib.MaLiLibConfigs;
 import fi.dy.masa.malilib.MaLiLibReference;
@@ -40,6 +43,7 @@ import fi.dy.masa.malilib.util.GuiUtils;
 import fi.dy.masa.malilib.util.StringUtils;
 import fi.dy.masa.malilib.util.data.ModInfo;
 import fi.dy.masa.malilib.render.GuiContext;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 
 import org.jetbrains.annotations.Nullable;
@@ -57,12 +61,12 @@ import java.util.Set;
  * 主体列表自绘，右上角模组切换沿用 MaLiLib 的 WidgetDropDownList 行为。
  */
 public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGui {
-    private static final int MARGIN = 12;
+    private static final int MARGIN = FullConfigListLayout.MARGIN;
     private static final int TAB_Y = 28;
     private static final int SEARCH_Y = 54;
     private static final int LIST_Y = 80;
-    private static final int ROW_HEIGHT = 30;
-    private static final int ROW_GAP = 3;
+    private static final int ROW_HEIGHT = FullConfigListLayout.ROW_HEIGHT;
+    private static final int ROW_GAP = FullConfigListLayout.ROW_GAP;
     private static final int BUTTON_HEIGHT = 20;
     private static final int COLOR_ROW = FastMasaMenuPalette.SURFACE_TRANSLUCENT;
     private static final int COLOR_ROW_HOVER = FastMasaMenuPalette.ROW_HOVER_TRANSLUCENT;
@@ -74,7 +78,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private static final int NUMERIC_VALUE_WIDTH = 50;
     private static final int NUMERIC_SLIDER_WIDTH = 68;
 
-    private static ConfigGuiTab tab = ConfigGuiTab.GENERIC;
+    /** 页面状态属于当前 Screen，不能在多个 GUI 实例之间共享。 */
+    private ConfigGuiTab tab = ConfigGuiTab.GENERIC;
 
     private final HeldKeyInputSuppressor inputSuppressor;
     private final List<Runnable> hotkeyChangeListeners = new ArrayList<>();
@@ -82,22 +87,33 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     private GuiTextFieldGeneric searchField;
     private GuiTextFieldGeneric groupNameField;
+    private GuiTextFieldGeneric quickMessageLabelField;
+    private GuiTextFieldGeneric quickMessageContentField;
     private int searchFieldWidth;
     private boolean searchFieldFocused;
     private int groupNameFieldWidth;
     private boolean groupNameFieldFocused;
+    private int quickMessageLabelFieldWidth;
+    private int quickMessageContentFieldWidth;
+    private boolean quickMessageLabelFieldFocused;
+    private boolean quickMessageContentFieldFocused;
     private ConfigButtonKeybind activeKeybindButton;
     private ConfigButtonKeybind openQuickConfigButton;
     private ButtonGeneric hotkeySettingsButton;
     private IConfigBase activeNumericSliderConfig;
 
     private List<IConfigBase> filteredGenericConfigs = List.of();
+    private List<ConfigIndexEntry> configIndex = List.of();
     private List<ConfigIndexEntry> filteredConfigs = List.of();
+    private Map<ConfigIndexService.Target, Integer> selectedGroupItemOrder = Map.of();
     private FilterMode filterMode = FilterMode.ALL;
     private String selectedModId = "";
     private String selectedConfigGroupId = "";
     private String selectedGroupId = "";
+    private String selectedQuickMessageGroupId = "";
+    private String editingQuickMessageId = "";
     private int scrollOffset;
+    private List<QuickMessage> filteredQuickMessages = List.of();
 
     /**
      * 从 ModMenu 或命令直接打开时使用的构造函数，没有父界面，也不需要吞掉打开热键。
@@ -133,6 +149,19 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         }
     }
 
+    /** 在 MaLiLib 注册本模组配置页，初始化入口和切换器共用这条路径。 */
+    public static void registerConfigScreen() {
+        if (Registry.CONFIG_SCREEN.getModInfoFromConfigScreen(FastMasaConfigGui.class) != null) {
+            return;
+        }
+        try {
+            Registry.CONFIG_SCREEN.registerConfigScreenFactory(new ModInfo(FastMasaConfig.MOD_ID,
+                    FastMasaConfig.MOD_NAME, FastMasaConfigGui::new));
+        } catch (Exception | LinkageError exception) {
+            MaLiLib.LOGGER.warn("FastMasaConfigGui: Failed to register [{}]", FastMasaConfig.MOD_ID, exception);
+        }
+    }
+
     static String recoveryTargetGroupId() {
         return "default";
     }
@@ -140,9 +169,14 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     @Override
     public void initGui() {
         super.initGui();
+        this.ensureTextInputEnabled();
         ConfigGroupStore.ensureDefaultGroup();
         if (tab == ConfigGuiTab.ALL_CONFIGS) {
+            this.configIndex = ConfigIndexService.scanSupportedConfigs();
             this.normalizeSelectedGroup();
+        }
+        if (tab == ConfigGuiTab.QUICK_MESSAGES) {
+            this.normalizeSelectedQuickMessageGroup();
         }
         this.clearOptions();
         this.buildConfigSwitcher();
@@ -171,6 +205,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     @Override
     public void tick() {
+        // 全屏配置页允许用户在失焦状态下切换输入法；Minecraft 默认会在没有焦点文本框时关闭 IME。
+        this.ensureTextInputEnabled();
     }
 
     @Override
@@ -179,20 +215,27 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int mouseY = (int) click.y();
         this.searchFieldFocused = this.isSearchFieldHit(mouseX, mouseY);
         this.groupNameFieldFocused = this.isGroupNameFieldHit(mouseX, mouseY);
+        this.quickMessageLabelFieldFocused = this.isQuickMessageLabelFieldHit(mouseX, mouseY);
+        this.quickMessageContentFieldFocused = this.isQuickMessageContentFieldHit(mouseX, mouseY);
 
         if (super.onMouseClicked(click, doubleClick)) {
+            this.ensureTextInputEnabled();
             return true;
         }
 
         if (this.activeKeybindButton != null) {
             this.setActiveKeybindButton(null);
+            this.ensureTextInputEnabled();
             return true;
         }
 
-        return switch (tab) {
+        boolean handled = switch (tab) {
             case GENERIC -> this.handleGenericClick(mouseX, mouseY);
             case ALL_CONFIGS -> this.handleAllConfigsClick(mouseX, mouseY);
+            case QUICK_MESSAGES -> this.handleQuickMessagesClick(mouseX, mouseY);
         };
+        this.ensureTextInputEnabled();
+        return handled;
     }
 
     @Override
@@ -238,13 +281,30 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             return true;
         }
 
+        // MaLiLib 的 GuiBase 会在文本框聚焦时消费按键。左 Shift 是常用的中英文切换键，
+        // 非热键录制状态下放行，但仍保留 GuiBase.keyPressed() 的输入计数和事件链。
+        if (keyCode == fi.dy.masa.malilib.util.KeyCodes.KEY_LEFT_SHIFT && this.activeKeybindButton == null) {
+            this.ensureTextInputEnabled();
+            return false;
+        }
+
         if (this.activeKeybindButton != null) {
             this.activeKeybindButton.onKeyPressed(keyCode);
             this.notifyOwnConfigChanged(true);
+            this.ensureTextInputEnabled();
             return true;
         }
 
-        return super.onKeyTyped(input);
+        if (keyCode == 257 && this.tab == ConfigGuiTab.QUICK_MESSAGES
+                && this.quickMessageContentField != null && this.quickMessageContentField.isFocused()) {
+            this.saveQuickMessage();
+            this.ensureTextInputEnabled();
+            return true;
+        }
+
+        boolean handled = super.onKeyTyped(input);
+        this.ensureTextInputEnabled();
+        return handled;
     }
 
     @Override
@@ -265,6 +325,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     @Override
     public void removed() {
+        Minecraft.getInstance().textInputManager().stopTextInput();
         if (this.activeKeybindButton != null) {
             this.setActiveKeybindButton(null);
         }
@@ -275,6 +336,13 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         }
 
         super.removed();
+    }
+
+    private void ensureTextInputEnabled() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.gui.screen() == this) {
+            minecraft.textInputManager().startTextInput();
+        }
     }
 
     @Override
@@ -296,6 +364,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         switch (tab) {
             case GENERIC -> this.drawGenericRows(ctx, mouseX, mouseY);
             case ALL_CONFIGS -> this.drawAllConfigRows(ctx, mouseX, mouseY);
+            case QUICK_MESSAGES -> this.drawQuickMessageRows(ctx, mouseX, mouseY);
         }
     }
 
@@ -349,14 +418,9 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         ModInfo thisMod = Registry.CONFIG_SCREEN.getModInfoFromConfigScreen(this.getClass());
 
         if (thisMod == null) {
-            try {
-                MaLiLib.debugLog("FastMasaConfigGui#initGui(): Attempting to register [{}] ...", this.getModId());
-                Registry.CONFIG_SCREEN.registerConfigScreenFactory(
-                        new ModInfo(this.getModId(), StringUtils.splitCamelCase(this.getModId()), () -> this));
-                thisMod = Registry.CONFIG_SCREEN.getModInfoFromConfigScreen(this.getClass());
-            } catch (Exception ignored) {
-                MaLiLib.LOGGER.warn("FastMasaConfigGui#initGui(): Failed to automatically register [{}]",
-                        this.getModId());
+            registerConfigScreen();
+            thisMod = Registry.CONFIG_SCREEN.getModInfoFromConfigScreen(this.getClass());
+            if (thisMod == null) {
                 return;
             }
         }
@@ -411,15 +475,20 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private void createTabInputs() {
         this.searchField = null;
         this.groupNameField = null;
+        this.quickMessageLabelField = null;
+        this.quickMessageContentField = null;
         this.searchFieldFocused = false;
         this.groupNameFieldFocused = false;
+        this.quickMessageLabelFieldFocused = false;
+        this.quickMessageContentFieldFocused = false;
 
         boolean compactFilters = this.isCompactFilterLayout();
-        boolean wrapFilters = tab != ConfigGuiTab.GENERIC && filterControlsWrap(this.width);
-        int filterButtonWidth = tab == ConfigGuiTab.GENERIC ? 0
+        boolean supportsConfigFilters = tab == ConfigGuiTab.ALL_CONFIGS;
+        boolean wrapFilters = supportsConfigFilters && filterControlsWrap(this.width);
+        int filterButtonWidth = !supportsConfigFilters ? 0
                 : (compactFilters ? 60 : 110);
-        int modButtonWidth = tab == ConfigGuiTab.GENERIC ? 0 : (compactFilters ? 60 : 118);
-        int groupButtonWidth = tab == ConfigGuiTab.GENERIC ? 0 : (compactFilters ? 60 : 118);
+        int modButtonWidth = !supportsConfigFilters ? 0 : (compactFilters ? 60 : 118);
+        int groupButtonWidth = !supportsConfigFilters ? 0 : (compactFilters ? 60 : 118);
         int searchWidth = wrapFilters ? Math.max(80, this.width - MARGIN * 2) : Math.min(220,
                 Math.max(80, this.width - MARGIN * 2 - filterButtonWidth - modButtonWidth - groupButtonWidth - 18));
         this.searchField = new GuiTextFieldGeneric(MARGIN, SEARCH_Y, searchWidth, 18, this.font);
@@ -432,7 +501,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             return true;
         });
 
-        if (tab != ConfigGuiTab.GENERIC) {
+        if (tab == ConfigGuiTab.ALL_CONFIGS) {
             int filterY = wrapFilters ? SEARCH_Y + BUTTON_HEIGHT + 4 : SEARCH_Y - 1;
             int filterX = wrapFilters ? MARGIN : MARGIN + searchWidth + 6;
             this.addButton(new ButtonGeneric(filterX, filterY, filterButtonWidth,
@@ -455,12 +524,14 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                         this.scrollOffset = 0;
                         this.initGui();
                     });
-        } else {
+        } else if (tab == ConfigGuiTab.GENERIC) {
             this.createGenericButtons();
         }
 
         if (tab == ConfigGuiTab.ALL_CONFIGS) {
             this.createAllConfigsGroupControls();
+        } else if (tab == ConfigGuiTab.QUICK_MESSAGES) {
+            this.createQuickMessageControls();
         }
     }
 
@@ -489,22 +560,24 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private void refreshVisibleRows() {
         if (tab == ConfigGuiTab.GENERIC) {
             String filter = this.getSearchText();
-            this.filteredGenericConfigs = FastMasaConfigs.Generic.OPTIONS.stream()
-                    .filter(config -> this.matchesGenericConfig(config, filter))
-                    .toList();
+            this.filteredGenericConfigs = GenericConfigPage.filter(FastMasaConfigs.Generic.OPTIONS, filter);
         } else if (tab == ConfigGuiTab.ALL_CONFIGS) {
             String filter = this.getSearchText();
-            List<ConfigIndexEntry> index = ConfigIndexService.scanSupportedConfigs();
-            this.normalizeSelectedFilters(index);
+            this.normalizeSelectedFilters(this.configIndex);
             this.normalizeSelectedGroup();
             ConfigGroup selectedGroup = this.getSelectedGroup();
             List<GroupItem> selectedItems = selectedGroup == null ? List.of() : selectedGroup.items();
-            this.filteredConfigs = index.stream()
+            this.selectedGroupItemOrder = AllConfigsPage.buildGroupItemOrder(selectedItems);
+            this.filteredConfigs = this.configIndex.stream()
                     .filter(this::matchesSelectedFilters)
-                    .filter(entry -> this.matchesConfig(entry, filter))
+                    .filter(entry -> AllConfigsPage.matches(entry, filter))
                     .filter(this::matchesConfigFilterMode)
-                    .sorted(Comparator.comparingInt(entry -> groupItemOrder(selectedItems, entry)))
+                    .sorted(Comparator.comparingInt(this::getSelectedGroupItemOrder))
                     .toList();
+        } else if (tab == ConfigGuiTab.QUICK_MESSAGES) {
+            QuickMessageGroup selected = this.getSelectedQuickMessageGroup();
+            String filter = this.getSearchText();
+            this.filteredQuickMessages = QuickMessagesPage.filter(selected, filter);
         }
 
         this.scrollOffset = clamp(this.scrollOffset, 0, Math.max(0, this.getCurrentRowCount() - this.getVisibleRows()));
@@ -587,7 +660,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private void drawAllConfigRows(GuiContext context, int mouseX, int mouseY) {
-        this.drawListHeader(context, this.filteredConfigs.size(), ConfigIndexService.scanSupportedConfigs().size());
+        this.drawListHeader(context, this.filteredConfigs.size(), this.configIndex.size());
 
         if (this.filteredConfigs.isEmpty()) {
             this.drawEmptyText(context, StringUtils.translate("fast-masa-config.gui.full.empty_search"));
@@ -602,6 +675,42 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         }
 
         this.drawScrollBar(context, this.filteredConfigs.size());
+    }
+
+    private void drawQuickMessageRows(GuiContext context, int mouseX, int mouseY) {
+        QuickMessageGroup selected = this.getSelectedQuickMessageGroup();
+        int total = selected == null ? 0 : selected.messages().size();
+        this.drawListHeader(context, this.filteredQuickMessages.size(), total);
+        if (selected == null) {
+            this.drawEmptyText(context, StringUtils.translate("fast-masa-config.gui.quick_messages.no_group"));
+            return;
+        }
+        if (this.filteredQuickMessages.isEmpty()) {
+            this.drawEmptyText(context, StringUtils.translate("fast-masa-config.gui.quick_messages.empty"));
+            return;
+        }
+        int visible = this.getVisibleRows();
+        int end = Math.min(this.filteredQuickMessages.size(), this.scrollOffset + visible);
+        for (int index = this.scrollOffset; index < end; index++) {
+            QuickMessage message = this.filteredQuickMessages.get(index);
+            int x = MARGIN;
+            int y = this.getListTop() + (index - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP);
+            int width = this.width - MARGIN * 2;
+            int buttonX = x + width - 76;
+            boolean selectedMessage = message.id().equals(this.editingQuickMessageId);
+            boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT);
+            this.drawRowBase(context, x, y, width, hovered, selectedMessage);
+            this.drawString(context, fitText(message.displayName(), buttonX - x - 16), x + 8, y + 6, COLOR_TEXT);
+            String meta = (message.isCommand() ? "[CMD] " : "") + message.content();
+            this.drawString(context, fitText(meta, buttonX - x - 16), x + 8, y + 18, COLOR_MUTED);
+            this.drawSmallButton(context, buttonX - 48, y + 5, 20, "↑", FastMasaMenuPalette.CONTROL_DARK,
+                    GuiHitTest.isInside(mouseX, mouseY, buttonX - 48, y + 5, 20, BUTTON_HEIGHT));
+            this.drawSmallButton(context, buttonX - 24, y + 5, 20, "↓", FastMasaMenuPalette.CONTROL_DARK,
+                    GuiHitTest.isInside(mouseX, mouseY, buttonX - 24, y + 5, 20, BUTTON_HEIGHT));
+            this.drawSmallButton(context, buttonX, y + 5, 64, "x", FastMasaMenuPalette.ACTION_REMOVE,
+                    GuiHitTest.isInside(mouseX, mouseY, buttonX, y + 5, 64, BUTTON_HEIGHT));
+        }
+        this.drawScrollBar(context, this.filteredQuickMessages.size());
     }
 
     private void drawAllConfigRow(GuiContext context, ConfigIndexEntry entry, int visibleIndex, int mouseX,
@@ -639,9 +748,19 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                     SEARCH_Y + 5, COLOR_MUTED);
         }
         if (this.groupNameField != null && !this.groupNameFieldFocused && this.groupNameField.getValue().isBlank()) {
-            int y = this.getGroupControlsY() + BUTTON_HEIGHT + 4;
+            int y = this.getGroupNameFieldY();
             this.drawString(context, StringUtils.translate("fast-masa-config.gui.groups.name"), MARGIN + 4,
                     y + 5, COLOR_MUTED);
+        }
+        if (this.quickMessageLabelField != null && !this.quickMessageLabelFieldFocused
+                && this.quickMessageLabelField.getValue().isBlank()) {
+            this.drawString(context, StringUtils.translate("fast-masa-config.gui.quick_messages.label"), MARGIN + 4,
+                    this.getQuickMessageEditorY() + 5, COLOR_MUTED);
+        }
+        if (this.quickMessageContentField != null && !this.quickMessageContentFieldFocused
+                && this.quickMessageContentField.getValue().isBlank()) {
+            this.drawString(context, StringUtils.translate("fast-masa-config.gui.quick_messages.content"), MARGIN + 4,
+                    this.getQuickMessageEditorY() + BUTTON_HEIGHT + 4 + 5, COLOR_MUTED);
         }
     }
 
@@ -651,11 +770,21 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private boolean isGroupNameFieldHit(int mouseX, int mouseY) {
-        if (this.groupNameField == null || tab != ConfigGuiTab.ALL_CONFIGS) {
+        if (this.groupNameField == null || (tab != ConfigGuiTab.ALL_CONFIGS && tab != ConfigGuiTab.QUICK_MESSAGES)) {
             return false;
         }
-        int y = this.getGroupControlsY() + BUTTON_HEIGHT + 4;
+        int y = this.getGroupNameFieldY();
         return GuiHitTest.isInside(mouseX, mouseY, MARGIN, y, this.groupNameFieldWidth, 18);
+    }
+
+    private boolean isQuickMessageLabelFieldHit(int mouseX, int mouseY) {
+        return this.quickMessageLabelField != null && GuiHitTest.isInside(mouseX, mouseY, MARGIN,
+                this.getQuickMessageEditorY(), this.quickMessageLabelFieldWidth, 18);
+    }
+
+    private boolean isQuickMessageContentFieldHit(int mouseX, int mouseY) {
+        return this.quickMessageContentField != null && GuiHitTest.isInside(mouseX, mouseY, MARGIN,
+                this.getQuickMessageEditorY() + BUTTON_HEIGHT + 4, this.quickMessageContentFieldWidth, 18);
     }
 
     private void drawEmptyText(GuiContext context, String text) {
@@ -838,6 +967,88 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         return false;
     }
 
+    private boolean handleQuickMessagesClick(int mouseX, int mouseY) {
+        if (this.handleQuickMessageGroupAction(mouseX, mouseY)) {
+            return true;
+        }
+        int index = this.getRowIndexAt(mouseX, mouseY, this.filteredQuickMessages.size());
+        if (index < 0) {
+            return false;
+        }
+        QuickMessageGroup group = this.getSelectedQuickMessageGroup();
+        QuickMessage message = this.filteredQuickMessages.get(index);
+        int x = MARGIN;
+        int width = this.width - MARGIN * 2;
+        int rowY = this.getListTop() + (index - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP) + 5;
+        int buttonX = x + width - 76;
+        if (GuiHitTest.isInside(mouseX, mouseY, buttonX - 48, rowY, 20, BUTTON_HEIGHT)) {
+            int itemIndex = group == null ? -1 : group.messages().indexOf(message);
+            if (itemIndex >= 0 && QuickMessageStore.moveMessage(group.id(), itemIndex, -1)) {
+                this.afterQuickMessageChanged();
+            }
+            return true;
+        }
+        if (GuiHitTest.isInside(mouseX, mouseY, buttonX - 24, rowY, 20, BUTTON_HEIGHT)) {
+            int itemIndex = group == null ? -1 : group.messages().indexOf(message);
+            if (itemIndex >= 0 && QuickMessageStore.moveMessage(group.id(), itemIndex, 1)) {
+                this.afterQuickMessageChanged();
+            }
+            return true;
+        }
+        if (GuiHitTest.isInside(mouseX, mouseY, buttonX, rowY, 64, BUTTON_HEIGHT)) {
+            int itemIndex = group == null ? -1 : group.messages().indexOf(message);
+            if (itemIndex >= 0 && QuickMessageStore.removeMessage(group.id(), itemIndex)) {
+                this.clearQuickMessageEditor();
+                this.afterQuickMessageChanged();
+            }
+            return true;
+        }
+        this.editingQuickMessageId = message.id();
+        if (this.quickMessageLabelField != null) {
+            this.quickMessageLabelField.setValue(message.label());
+        }
+        if (this.quickMessageContentField != null) {
+            this.quickMessageContentField.setValue(message.content());
+        }
+        return true;
+    }
+
+    private boolean handleQuickMessageGroupAction(int mouseX, int mouseY) {
+        int actionY = this.getQuickMessageControlsY();
+        int selectorWidth = this.getGroupSelectorWidth();
+        int actionX = MARGIN + selectorWidth + 4;
+        if (GuiHitTest.isInside(mouseX, mouseY, MARGIN, actionY, selectorWidth, BUTTON_HEIGHT)) {
+            this.selectNextQuickMessageGroup();
+            return true;
+        }
+        if (GuiHitTest.isInside(mouseX, mouseY, actionX, actionY, 30, BUTTON_HEIGHT)) {
+            QuickMessageGroup selected = this.getSelectedQuickMessageGroup();
+            if (selected != null && QuickMessageStore.hideGroup(selected.id(), !selected.hidden())) {
+                this.afterQuickMessageChanged();
+                this.initGui();
+            }
+            return true;
+        }
+        if (GuiHitTest.isInside(mouseX, mouseY, actionX + 34, actionY, 30, BUTTON_HEIGHT)) {
+            if (QuickMessageStore.removeGroup(this.selectedQuickMessageGroupId)) {
+                this.selectedQuickMessageGroupId = "";
+                this.clearQuickMessageEditor();
+                this.afterQuickMessageChanged();
+                this.initGui();
+            }
+            return true;
+        }
+        if (GuiHitTest.isInside(mouseX, mouseY, actionX + 68, actionY, 24, BUTTON_HEIGHT)) {
+            this.moveSelectedQuickMessageGroup(-1);
+            return true;
+        }
+        if (GuiHitTest.isInside(mouseX, mouseY, actionX + 96, actionY, 24, BUTTON_HEIGHT)) {
+            this.moveSelectedQuickMessageGroup(1);
+            return true;
+        }
+        return false;
+    }
+
     private void openColorEditor(IConfigColor config) {
         IDialogHandler dialogHandler = new IDialogHandler() {
             @Override
@@ -968,6 +1179,139 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.addButton(renameButton, (button, mouseButton) -> this.renameSelectedGroup());
     }
 
+    private void createQuickMessageControls() {
+        int controlsY = this.getQuickMessageControlsY();
+        GroupActionLayout actionLayout = GroupActionLayout.calculate(this.width);
+        int selectorWidth = actionLayout.selectorWidth();
+        int actionX = actionLayout.actionX();
+        QuickMessageGroup selected = this.getSelectedQuickMessageGroup();
+        String targetLabel = StringUtils.translate("fast-masa-config.gui.quick_messages.group")
+                + (selected == null ? StringUtils.translate("fast-masa-config.gui.group.none") : selected.name());
+        this.addButton(new ButtonGeneric(MARGIN, controlsY, selectorWidth, BUTTON_HEIGHT, targetLabel),
+                (button, mouseButton) -> this.selectNextQuickMessageGroup());
+        this.addButton(new ButtonGeneric(actionX, controlsY, 30, BUTTON_HEIGHT,
+                StringUtils.translate(selected != null && selected.hidden() ? "fast-masa-config.gui.group.show"
+                        : "fast-masa-config.gui.group.hide")), (button, mouseButton) -> {
+                    QuickMessageGroup current = this.getSelectedQuickMessageGroup();
+                    if (current != null && QuickMessageStore.hideGroup(current.id(), !current.hidden())) {
+                        this.afterQuickMessageChanged();
+                        this.initGui();
+                    }
+                });
+        ButtonGeneric deleteButton = new ButtonGeneric(actionX + 34, controlsY, 30, BUTTON_HEIGHT, "x");
+        deleteButton.setEnabled(selected != null);
+        this.addButton(deleteButton, (button, mouseButton) -> {
+            QuickMessageGroup current = this.getSelectedQuickMessageGroup();
+            if (current != null && QuickMessageStore.removeGroup(current.id())) {
+                this.selectedQuickMessageGroupId = "";
+                this.editingQuickMessageId = "";
+                this.afterQuickMessageChanged();
+                this.initGui();
+            }
+        });
+        ButtonGeneric moveUp = new ButtonGeneric(actionX + 68, controlsY, 24, BUTTON_HEIGHT, "↑");
+        ButtonGeneric moveDown = new ButtonGeneric(actionX + 96, controlsY, 24, BUTTON_HEIGHT, "↓");
+        this.addButton(moveUp, (button, mouseButton) -> this.moveSelectedQuickMessageGroup(-1));
+        this.addButton(moveDown, (button, mouseButton) -> this.moveSelectedQuickMessageGroup(1));
+
+        int nameY = controlsY + BUTTON_HEIGHT + 4;
+        int nameWidth = Math.max(60, this.width - MARGIN * 2 - 68);
+        this.groupNameField = new GuiTextFieldGeneric(MARGIN, nameY, nameWidth, 18, this.font);
+        this.groupNameFieldWidth = nameWidth;
+        this.groupNameField.setMaxLength(128);
+        this.addTextField(this.groupNameField, field -> true);
+        ButtonGeneric createButton = new ButtonGeneric(MARGIN + nameWidth + 4, nameY - 1, 30, BUTTON_HEIGHT, "+");
+        createButton.setHoverStrings("fast-masa-config.gui.group.create");
+        this.addButton(createButton, (button, mouseButton) -> this.createQuickMessageGroup());
+        ButtonGeneric renameButton = new ButtonGeneric(MARGIN + nameWidth + 38, nameY - 1, 30, BUTTON_HEIGHT, "R");
+        renameButton.setHoverStrings("fast-masa-config.gui.group.rename");
+        this.addButton(renameButton, (button, mouseButton) -> this.renameSelectedQuickMessageGroup());
+
+        int editorY = this.getQuickMessageEditorY();
+        // 消息内容通常比配置项名称长，编辑器始终使用整行宽度，操作按钮放在下一行。
+        int editorWidth = Math.max(80, this.width - MARGIN * 2);
+        this.quickMessageLabelField = new GuiTextFieldGeneric(MARGIN, editorY, editorWidth, 18, this.font);
+        this.quickMessageLabelFieldWidth = editorWidth;
+        this.quickMessageLabelField.setMaxLength(Integer.MAX_VALUE);
+        this.addTextField(this.quickMessageLabelField, field -> true);
+        this.quickMessageContentField = new GuiTextFieldGeneric(MARGIN, editorY + BUTTON_HEIGHT + 4, editorWidth, 18,
+                this.font);
+        this.quickMessageContentFieldWidth = editorWidth;
+        this.quickMessageContentField.setMaxLength(Integer.MAX_VALUE);
+        this.addTextField(this.quickMessageContentField, field -> true);
+        int editorActionX = MARGIN;
+        int editorActionY = editorY + BUTTON_HEIGHT * 2 + 8;
+        ButtonGeneric saveButton = new ButtonGeneric(editorActionX, editorActionY, 64, BUTTON_HEIGHT,
+                StringUtils.translate("fast-masa-config.gui.quick_messages.save"));
+        this.addButton(saveButton, (button, mouseButton) -> this.saveQuickMessage());
+        ButtonGeneric clearButton = new ButtonGeneric(editorActionX + 68, editorActionY, 64,
+                BUTTON_HEIGHT, StringUtils.translate("fast-masa-config.gui.quick_messages.clear"));
+        this.addButton(clearButton, (button, mouseButton) -> this.clearQuickMessageEditor());
+    }
+
+    private void createQuickMessageGroup() {
+        if (this.groupNameField == null || this.groupNameField.getValue().trim().isBlank()) {
+            return;
+        }
+        QuickMessageGroup group = QuickMessageStore.createGroup(this.groupNameField.getValue().trim());
+        this.selectedQuickMessageGroupId = group.id();
+        this.groupNameField.setValue("");
+        this.afterQuickMessageChanged();
+        this.initGui();
+    }
+
+    private void renameSelectedQuickMessageGroup() {
+        if (this.groupNameField == null || this.selectedQuickMessageGroupId.isBlank()
+                || this.groupNameField.getValue().trim().isBlank()) {
+            return;
+        }
+        if (QuickMessageStore.renameGroup(this.selectedQuickMessageGroupId, this.groupNameField.getValue().trim())) {
+            this.groupNameField.setValue("");
+            this.afterQuickMessageChanged();
+            this.initGui();
+        }
+    }
+
+    private void saveQuickMessage() {
+        QuickMessageGroup group = this.getSelectedQuickMessageGroup();
+        if (group == null || this.quickMessageContentField == null) {
+            return;
+        }
+        String label = this.quickMessageLabelField == null ? "" : this.quickMessageLabelField.getValue();
+        String content = this.quickMessageContentField.getValue();
+        boolean saved = this.editingQuickMessageId.isBlank()
+                ? QuickMessageStore.addMessage(group.id(), label, content) != null
+                : QuickMessageStore.updateMessage(group.id(), this.editingQuickMessageId, label, content);
+        if (saved) {
+            this.clearQuickMessageEditor();
+            this.afterQuickMessageChanged();
+            this.initGui();
+        }
+    }
+
+    private void clearQuickMessageEditor() {
+        this.editingQuickMessageId = "";
+        if (this.quickMessageLabelField != null) {
+            this.quickMessageLabelField.setValue("");
+        }
+        if (this.quickMessageContentField != null) {
+            this.quickMessageContentField.setValue("");
+        }
+    }
+
+    private void afterQuickMessageChanged() {
+        this.scrollOffset = 0;
+        this.refreshVisibleRows();
+        this.notifyOwnConfigChanged(false);
+    }
+
+    private void moveSelectedQuickMessageGroup(int offset) {
+        if (QuickMessageStore.moveGroup(this.selectedQuickMessageGroupId, offset)) {
+            this.afterQuickMessageChanged();
+            this.initGui();
+        }
+    }
+
     private void afterGroupChanged() {
         this.scrollOffset = 0;
         this.refreshVisibleRows();
@@ -1008,26 +1352,6 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         }
     }
 
-    private boolean matchesGenericConfig(IConfigBase config, String filter) {
-        if (filter.isBlank()) {
-            return true;
-        }
-
-        String haystack = (config.getName() + " " + config.getConfigGuiDisplayName() + " " + config.getComment())
-                .toLowerCase(Locale.ROOT);
-        return haystack.contains(filter);
-    }
-
-    private boolean matchesConfig(ConfigIndexEntry entry, String filter) {
-        if (filter.isBlank()) {
-            return true;
-        }
-
-        String haystack = (entry.modId() + " " + entry.modName() + " " + entry.groupId() + " " + entry.groupName() + " "
-                + entry.configName() + " " + entry.displayName()).toLowerCase(Locale.ROOT);
-        return haystack.contains(filter);
-    }
-
     private boolean matchesSelectedFilters(ConfigIndexEntry entry) {
         if (this.selectedModId.isBlank() == false && entry.modId().equals(this.selectedModId) == false) {
             return false;
@@ -1037,9 +1361,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private boolean matchesConfigFilterMode(ConfigIndexEntry entry) {
-        ConfigGroup selected = this.getSelectedGroup();
-        boolean added = selected != null && isTargetInGroup(selected.items(), entry.modId(), entry.groupId(),
-                entry.configName());
+        boolean added = this.selectedGroupItemOrder.containsKey(targetOf(entry));
         return switch (this.filterMode) {
             case ALL -> true;
             case ADDED -> added;
@@ -1048,32 +1370,23 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private boolean isInSelectedGroup(ConfigIndexEntry entry) {
-        ConfigGroup selected = this.getSelectedGroup();
-        return selected != null && isTargetInGroup(selected.items(), entry.modId(), entry.groupId(), entry.configName());
+        return this.selectedGroupItemOrder.containsKey(targetOf(entry));
     }
 
     private int getSelectedGroupItemIndex(ConfigIndexEntry entry) {
-        ConfigGroup selected = this.getSelectedGroup();
-        return selected == null ? -1 : groupItemIndex(selected.items(), entry);
+        return this.selectedGroupItemOrder.getOrDefault(targetOf(entry), -1);
     }
 
-    static int groupItemOrder(List<GroupItem> items, ConfigIndexEntry entry) {
-        int index = groupItemIndex(items, entry);
-        return index < 0 ? Integer.MAX_VALUE : index;
+    private int getSelectedGroupItemOrder(ConfigIndexEntry entry) {
+        return this.selectedGroupItemOrder.getOrDefault(targetOf(entry), Integer.MAX_VALUE);
     }
 
-    private static int groupItemIndex(List<GroupItem> items, ConfigIndexEntry entry) {
-        for (int index = 0; index < items.size(); index++) {
-            GroupItem item = items.get(index);
-            if (item.isSameTarget(entry.modId(), entry.groupId(), entry.configName())) {
-                return index;
-            }
-        }
-        return -1;
+    static Map<ConfigIndexService.Target, Integer> buildGroupItemOrder(List<GroupItem> items) {
+        return AllConfigsPage.buildGroupItemOrder(items);
     }
 
-    static boolean isTargetInGroup(List<GroupItem> items, String modId, String groupId, String configName) {
-        return items.stream().anyMatch(item -> item.isSameTarget(modId, groupId, configName));
+    private static ConfigIndexService.Target targetOf(ConfigIndexEntry entry) {
+        return AllConfigsPage.targetOf(entry);
     }
 
     private String getSearchText() {
@@ -1084,19 +1397,18 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         return switch (tab) {
             case GENERIC -> this.filteredGenericConfigs.size();
             case ALL_CONFIGS -> this.filteredConfigs.size();
+            case QUICK_MESSAGES -> this.filteredQuickMessages.size();
         };
     }
 
     private int getVisibleRows() {
         int bottom = this.height - 18;
         int top = this.getListTop();
-        return Math.max(1, (bottom - top) / (ROW_HEIGHT + ROW_GAP));
+        return FullConfigListLayout.visibleRows(this.height, top);
     }
 
     private boolean isInsideList(int mouseX, int mouseY) {
-        int top = this.getListTop();
-        int bottom = this.height - 18;
-        return GuiHitTest.isInside(mouseX, mouseY, MARGIN, top, this.width - MARGIN * 2, bottom - top);
+        return FullConfigListLayout.containsListPoint(mouseX, mouseY, this.width, this.height, this.getListTop());
     }
 
     private boolean isCompactFilterLayout() {
@@ -1106,6 +1418,9 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private int getListTop() {
         if (tab == ConfigGuiTab.ALL_CONFIGS) {
             return this.getGroupControlsY() + BUTTON_HEIGHT * 2 + 8;
+        }
+        if (tab == ConfigGuiTab.QUICK_MESSAGES) {
+            return this.getQuickMessageListTop();
         }
         return tab != ConfigGuiTab.GENERIC && filterControlsWrap(this.width) ? SEARCH_Y + BUTTON_HEIGHT * 2 + 8 : LIST_Y;
     }
@@ -1147,9 +1462,32 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.initGui();
     }
 
+    private void selectNextQuickMessageGroup() {
+        List<QuickMessageGroup> groups = QuickMessageStore.getGroups();
+        if (groups.isEmpty()) {
+            return;
+        }
+        int current = -1;
+        for (int index = 0; index < groups.size(); index++) {
+            if (groups.get(index).id().equals(this.selectedQuickMessageGroupId)) {
+                current = index;
+                break;
+            }
+        }
+        this.selectedQuickMessageGroupId = groups.get((current + 1) % groups.size()).id();
+        this.editingQuickMessageId = "";
+        this.initGui();
+    }
+
     private void normalizeSelectedGroup() {
         this.selectedGroupId = normalizedTargetGroupId(this.selectedGroupId,
                 ConfigGroupStore.getGroups().stream().map(ConfigGroup::id).toList());
+    }
+
+    private void normalizeSelectedQuickMessageGroup() {
+        List<String> groupIds = QuickMessageStore.getGroups().stream().map(QuickMessageGroup::id).toList();
+        this.selectedQuickMessageGroupId = groupIds.contains(this.selectedQuickMessageGroupId)
+                ? this.selectedQuickMessageGroupId : (groupIds.isEmpty() ? "" : groupIds.getFirst());
     }
 
     static String normalizedTargetGroupId(String selectedGroupId, List<String> groupIds) {
@@ -1162,20 +1500,31 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         return ConfigGroupStore.get(this.selectedGroupId).orElse(null);
     }
 
+    @Nullable
+    private QuickMessageGroup getSelectedQuickMessageGroup() {
+        return QuickMessageStore.get(this.selectedQuickMessageGroupId).orElse(null);
+    }
+
+    private int getQuickMessageControlsY() {
+        return SEARCH_Y + BUTTON_HEIGHT + 4;
+    }
+
+    private int getGroupNameFieldY() {
+        return (tab == ConfigGuiTab.QUICK_MESSAGES ? this.getQuickMessageControlsY() : this.getGroupControlsY())
+                + BUTTON_HEIGHT + 4;
+    }
+
+    private int getQuickMessageEditorY() {
+        return this.getQuickMessageControlsY() + BUTTON_HEIGHT * 2 + 8;
+    }
+
+    private int getQuickMessageListTop() {
+        return this.getQuickMessageEditorY() + BUTTON_HEIGHT * 3 + 18;
+    }
+
     private int getRowIndexAt(int mouseX, int mouseY, int rowCount) {
-        if (this.isInsideList(mouseX, mouseY) == false) {
-            return -1;
-        }
-
-        int visibleIndex = (mouseY - this.getListTop()) / (ROW_HEIGHT + ROW_GAP);
-        int index = this.scrollOffset + visibleIndex;
-        int rowY = this.getListTop() + visibleIndex * (ROW_HEIGHT + ROW_GAP);
-
-        if (mouseY >= rowY + ROW_HEIGHT || index < 0 || index >= rowCount) {
-            return -1;
-        }
-
-        return index;
+        return FullConfigListLayout.rowIndexAt(mouseX, mouseY, this.width, this.height, this.getListTop(),
+                this.scrollOffset, rowCount);
     }
 
     private int getControlX() {
@@ -1214,7 +1563,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private void cycleModFilter() {
-        List<String> modIds = ConfigIndexService.scanSupportedConfigs().stream()
+        List<String> modIds = this.configIndex.stream()
                 .map(entry -> entry.modId())
                 .distinct()
                 .toList();
@@ -1225,7 +1574,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private void cycleGroupFilter() {
-        List<String> groupIds = ConfigIndexService.scanSupportedConfigs().stream()
+        List<String> groupIds = this.configIndex.stream()
                 .filter(entry -> this.selectedModId.isBlank() || entry.modId().equals(this.selectedModId))
                 .map(entry -> entry.groupId())
                 .filter(groupId -> groupId.isBlank() == false)
@@ -1251,7 +1600,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private String getSelectedModName() {
-        return ConfigIndexService.scanSupportedConfigs().stream()
+        return this.configIndex.stream()
                 .filter(entry -> entry.modId().equals(this.selectedModId))
                 .map(entry -> entry.modName())
                 .findFirst()
@@ -1259,7 +1608,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private String getSelectedGroupName() {
-        return ConfigIndexService.scanSupportedConfigs().stream()
+        return this.configIndex.stream()
                 .filter(entry -> this.selectedModId.isBlank() || entry.modId().equals(this.selectedModId))
                 .filter(entry -> entry.groupId().equals(this.selectedConfigGroupId))
                 .map(entry -> entry.groupName())
@@ -1310,29 +1659,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private String fitText(String text, int maxWidth) {
-        if (text == null || maxWidth <= 0) {
-            return "";
-        }
-
-        if (this.getStringWidth(text) <= maxWidth) {
-            return text;
-        }
-
-        String ellipsis = "...";
-        if (this.getStringWidth(ellipsis) > maxWidth) {
-            int end = text.length();
-            while (end > 0 && this.getStringWidth(text.substring(0, end)) > maxWidth) {
-                end--;
-            }
-            return text.substring(0, end);
-        }
-        int end = text.length();
-
-        while (end > 0 && this.getStringWidth(text.substring(0, end) + ellipsis) > maxWidth) {
-            end--;
-        }
-
-        return text.substring(0, Math.max(0, end)) + ellipsis;
+        return FloatingGroupPanel.fitText(text, maxWidth, this::getStringWidth);
     }
 
     private static String formatDouble(double value) {
@@ -1371,7 +1698,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     private enum ConfigGuiTab {
         GENERIC("fast-masa-config.gui.tab.generic"),
-        ALL_CONFIGS("fast-masa-config.gui.tab.all_configs");
+        ALL_CONFIGS("fast-masa-config.gui.tab.all_configs"),
+        QUICK_MESSAGES("fast-masa-config.gui.tab.quick_messages");
 
         private final String translationKey;
 

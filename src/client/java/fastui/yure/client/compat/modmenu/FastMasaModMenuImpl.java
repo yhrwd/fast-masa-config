@@ -7,6 +7,6 @@ import fastui.yure.client.gui.FastMasaConfigGui;
 public final class FastMasaModMenuImpl implements ModMenuApi {
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
-        return parent -> new FastMasaConfigGui().setParent(parent);
+        return FastMasaConfigGui::new;
     }
 }

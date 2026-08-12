@@ -2,6 +2,7 @@ package fastui.yure.client.gui;
 
 import fastui.yure.FastMasaConfig;
 import fastui.yure.client.input.BoundKeyReader;
+import fastui.yure.client.message.QuickMessageSender;
 import fastui.yure.client.shortcut.ResolvedShortcut;
 import fastui.yure.client.shortcut.ShortcutControl;
 import fastui.yure.config.ConfigGroup;
@@ -9,6 +10,7 @@ import fastui.yure.config.ConfigGroupStore;
 import fastui.yure.config.FastMasaConfigs;
 import fastui.yure.config.GroupItem;
 import fastui.yure.config.MovementKeyPassthrough;
+import fastui.yure.config.QuickMessageStore;
 import fastui.yure.config.ShortcutControlType;
 import fi.dy.masa.malilib.config.ConfigManager;
 import fi.dy.masa.malilib.hotkeys.KeybindMulti;
@@ -29,6 +31,7 @@ public final class QuickConfigScreen extends Screen {
     private final List<KeyMapping> movementKeys;
     private MovementKeyPassthrough movementKeyPassthrough = new MovementKeyPassthrough(Set.of());
     private String activeFloatingGroupId;
+    private String activeFloatingMessageGroupId;
     private int floatingDragOffsetX;
     private int floatingDragOffsetY;
     private String activeFloatingSliderGroupId;
@@ -51,7 +54,7 @@ public final class QuickConfigScreen extends Screen {
     @Override
     public void added() {
         ConfigGroupStore.ensureDefaultGroup();
-        if (ConfigGroupStore.getGroups().stream().noneMatch(group -> !group.hidden())) {
+        if (!hasVisibleFloatingWindows()) {
             // Screen.added() 仍处于 Fabric 事件初始化阶段，不能在这里直接 setScreen。
             // 延迟到首个 tick()，既保留“全隐藏时打开完整配置”的入口，也不会触发未初始化崩溃。
             this.redirectToFullConfig = true;
@@ -59,6 +62,11 @@ public final class QuickConfigScreen extends Screen {
         }
         this.movementKeyPassthrough = createMovementPassthrough(Minecraft.getInstance());
         syncHeldMovementKeys();
+    }
+
+    private static boolean hasVisibleFloatingWindows() {
+        return ConfigGroupStore.getGroups().stream().anyMatch(group -> !group.hidden())
+                || QuickMessageStore.getGroups().stream().anyMatch(group -> !group.hidden());
     }
 
     @Override
@@ -119,7 +127,36 @@ public final class QuickConfigScreen extends Screen {
     public boolean handleMouseClicked(double mouseX, double mouseY, int button) {
         int x = (int) mouseX;
         int y = (int) mouseY;
-        for (FloatingGroupPanel floating : this.panel.floatingPanels().reversed()) {
+        for (QuickConfigPanel.FloatingWindow window : this.panel.floatingWindows().reversed()) {
+            if (window instanceof QuickConfigPanel.MessageWindow messageWindow) {
+                FloatingMessagePanel floating = messageWindow.panel();
+                GroupWindowHitTest.Result hit = floating.hitTest(x, y);
+                if (hit.target() == GroupWindowHitTest.Target.NONE) {
+                    continue;
+                }
+                // 数值输入是单一焦点状态，切换到消息窗口前必须结束它，避免后续按键被旧输入框吞掉。
+                if (shouldCommitNumericInputBeforeWindowInteraction(true, hit.target())) {
+                    commitNumericInput();
+                }
+                this.panel.raiseFloatingMessageGroup(floating.groupId());
+                if (hit.target() == GroupWindowHitTest.Target.HEADER) {
+                    if (floating.isCollapseHit(x, y)) {
+                        floating.toggleCollapsed();
+                        persistRuntimeGroupState();
+                    } else {
+                        this.activeFloatingMessageGroupId = floating.groupId();
+                        this.floatingDragOffsetX = x - floating.x();
+                        this.floatingDragOffsetY = y - floating.y();
+                    }
+                    return true;
+                }
+                if (hit.target() == GroupWindowHitTest.Target.ROW) {
+                    QuickMessageSender.send(floating.messageAt(hit.itemIndex()));
+                }
+                return true;
+            }
+
+            FloatingGroupPanel floating = ((QuickConfigPanel.ConfigWindow) window).panel();
             GroupWindowHitTest.Result hit = floating.hitTest(x, y);
             if (hit.target() == GroupWindowHitTest.Target.NONE) {
                 continue;
@@ -179,6 +216,12 @@ public final class QuickConfigScreen extends Screen {
     }
 
     public boolean handleMouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+        if (this.activeFloatingMessageGroupId != null) {
+            this.floatingDragDirty |= this.panel.moveFloatingMessageGroup(this.activeFloatingMessageGroupId,
+                    (int) mouseX - this.floatingDragOffsetX, (int) mouseY - this.floatingDragOffsetY,
+                    this.width, this.height);
+            return true;
+        }
         if (this.activeFloatingGroupId != null) {
             this.floatingDragDirty |= this.panel.moveFloatingGroup(this.activeFloatingGroupId,
                     (int) mouseX - this.floatingDragOffsetX, (int) mouseY - this.floatingDragOffsetY,
@@ -201,10 +244,19 @@ public final class QuickConfigScreen extends Screen {
     }
 
     public boolean handleMouseScrolled(double mouseX, double mouseY, double h, double v) {
-        for (FloatingGroupPanel floating : this.panel.floatingPanels().reversed()) {
-            GroupWindowHitTest.Result hit = floating.hitTest((int) mouseX, (int) mouseY);
+        for (QuickConfigPanel.FloatingWindow window : this.panel.floatingWindows().reversed()) {
+            GroupWindowHitTest.Result hit;
+            if (window instanceof QuickConfigPanel.MessageWindow messageWindow) {
+                hit = messageWindow.panel().hitTest((int) mouseX, (int) mouseY);
+            } else {
+                hit = ((QuickConfigPanel.ConfigWindow) window).panel().hitTest((int) mouseX, (int) mouseY);
+            }
             if (hit.target() != GroupWindowHitTest.Target.NONE && hit.target() != GroupWindowHitTest.Target.HEADER) {
-                floating.scroll(v);
+                if (window instanceof QuickConfigPanel.MessageWindow messageWindow) {
+                    messageWindow.panel().scroll(v);
+                } else {
+                    ((QuickConfigPanel.ConfigWindow) window).panel().scroll(v);
+                }
                 return true;
             }
         }
@@ -213,6 +265,7 @@ public final class QuickConfigScreen extends Screen {
 
     public boolean handleMouseReleased(double mouseX, double mouseY, int button) {
         this.activeFloatingGroupId = null;
+        this.activeFloatingMessageGroupId = null;
         this.activeFloatingSliderGroupId = null;
         this.activeFloatingSliderIndex = -1;
         flushPendingDragPersistence();
@@ -395,6 +448,11 @@ public final class QuickConfigScreen extends Screen {
 
     static boolean shouldOpenSystemConfigRow(GroupWindowHitTest.Target target, boolean systemConfigRow) {
         return target == GroupWindowHitTest.Target.ROW && systemConfigRow;
+    }
+
+    static boolean shouldCommitNumericInputBeforeWindowInteraction(boolean messageWindow,
+            GroupWindowHitTest.Target target) {
+        return messageWindow && target != GroupWindowHitTest.Target.NONE;
     }
 
     static boolean isValidToggleItemIndex(int itemIndex, int itemCount) {

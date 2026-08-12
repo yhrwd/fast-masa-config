@@ -38,41 +38,7 @@ public record GroupWindowLayout(
      */
     public static GroupWindowLayout calculate(int screenWidth, int screenHeight, int requestedX, int requestedY,
                                               boolean collapsed, int[] rowHeights) {
-        if (rowHeights == null) {
-            throw new NullPointerException("rowHeights");
-        }
-
-        int viewportWidth = Math.max(0, screenWidth);
-        int viewportHeight = Math.max(0, screenHeight);
-        int availableWidth = Math.max(0, viewportWidth - SAFE_MARGIN * 2);
-        int availableHeight = Math.max(0, viewportHeight - SAFE_MARGIN * 2);
-        int width = availableWidth >= MIN_SAFE_WIDTH
-                ? Math.min(DESIRED_WIDTH, availableWidth)
-                : availableWidth;
-        int headerHeight = Math.min(HEADER_HEIGHT, availableHeight);
-        int contentHeight = headerHeight;
-        List<Row> rows = new ArrayList<>();
-
-        if (!collapsed) {
-            for (int itemIndex = 0; itemIndex < rowHeights.length; itemIndex++) {
-                int rowHeight = rowHeights[itemIndex];
-                if (rowHeight <= 0) {
-                    throw new IllegalArgumentException("row heights must be positive");
-                }
-                rows.add(new Row(itemIndex, 0, contentHeight, width, rowHeight));
-                contentHeight += rowHeight;
-            }
-        }
-
-        int height = Math.min(contentHeight, availableHeight);
-        int x = clampPosition(requestedX, viewportWidth, width);
-        int y = clampPosition(requestedY, viewportHeight, height);
-        List<Row> positionedRows = rows.stream()
-                .map(row -> new Row(row.itemIndex(), x, y + row.y(), width, row.height()))
-                .toList();
-
-        return new GroupWindowLayout(x, y, width, height, SAFE_MARGIN, headerHeight, contentHeight,
-                Math.max(0, contentHeight - height), positionedRows);
+        return calculate(screenWidth, screenHeight, requestedX, requestedY, collapsed, rowHeights, null);
     }
 
     /**
@@ -87,41 +53,66 @@ public record GroupWindowLayout(
         if (rowHeights == null) {
             throw new NullPointerException("rowHeights");
         }
+        return calculate(screenWidth, screenHeight, requestedX, requestedY, collapsed, rowHeights,
+                Integer.valueOf(contentWidth));
+    }
+
+    private static GroupWindowLayout calculate(int screenWidth, int screenHeight, int requestedX, int requestedY,
+                                               boolean collapsed, int[] rowHeights, Integer measuredContentWidth) {
+        if (rowHeights == null) {
+            throw new NullPointerException("rowHeights");
+        }
 
         int viewportWidth = Math.max(0, screenWidth);
         int viewportHeight = Math.max(0, screenHeight);
         int availableWidth = Math.max(0, viewportWidth - SAFE_MARGIN * 2);
         int availableHeight = Math.max(0, viewportHeight - SAFE_MARGIN * 2);
-        int width = Math.min(Math.max(0, contentWidth) + WINDOW_PADDING * 2, availableWidth);
+        int width = measuredContentWidth == null
+                ? (availableWidth >= MIN_SAFE_WIDTH ? Math.min(DESIRED_WIDTH, availableWidth) : availableWidth)
+                : Math.min(Math.max(0, measuredContentWidth) + WINDOW_PADDING * 2, availableWidth);
         int headerHeight = Math.min(HEADER_HEIGHT, availableHeight);
         int contentHeight = headerHeight;
         List<Row> rows = new ArrayList<>();
 
         if (!collapsed) {
-            // 标题栏下方先留出内边距；每个 Row 保存的是未滚动的绝对屏幕坐标。
-            contentHeight += WINDOW_PADDING;
+            if (measuredContentWidth != null) {
+                // 标题栏下方先留出内边距；每个 Row 保存的是未滚动的绝对屏幕坐标。
+                contentHeight += WINDOW_PADDING;
+            }
             for (int itemIndex = 0; itemIndex < rowHeights.length; itemIndex++) {
                 int rowHeight = rowHeights[itemIndex];
                 if (rowHeight <= 0) {
                     throw new IllegalArgumentException("row heights must be positive");
                 }
-                if (!rows.isEmpty()) {
+                if (measuredContentWidth != null && !rows.isEmpty()) {
                     contentHeight += ROW_SPACING;
                 }
-                // 行宽已去除左右内边距。FloatingGroupPanel 必须使用 row.x/y/width 绘制和命中。
-                rows.add(new Row(itemIndex, WINDOW_PADDING, contentHeight, Math.max(0, width - WINDOW_PADDING * 2),
-                        rowHeight));
+                int rowX = measuredContentWidth == null ? 0 : WINDOW_PADDING;
+                int rowWidth = measuredContentWidth == null ? width : Math.max(0, width - WINDOW_PADDING * 2);
+                rows.add(new Row(itemIndex, rowX, contentHeight, rowWidth, rowHeight));
                 contentHeight += rowHeight;
             }
-            contentHeight += WINDOW_PADDING;
+            if (measuredContentWidth != null) {
+                contentHeight += WINDOW_PADDING;
+            }
         }
 
         int height = Math.min(contentHeight, availableHeight);
+        return finishLayout(screenWidth, screenHeight, requestedX, requestedY, width, height, headerHeight,
+                contentHeight, rows, measuredContentWidth != null);
+    }
+
+    private static GroupWindowLayout finishLayout(int screenWidth, int screenHeight, int requestedX, int requestedY,
+                                                  int width, int height, int headerHeight, int contentHeight,
+                                                  List<Row> rows, boolean rowsHaveRelativeX) {
+        int viewportWidth = Math.max(0, screenWidth);
+        int viewportHeight = Math.max(0, screenHeight);
         int x = clampPosition(requestedX, viewportWidth, width);
         int y = clampPosition(requestedY, viewportHeight, height);
-        // 前面暂存的是相对窗口原点的坐标；窗口位置夹紧后才转换为最终屏幕坐标。
         List<Row> positionedRows = rows.stream()
-                .map(row -> new Row(row.itemIndex(), x + row.x(), y + row.y(), row.width(), row.height()))
+                .map(row -> rowsHaveRelativeX
+                        ? new Row(row.itemIndex(), x + row.x(), y + row.y(), row.width(), row.height())
+                        : new Row(row.itemIndex(), x, y + row.y(), width, row.height()))
                 .toList();
 
         return new GroupWindowLayout(x, y, width, height, SAFE_MARGIN, headerHeight, contentHeight,

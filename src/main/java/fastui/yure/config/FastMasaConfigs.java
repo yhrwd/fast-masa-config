@@ -34,7 +34,7 @@ public final class FastMasaConfigs {
                                 "floatingBackgroundAlpha", 216, 0, 255, true,
                                 "悬浮菜单背景透明度。", "Floating Menu Background Opacity").apply(GENERIC_KEY);
                 public static final ConfigBoolean BLOCK_BREAK_INDICATOR = new ConfigBoolean("blockBreakIndicator", true,
-                                "用动态方块描边替换原版挖掘裂纹动画。", "Replace Block Break Overlay").apply(GENERIC_KEY);
+                                "用动态方块描边替换原版挖掘裂纹动画。", "Replace Block Break Animation").apply(GENERIC_KEY);
                 public static final ConfigBoolean BLOCK_BREAK_LINES = new ConfigBoolean("blockBreakLines", true,
                                 "显示挖掘动画的方块描边。", "Render Break Outline").apply(GENERIC_KEY);
                 public static final ConfigBoolean BLOCK_BREAK_SIDES = new ConfigBoolean("blockBreakSides", true,

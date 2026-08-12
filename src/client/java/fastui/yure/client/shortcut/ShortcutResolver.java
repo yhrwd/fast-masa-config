@@ -6,6 +6,7 @@ import fastui.yure.config.ShortcutEntry;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public final class ShortcutResolver {
@@ -13,21 +14,19 @@ public final class ShortcutResolver {
     }
 
     public static List<ResolvedShortcut> resolve(List<ShortcutEntry> shortcuts) {
-        List<ConfigIndexEntry> index = ConfigIndexService.scanSupportedConfigs();
+        Map<ConfigIndexService.Target, ConfigIndexEntry> indexByTarget = ConfigIndexService.indexByTarget();
         List<ResolvedShortcut> resolved = new ArrayList<>();
 
         for (ShortcutEntry shortcut : shortcuts) {
-            find(index, shortcut).ifPresent(entry -> resolved.add(new ResolvedShortcut(shortcut, entry)));
+            find(indexByTarget, shortcut).ifPresent(entry -> resolved.add(new ResolvedShortcut(shortcut, entry)));
         }
 
         return resolved;
     }
 
-    public static Optional<ConfigIndexEntry> find(List<ConfigIndexEntry> index, ShortcutEntry shortcut) {
-        return index.stream()
-                .filter(entry -> entry.modId().equals(shortcut.modId()))
-                .filter(entry -> entry.groupId().equals(shortcut.groupId()))
-                .filter(entry -> entry.configName().equals(shortcut.configName()))
-                .findFirst();
+    public static Optional<ConfigIndexEntry> find(Map<ConfigIndexService.Target, ConfigIndexEntry> index,
+            ShortcutEntry shortcut) {
+        return Optional.ofNullable(index.get(new ConfigIndexService.Target(shortcut.modId(), shortcut.groupId(),
+                shortcut.configName())));
     }
 }

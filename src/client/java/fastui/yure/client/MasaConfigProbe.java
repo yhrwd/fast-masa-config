@@ -77,11 +77,13 @@ public final class MasaConfigProbe {
                 .sum();
 
         context.getSource().sendFeedback(Component.literal("Fast Masa Config scan complete. Registered entries: "
-                + registeredCount + ". Use /fastmasaconfig scan fallback for fallback reflection."));
+                + registeredCount + ". /fastmasaconfig scan fallback is diagnostic only; its results are not used by the runtime quick panel."));
         return 1;
     }
 
     private static int scanFallback(CommandContext<FabricClientCommandSource> context) {
+        context.getSource().sendFeedback(Component.literal(
+                "Fast Masa Config fallback scan is diagnostic only. Reflected results are not added to the runtime quick panel."));
         Map<String, List<ConfigEntry>> fallbackEntries = scanFallbackConfigClasses();
 
         FastMasaConfig.LOGGER.info("==== Fast Masa Config probe: fallback reflected config classes ====");
@@ -90,7 +92,8 @@ public final class MasaConfigProbe {
         int fallbackCount = fallbackEntries.values().stream().mapToInt(entries -> entries.size()).sum();
 
         context.getSource().sendFeedback(Component.literal(
-                "Fast Masa Config fallback scan complete. Fallback entries: " + fallbackCount + ". See client log."));
+                "Fast Masa Config fallback scan complete. Fallback entries: " + fallbackCount
+                        + ". Diagnostic output only; see client log."));
         return 1;
     }
 

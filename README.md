@@ -30,7 +30,7 @@ Fast Masa Config 的设计初衷很直接：Minecraft 中便于使用的按键�
 
 - 自动发现已加载 Mod 注册的 MaLiLib 配置界面，并识别其中的配置分组、显示名称和配置 ID。
 - 支持使用 `modId/groupId/configName` 或 `modId:configName` 标识快捷配置目标。
-- 对不完全遵循标准注册方式的配置界面提供反射回退扫描，方便兼容性排查。
+- 对已注册但分组结构不标准的配置界面提供反射扫描，方便兼容性排查。
 
 ### 快捷面板
 

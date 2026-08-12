@@ -6,7 +6,9 @@ import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -14,6 +16,9 @@ public final class ConfigGroupStore {
     private static final String DEFAULT_GROUP_ID = "default";
     private static final String DEFAULT_GROUP_NAME = "FastUI";
     private static final List<ConfigGroup> GROUPS = new ArrayList<>();
+    private static final Map<String, ConfigGroup> GROUPS_BY_ID = new HashMap<>();
+    private static long revision;
+    private static long contentRevision;
 
     private ConfigGroupStore() {
     }
@@ -23,8 +28,11 @@ public final class ConfigGroupStore {
             throw new IllegalArgumentException("分组名称不能为空");
         }
 
-        ConfigGroup group = new ConfigGroup(UUID.randomUUID().toString(), name, false);
+        ConfigGroup group = new ConfigGroup(UUID.randomUUID().toString(), name.trim(), false);
         GROUPS.add(group);
+        GROUPS_BY_ID.put(group.id(), group);
+        revision++;
+        contentRevision++;
         return group;
     }
 
@@ -32,13 +40,20 @@ public final class ConfigGroupStore {
         Optional<ConfigGroup> existing = get(DEFAULT_GROUP_ID);
         if (existing.isPresent()) {
             ConfigGroup group = existing.get();
-            group.rename(DEFAULT_GROUP_NAME);
-            group.setSystem(true);
+            if (!DEFAULT_GROUP_NAME.equals(group.name()) || !group.system()) {
+                group.rename(DEFAULT_GROUP_NAME);
+                group.setSystem(true);
+                revision++;
+                contentRevision++;
+            }
             return group;
         }
 
         ConfigGroup group = new ConfigGroup(DEFAULT_GROUP_ID, DEFAULT_GROUP_NAME, true);
         GROUPS.add(group);
+        GROUPS_BY_ID.put(group.id(), group);
+        revision++;
+        contentRevision++;
         return group;
     }
 
@@ -47,7 +62,17 @@ public final class ConfigGroupStore {
     }
 
     public static Optional<ConfigGroup> get(String id) {
-        return GROUPS.stream().filter(group -> group.id().equals(id)).findFirst();
+        return Optional.ofNullable(GROUPS_BY_ID.get(id));
+    }
+
+    /** 组集合、可见性或排序发生变化时递增，供客户端避免空闲帧重复同步。 */
+    public static long revision() {
+        return revision;
+    }
+
+    /** 仅在名称或条目发生变化时递增，不包含拖动和隐藏等窗口状态。 */
+    public static long contentRevision() {
+        return contentRevision;
     }
 
     public static boolean rename(String id, String name) {
@@ -55,19 +80,41 @@ public final class ConfigGroupStore {
             return false;
         }
 
-        Optional<ConfigGroup> group = get(id);
-        group.ifPresent(value -> value.rename(name));
-        return group.isPresent();
+        ConfigGroup group = GROUPS_BY_ID.get(id);
+        if (group == null) {
+            return false;
+        }
+        String normalized = name.trim();
+        if (!normalized.equals(group.name())) {
+            group.rename(normalized);
+            revision++;
+            contentRevision++;
+        }
+        return true;
     }
 
     public static boolean remove(String id) {
-        return GROUPS.removeIf(group -> group.id().equals(id) && !group.system());
+        ConfigGroup group = GROUPS_BY_ID.get(id);
+        if (group == null || group.system()) {
+            return false;
+        }
+        GROUPS.remove(group);
+        GROUPS_BY_ID.remove(id);
+        revision++;
+        contentRevision++;
+        return true;
     }
 
     public static boolean hide(String id, boolean hidden) {
-        Optional<ConfigGroup> group = get(id);
-        group.ifPresent(value -> value.setHidden(hidden));
-        return group.isPresent();
+        ConfigGroup group = GROUPS_BY_ID.get(id);
+        if (group == null) {
+            return false;
+        }
+        if (group.hidden() != hidden) {
+            group.setHidden(hidden);
+            revision++;
+        }
+        return true;
     }
 
     public static boolean moveGroup(String id, int offset) {
@@ -79,6 +126,7 @@ public final class ConfigGroupStore {
         }
 
         Collections.swap(GROUPS, index, target);
+        revision++;
         return true;
     }
 
@@ -90,29 +138,67 @@ public final class ConfigGroupStore {
         GroupItem normalized = item.groupId() == null
                 ? new GroupItem(item.modId(), "", item.configName(), item.expanded())
                 : item;
-        return get(groupId).map(group -> group.addItem(normalized)).orElse(false);
+        ConfigGroup group = GROUPS_BY_ID.get(groupId);
+        if (group == null || !group.addItem(normalized)) {
+            return false;
+        }
+        revision++;
+        contentRevision++;
+        return true;
     }
 
     public static boolean removeItem(String groupId, int index) {
-        return get(groupId).map(group -> group.removeItem(index)).orElse(false);
+        ConfigGroup group = GROUPS_BY_ID.get(groupId);
+        if (group == null || !group.removeItem(index)) {
+            return false;
+        }
+        revision++;
+        contentRevision++;
+        return true;
     }
 
     public static boolean moveItem(String groupId, int index, int offset) {
-        return get(groupId).map(group -> group.moveItem(index, offset)).orElse(false);
+        ConfigGroup group = GROUPS_BY_ID.get(groupId);
+        if (group == null || !group.moveItem(index, offset)) {
+            return false;
+        }
+        revision++;
+        contentRevision++;
+        return true;
     }
 
     public static boolean setItemExpanded(String groupId, int index, boolean expanded) {
-        return get(groupId).map(group -> group.setItemExpanded(index, expanded)).orElse(false);
+        ConfigGroup group = GROUPS_BY_ID.get(groupId);
+        if (group == null || index < 0 || index >= group.items().size()) {
+            return false;
+        }
+        if (group.items().get(index).expanded() != expanded) {
+            group.setItemExpanded(index, expanded);
+            revision++;
+            contentRevision++;
+        }
+        return true;
     }
 
     public static boolean setWindowState(String groupId, boolean collapsed, int x, int y) {
-        Optional<ConfigGroup> group = get(groupId);
-        group.ifPresent(value -> value.setWindowState(collapsed, x, y));
-        return group.isPresent();
+        ConfigGroup group = GROUPS_BY_ID.get(groupId);
+        if (group == null) {
+            return false;
+        }
+        if (group.collapsed() != collapsed || group.x() != x || group.y() != y) {
+            group.setWindowState(collapsed, x, y);
+        }
+        return true;
     }
 
     public static void clear() {
+        if (GROUPS.isEmpty()) {
+            return;
+        }
         GROUPS.clear();
+        GROUPS_BY_ID.clear();
+        revision++;
+        contentRevision++;
     }
 
     public static JsonArray toJson() {
@@ -145,7 +231,7 @@ public final class ConfigGroupStore {
     }
 
     public static void fromJson(JsonArray groups) {
-        GROUPS.clear();
+        clear();
         if (groups == null) {
             return;
         }
@@ -164,11 +250,14 @@ public final class ConfigGroupStore {
             }
 
             boolean defaultGroup = DEFAULT_GROUP_ID.equals(id);
-            ConfigGroup group = new ConfigGroup(id, defaultGroup ? DEFAULT_GROUP_NAME : name, defaultGroup);
+            ConfigGroup group = new ConfigGroup(id, defaultGroup ? DEFAULT_GROUP_NAME : name.trim(), defaultGroup);
             group.setHidden(booleanValue(object, "hidden", false));
             group.setWindowState(booleanValue(object, "collapsed", false), intValue(object, "x", 0),
                     intValue(object, "y", 0));
             GROUPS.add(group);
+            GROUPS_BY_ID.put(group.id(), group);
+            revision++;
+            contentRevision++;
 
             JsonElement items = object.get("items");
             if (items != null && items.isJsonArray()) {

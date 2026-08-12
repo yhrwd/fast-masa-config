@@ -8,6 +8,7 @@ package fastui.yure.client.gui;
 
 import fastui.yure.FastMasaConfig;
 import fastui.yure.client.index.ConfigIndexEntry;
+import fastui.yure.client.index.ConfigIndexService;
 import fastui.yure.client.shortcut.ResolvedShortcut;
 import fastui.yure.client.shortcut.ShortcutControl;
 import fastui.yure.client.shortcut.ShortcutResolver;
@@ -26,6 +27,7 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.ToIntFunction;
 
 /** 分组浮动窗口。布局、绘制和命中测试共用同一份行模型。 */
@@ -60,6 +62,7 @@ public final class FloatingGroupPanel {
      * 值显示被 fitText() 截断时应增大此值，而不是继续压缩滑条。
      */
     private static final int RESET_WIDTH = 12;
+    private static final int[] EMPTY_ROW_HEIGHTS = new int[0];
     /**
      * 跑马灯速度，单位 px/s。当前 30 约为每 33ms 前进 1px；调小更慢，调大更快。
      * GuiContext 文本坐标是整数像素，因此实际位置变化频率约等于该数值，不能独立强制提高帧率。
@@ -71,6 +74,16 @@ public final class FloatingGroupPanel {
     private GroupWindowLayout layout;
     private List<RowModel> rows = List.of();
     private List<GroupWindowHitTest.ItemControls> controls = List.of();
+    private int[] rowHeights = new int[0];
+    private int contentWidth;
+    private long resolvedContentRevision = -1;
+    private Map<ConfigIndexService.Target, ConfigIndexEntry> resolvedIndex = Map.of();
+    private int layoutScreenWidth = -1;
+    private int layoutScreenHeight = -1;
+    private int layoutRequestedX;
+    private int layoutRequestedY;
+    private int layoutContentWidth = -1;
+    private boolean layoutCollapsed;
     private int scrollOffset;
     private int editingItemIndex = -1;
     private String editingValue = "";
@@ -155,26 +168,14 @@ public final class FloatingGroupPanel {
     }
 
     public void render(GuiContext context, int screenWidth, int screenHeight, int mouseX, int mouseY,
-            List<ConfigIndexEntry> index) {
+            Map<ConfigIndexService.Target, ConfigIndexEntry> indexByTarget) {
         ConfigGroup group = ConfigGroupStore.get(this.groupId).orElse(null);
         if (group == null) {
             this.layout = null;
             return;
         }
-        // 先建行模型、测内容宽度、再算窗口坐标，最后才生成命中矩形。
-        // 这个顺序不能颠倒：命中区必须使用与渲染相同的最终 row 坐标。
-        // 收起只隐藏内容，不改变参与测宽的行，保证窗口前后宽度一致。
-        this.rows = buildRows(group, index);
-        if (group.collapsed()) {
-            this.controls = List.of();
-            this.layout = GroupWindowLayout.calculate(screenWidth, screenHeight, group.x(), group.y(), true,
-                    new int[0], measureContentWidth(group.name()));
-        } else {
-            int[] rowHeights = this.rows.stream().mapToInt(RowModel::height).toArray();
-            this.layout = GroupWindowLayout.calculate(screenWidth, screenHeight, group.x(), group.y(), false,
-                    rowHeights, measureContentWidth(group.name()));
-            this.controls = buildControls();
-        }
+        this.refreshRows(group, indexByTarget);
+        this.refreshLayout(group, screenWidth, screenHeight);
         this.scrollOffset = this.layout.clampScrollOffset(this.scrollOffset);
 
         if (this.layout.width() <= 0 || this.layout.height() <= 0) {
@@ -311,7 +312,8 @@ public final class FloatingGroupPanel {
      * 将持久化的 GroupItem 解析为当前帧可绘制的行。
      * 系统行的 item 允许为 null，失效的外部配置则 shortcut 为 null；后续代码必须区分这两种情况。
      */
-    private List<RowModel> buildRows(ConfigGroup group, List<ConfigIndexEntry> index) {
+    private List<RowModel> buildRows(ConfigGroup group,
+            Map<ConfigIndexService.Target, ConfigIndexEntry> indexByTarget) {
         List<RowModel> result = new ArrayList<>();
         if (hasSystemConfigEntry(group.id())) {
             result.add(new RowModel(null, null, true, ROW_HEIGHT));
@@ -321,7 +323,7 @@ public final class FloatingGroupPanel {
         for (GroupItem item : group.items()) {
             ShortcutEntry shortcut = new ShortcutEntry(item.modId(), item.groupId(), item.configName(), "",
                     ShortcutControlType.SLIDER, 1.0, null, null);
-            ResolvedShortcut resolved = ShortcutResolver.find(index, shortcut)
+            ResolvedShortcut resolved = ShortcutResolver.find(indexByTarget, shortcut)
                     .map(entry -> new ResolvedShortcut(shortcut, entry)).orElse(null);
             boolean numeric = resolved != null && ShortcutControl.isNumeric(resolved.configEntry().config());
             result.add(new RowModel(item, resolved, false, numeric && item.expanded() ? EXPANDED_HEIGHT : ROW_HEIGHT));
@@ -329,9 +331,44 @@ public final class FloatingGroupPanel {
         return List.copyOf(result);
     }
 
+    private void refreshRows(ConfigGroup group, Map<ConfigIndexService.Target, ConfigIndexEntry> indexByTarget) {
+        long contentRevision = ConfigGroupStore.contentRevision();
+        if (this.resolvedContentRevision == contentRevision && this.resolvedIndex == indexByTarget) {
+            return;
+        }
+
+        this.rows = buildRows(group, indexByTarget);
+        this.rowHeights = new int[this.rows.size()];
+        for (int index = 0; index < this.rows.size(); index++) {
+            this.rowHeights[index] = this.rows.get(index).height();
+        }
+        this.contentWidth = measureContentWidth(group.name());
+        this.resolvedContentRevision = contentRevision;
+        this.resolvedIndex = indexByTarget;
+        this.layout = null;
+    }
+
+    private void refreshLayout(ConfigGroup group, int screenWidth, int screenHeight) {
+        if (this.layout != null && this.layoutScreenWidth == screenWidth && this.layoutScreenHeight == screenHeight
+                && this.layoutRequestedX == group.x() && this.layoutRequestedY == group.y()
+                && this.layoutCollapsed == group.collapsed() && this.layoutContentWidth == this.contentWidth) {
+            return;
+        }
+
+        this.layout = GroupWindowLayout.calculate(screenWidth, screenHeight, group.x(), group.y(), group.collapsed(),
+                group.collapsed() ? EMPTY_ROW_HEIGHTS : this.rowHeights, this.contentWidth);
+        this.controls = group.collapsed() ? List.of() : buildControls();
+        this.layoutScreenWidth = screenWidth;
+        this.layoutScreenHeight = screenHeight;
+        this.layoutRequestedX = group.x();
+        this.layoutRequestedY = group.y();
+        this.layoutCollapsed = group.collapsed();
+        this.layoutContentWidth = this.contentWidth;
+    }
+
     private RowModel systemBooleanRow(IConfigBase config) {
-        ConfigIndexEntry entry = new ConfigIndexEntry(FastMasaConfig.MOD_ID, "Fast Masa Config",
-                "generic", "Fast Masa Config", config.getName(), config.getConfigGuiDisplayName(), config);
+        ConfigIndexEntry entry = new ConfigIndexEntry(FastMasaConfig.MOD_ID, FastMasaConfig.MOD_NAME,
+                "generic", FastMasaConfig.MOD_NAME, config.getName(), config.getConfigGuiDisplayName(), config);
         ShortcutEntry shortcut = new ShortcutEntry(FastMasaConfig.MOD_ID, "generic", config.getName(), "",
                 ShortcutControlType.TOGGLE, 1.0, null, null);
         return new RowModel(null, new ResolvedShortcut(shortcut, entry), true, ROW_HEIGHT);
@@ -621,4 +658,5 @@ public final class FloatingGroupPanel {
             return this.shortcut != null && ShortcutControl.isNumeric(this.shortcut.configEntry().config());
         }
     }
+
 }

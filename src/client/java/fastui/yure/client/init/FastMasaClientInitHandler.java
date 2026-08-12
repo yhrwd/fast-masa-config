@@ -10,14 +10,12 @@ import fastui.yure.config.FastMasaConfigHandler;
 import fi.dy.masa.malilib.config.ConfigManager;
 import fi.dy.masa.malilib.event.InputEventHandler;
 import fi.dy.masa.malilib.interfaces.IInitializationHandler;
-import fi.dy.masa.malilib.registry.Registry;
-import fi.dy.masa.malilib.util.data.ModInfo;
 
 public final class FastMasaClientInitHandler implements IInitializationHandler {
     @Override
     public void registerModHandlers() {
         ConfigManager.getInstance().registerConfigHandler(FastMasaConfig.MOD_ID, new FastMasaConfigHandler());
-        Registry.CONFIG_SCREEN.registerConfigScreenFactory(new ModInfo(FastMasaConfig.MOD_ID, "Fast Masa Config", FastMasaConfigGui::new));
+        FastMasaConfigGui.registerConfigScreen();
         InputEventHandler.getKeybindManager().registerKeybindProvider(FastMasaInputHandler.getInstance());
         FastMasaInputHandler.getInstance().initCallbacks();
         ClientTickEvents.END_CLIENT_TICK.register(client -> FastMasaInputHandler.getInstance().tick());

@@ -9,6 +9,7 @@ import fi.dy.masa.malilib.hotkeys.IKeybindManager;
 import fi.dy.masa.malilib.hotkeys.IKeybindProvider;
 import fi.dy.masa.malilib.hotkeys.KeyAction;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 
 import java.util.List;
 import java.util.Set;
@@ -79,9 +80,10 @@ public final class FastMasaInputHandler implements IKeybindProvider {
             return false;
         }
 
-        private static Object getCurrentScreen(Minecraft client) {
+        private static Screen getCurrentScreen(Minecraft client) {
             try {
-                return Minecraft.class.getMethod("screen").invoke(client);
+                Object screen = Minecraft.class.getMethod("screen").invoke(client);
+                return screen instanceof Screen value ? value : null;
             } catch (ReflectiveOperationException ignored) {
                 return null;
             }

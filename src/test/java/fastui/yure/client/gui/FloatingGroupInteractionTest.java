@@ -43,4 +43,16 @@ class FloatingGroupInteractionTest {
         assertFalse(QuickConfigScreen.isValidToggleItemIndex(-1, 0));
         assertTrue(QuickConfigScreen.isValidToggleItemIndex(0, 2));
     }
+
+    @Test
+    void commitsNumericInputBeforeAnyMessageWindowInteraction() {
+        assertTrue(QuickConfigScreen.shouldCommitNumericInputBeforeWindowInteraction(true,
+                GroupWindowHitTest.Target.ROW));
+        assertTrue(QuickConfigScreen.shouldCommitNumericInputBeforeWindowInteraction(true,
+                GroupWindowHitTest.Target.HEADER));
+        assertFalse(QuickConfigScreen.shouldCommitNumericInputBeforeWindowInteraction(true,
+                GroupWindowHitTest.Target.NONE));
+        assertFalse(QuickConfigScreen.shouldCommitNumericInputBeforeWindowInteraction(false,
+                GroupWindowHitTest.Target.ROW));
+    }
 }

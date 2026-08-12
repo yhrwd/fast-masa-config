@@ -1,11 +1,13 @@
 package fastui.yure.client.gui;
 
 import fastui.yure.config.GroupItem;
-import fastui.yure.client.index.ConfigIndexEntry;
+import fastui.yure.config.QuickMessageStore;
+import fastui.yure.client.index.ConfigIndexService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -89,28 +91,27 @@ class QuickConfigGroupGeometryTest {
     }
 
     @Test
-    void groupMembershipUsesTheCanonicalThreePartTarget() {
-        List<GroupItem> items = List.of(new GroupItem("tweakeroo", "Generic", "fastBlockPlacement", false));
+    void indexesGroupItemsByTheirCanonicalTargetWithoutChangingFirstItemOrder() {
+        GroupItem first = new GroupItem("tweakeroo", "Generic", "fastBlockPlacement", false);
+        GroupItem duplicate = new GroupItem("tweakeroo", "Generic", "fastBlockPlacement", true);
+        Map<ConfigIndexService.Target, Integer> order = FastMasaConfigGui.buildGroupItemOrder(List.of(first, duplicate));
 
-        assertTrue(FastMasaConfigGui.isTargetInGroup(items, "tweakeroo", "Generic", "fastBlockPlacement"));
-        assertFalse(FastMasaConfigGui.isTargetInGroup(items, "tweakeroo", "Hotkeys", "fastBlockPlacement"));
+        assertEquals(0, order.get(new ConfigIndexService.Target("tweakeroo", "Generic", "fastBlockPlacement")));
     }
 
     @Test
-    void usesPersistedGroupItemOrderForTheGroupEditorList() {
-        List<GroupItem> items = List.of(
-                new GroupItem("tweakeroo", "Generic", "fastBlockPlacement", false),
-                new GroupItem("minihud", "Renderer", "overlayLightLevel", false));
-        ConfigIndexEntry first = new ConfigIndexEntry("tweakeroo", "Tweakeroo", "Generic", "Generic",
-                "fastBlockPlacement", "Fast Block Placement", null);
-        ConfigIndexEntry second = new ConfigIndexEntry("minihud", "MiniHUD", "Renderer", "Renderer",
-                "overlayLightLevel", "Overlay Light Level", null);
-        ConfigIndexEntry missing = new ConfigIndexEntry("minihud", "MiniHUD", "Renderer", "Renderer",
-                "infoLines", "Info Lines", null);
+    void pageModelsKeepSearchMatchingCaseInsensitive() {
+        QuickMessageStore.clear();
+        try {
+            var group = QuickMessageStore.createGroup("常用");
+            QuickMessageStore.addMessage(group.id(), "回城", "/home");
+            QuickMessageStore.addMessage(group.id(), "", "Hello world");
 
-        assertEquals(0, FastMasaConfigGui.groupItemOrder(items, first));
-        assertEquals(1, FastMasaConfigGui.groupItemOrder(items, second));
-        assertEquals(Integer.MAX_VALUE, FastMasaConfigGui.groupItemOrder(items, missing));
+            assertEquals(1, QuickMessagesPage.filter(group, "HOME").size());
+            assertEquals("Hello world", QuickMessagesPage.filter(group, "hello").getFirst().content());
+        } finally {
+            QuickMessageStore.clear();
+        }
     }
 
     @Test
@@ -123,6 +124,17 @@ class QuickConfigGroupGeometryTest {
         FastMasaConfigGui.GroupActionLayout layout = FastMasaConfigGui.GroupActionLayout.calculate(260);
 
         assertTrue(layout.rightEdge() <= 260 - 12);
+    }
+
+    @Test
+    void fullScreenListHitTestingUsesTheSameRowBoundsAsRendering() {
+        assertEquals(2, FullConfigListLayout.visibleRows(180, 80));
+        assertTrue(FullConfigListLayout.containsListPoint(12, 80, 300, 180, 80));
+        assertFalse(FullConfigListLayout.containsListPoint(11, 80, 300, 180, 80));
+        assertFalse(FullConfigListLayout.containsListPoint(20, 162, 300, 180, 80));
+        assertEquals(1, FullConfigListLayout.rowIndexAt(20, 114, 300, 180, 80, 0, 3));
+        assertEquals(-1, FullConfigListLayout.rowIndexAt(20, 110, 300, 180, 80, 0, 3));
+        assertEquals(-1, FullConfigListLayout.rowIndexAt(20, 147, 300, 180, 80, 0, 3));
     }
 
     @Test
