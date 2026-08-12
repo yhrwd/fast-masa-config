@@ -96,7 +96,7 @@ public final class FastMasaConfigs {
                 public static final ConfigBoolean ENTITY_RENDER_FILTER = new ConfigBoolean("entityRenderFilter", false,
                                 "Enable entity rendering filtering.", "Entity Render Filter").apply(TOOLS_KEY);
                 public static final ConfigBoolean ENTITY_RENDER_WHITELIST = new ConfigBoolean("entityRenderWhitelist", false,
-                                "When enabled, only entities in the list are rendered. Otherwise list entries are hidden.",
+                                "When enabled, listed entities are hidden. Otherwise only listed entities are rendered.",
                                 "Use Whitelist").apply(TOOLS_KEY);
                 public static final ConfigStringList ENTITY_RENDER_ENTITIES = new ConfigStringList("entityRenderEntities",
                                 ImmutableList.of(), "Choose entity types from the entity selector.",

@@ -100,7 +100,7 @@
   ,"fast-masa-config.config.tools.comment.entityRenderFilter": "Enable entity rendering filtering."
   ,"fast-masa-config.config.tools.prettyName.entityRenderFilter": "Entity Render Filter"
   ,"fast-masa-config.config.tools.name.entityRenderWhitelist": "Use Whitelist"
-  ,"fast-masa-config.config.tools.comment.entityRenderWhitelist": "Only render the listed entity IDs. When disabled, listed IDs are hidden."
+  ,"fast-masa-config.config.tools.comment.entityRenderWhitelist": "When enabled, listed entity IDs are hidden. When disabled, only listed IDs are rendered."
   ,"fast-masa-config.config.tools.prettyName.entityRenderWhitelist": "Use Whitelist"
   ,"fast-masa-config.config.tools.name.entityRenderEntities": "Entity IDs"
   ,"fast-masa-config.config.tools.comment.entityRenderEntities": "Open the selector to choose entity types for the render filter."

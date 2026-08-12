@@ -47,7 +47,8 @@ public final class EntityRenderFilter {
                 return true;
             }
             boolean matched = this.ids.contains(normalize(entityId));
-            return this.whitelist ? matched : !matched;
+            // 当前开关语义：启用“白名单”时排除列表实体；关闭时仅保留列表实体。
+            return this.whitelist ? !matched : matched;
         }
     }
 }
