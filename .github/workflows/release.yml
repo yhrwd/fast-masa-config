@@ -77,7 +77,8 @@ jobs:
             '{project_id: $project_id, version_number: $version_number,
               version_title: $version_title, changelog: $changelog,
               version_type: "release", loaders: ["fabric"],
-              game_versions: ["26.2"], dependencies: [], file_parts: [$jar_name]}')"
+              game_versions: ["26.2"], dependencies: [], featured: false,
+              file_parts: [$jar_name]}')"
           curl --fail-with-body --request PATCH \
             --header "Authorization: ${MODRINTH_TOKEN}" \
             --header 'Content-Type: application/json' \
