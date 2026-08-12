@@ -15,7 +15,7 @@ import java.util.List;
 
 public final class FastMasaConfigHandler implements IConfigHandler {
     private static final String CONFIG_FILE_NAME = FastMasaConfig.MOD_ID + ".json";
-    private static final int CONFIG_VERSION = 3;
+    private static final int CONFIG_VERSION = 4;
 
     @Override
     public void load() {
@@ -30,7 +30,8 @@ public final class FastMasaConfigHandler implements IConfigHandler {
 
             if (element != null && element.isJsonObject()) {
                 JsonObject root = element.getAsJsonObject();
-                ConfigUtils.readConfigBase(root, "Generic", FastMasaConfigs.Generic.OPTIONS);
+                ConfigUtils.readConfigBase(root, "Generic", FastMasaConfigs.Generic.PERSISTED_OPTIONS);
+                ConfigUtils.readConfigBase(root, "Tools", FastMasaConfigs.Tools.OPTIONS);
 
                 loadShortcuts(root);
                 loadGroups(root, ShortcutConfigStore.getEntries());
@@ -79,6 +80,7 @@ public final class FastMasaConfigHandler implements IConfigHandler {
         if (Files.isDirectory(dir)) {
             JsonObject root = new JsonObject();
             ConfigUtils.writeConfigBase(root, "Generic", FastMasaConfigs.Generic.OPTIONS);
+            ConfigUtils.writeConfigBase(root, "Tools", FastMasaConfigs.Tools.OPTIONS);
             root.add("Shortcuts", ShortcutConfigStore.toJson());
             root.add("Groups", ConfigGroupStore.toJson());
             root.add("QuickMessageGroups", QuickMessageStore.toJson());

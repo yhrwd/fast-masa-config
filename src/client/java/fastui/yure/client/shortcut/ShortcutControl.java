@@ -1,7 +1,9 @@
 package fastui.yure.client.shortcut;
 
+import fastui.yure.FastMasaConfig;
 import fastui.yure.config.MasaConfigEditor;
 import fastui.yure.config.ShortcutControlType;
+import fi.dy.masa.malilib.config.ConfigManager;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.IConfigBoolean;
 import fi.dy.masa.malilib.config.IConfigDouble;
@@ -44,7 +46,8 @@ public final class ShortcutControl {
 
         if (config instanceof IConfigBoolean booleanConfig) {
             // Keep the same runtime semantics as MaLiLib's native toggle hotkeys.
-            EDITOR.apply(config, Boolean.toString(booleanConfig.getBooleanValue() == false));
+            persistOwnConfigIfChanged(shortcut,
+                    EDITOR.apply(config, Boolean.toString(booleanConfig.getBooleanValue() == false)).success());
         }
     }
 
@@ -60,7 +63,7 @@ public final class ShortcutControl {
         double steppedValue = Math.round(rawValue / step) * step;
 
         // Avoid ConfigManager.onConfigsChanged(): its default handler saves and reloads the target mod's config.
-        EDITOR.apply(config, formatValue(config, range.clamp(steppedValue)));
+        persistOwnConfigIfChanged(shortcut, EDITOR.apply(config, formatValue(config, range.clamp(steppedValue))).success());
     }
 
     public static boolean setTypedValue(ResolvedShortcut shortcut, String rawValue) {
@@ -89,11 +92,15 @@ public final class ShortcutControl {
         } else {
             normalized = Double.toString(value);
         }
-        return EDITOR.apply(config, normalized).success();
+        boolean changed = EDITOR.apply(config, normalized).success();
+        persistOwnConfigIfChanged(shortcut, changed);
+        return changed;
     }
 
     public static boolean reset(ResolvedShortcut shortcut) {
-        return EDITOR.reset(shortcut.configEntry().config()).success();
+        boolean changed = EDITOR.reset(shortcut.configEntry().config()).success();
+        persistOwnConfigIfChanged(shortcut, changed);
+        return changed;
     }
 
     private static double getValue(IConfigBase config) {
@@ -145,6 +152,12 @@ public final class ShortcutControl {
 
     private static String formatValue(IConfigBase config, double value) {
         return config instanceof IConfigInteger ? Integer.toString((int) Math.round(value)) : Double.toString(value);
+    }
+
+    private static void persistOwnConfigIfChanged(ResolvedShortcut shortcut, boolean changed) {
+        if (changed && FastMasaConfig.MOD_ID.equals(shortcut.configEntry().modId())) {
+            ConfigManager.getInstance().onConfigsChanged(FastMasaConfig.MOD_ID);
+        }
     }
 
     private record NumericRange(double min, double max) {
