@@ -47,7 +47,12 @@ jobs:
           if [ ! -s release-notes.md ]; then
             printf 'Automated release for %s\n' "${GITHUB_REF_NAME}" > release-notes.md
           fi
-          if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release edit "${GITHUB_REF_NAME}" \
+              --title "Fast Masa Config UI ${GITHUB_REF_NAME}" \
+              --notes-file release-notes.md
+            gh release upload "${GITHUB_REF_NAME}" release/*.jar --clobber
+          else
             gh release create "${GITHUB_REF_NAME}" release/*.jar \
               --title "Fast Masa Config UI ${GITHUB_REF_NAME}" \
               --notes-file release-notes.md
