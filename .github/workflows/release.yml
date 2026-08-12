@@ -47,9 +47,11 @@ jobs:
           if [ ! -s release-notes.md ]; then
             printf 'Automated release for %s\n' "${GITHUB_REF_NAME}" > release-notes.md
           fi
-          gh release create "${GITHUB_REF_NAME}" release/*.jar \
-            --title "Fast Masa Config UI ${GITHUB_REF_NAME}" \
-            --notes-file release-notes.md
+          if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release create "${GITHUB_REF_NAME}" release/*.jar \
+              --title "Fast Masa Config UI ${GITHUB_REF_NAME}" \
+              --notes-file release-notes.md
+          fi
 
       - name: publish to modrinth
         env:
@@ -70,7 +72,7 @@ jobs:
             '{project_id: $project_id, version_number: $version_number,
               version_title: $version_title, changelog: $changelog,
               version_type: "release", loaders: ["fabric"],
-              game_versions: ["26.2"], file_parts: [$jar_name]}')"
+              game_versions: ["26.2"], dependencies: [], file_parts: [$jar_name]}')"
           curl --fail-with-body --request PATCH \
             --header "Authorization: ${MODRINTH_TOKEN}" \
             --header 'Content-Type: application/json' \
