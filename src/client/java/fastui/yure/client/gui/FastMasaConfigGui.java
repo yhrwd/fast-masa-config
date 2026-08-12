@@ -844,10 +844,11 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private void drawSmallButton(GuiContext context, int x, int y, int width, String text, int color,
             boolean hovered) {
         RenderUtils.drawRect(context, x, y, width, BUTTON_HEIGHT, hovered ? lighten(color) : color);
-        RenderUtils.drawRect(context, x, y, width, 1, COLOR_BORDER);
-        RenderUtils.drawRect(context, x, y + BUTTON_HEIGHT - 1, width, 1, COLOR_BORDER);
-        RenderUtils.drawRect(context, x, y, 1, BUTTON_HEIGHT, COLOR_BORDER);
-        RenderUtils.drawRect(context, x + width - 1, y, 1, BUTTON_HEIGHT, COLOR_BORDER);
+        int border = hovered ? FullConfigPalette.BORDER_HOVER : COLOR_BORDER;
+        RenderUtils.drawRect(context, x, y, width, 1, border);
+        RenderUtils.drawRect(context, x, y + BUTTON_HEIGHT - 1, width, 1, border);
+        RenderUtils.drawRect(context, x, y, 1, BUTTON_HEIGHT, border);
+        RenderUtils.drawRect(context, x + width - 1, y, 1, BUTTON_HEIGHT, border);
         int textX = x + (width - this.getStringWidth(text)) / 2;
         int textColor = color == COLOR_ACCENT || color == FullConfigPalette.ACTION_ADD
                 || color == FullConfigPalette.ACTION_REMOVE ? 0xFFFFFFFF : COLOR_TEXT;
@@ -1573,7 +1574,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     }
 
     private int getQuickMessageActionY() {
-        return this.getQuickMessageVariablesY() + this.font.lineHeight * 4 + 8;
+        int lineCount = StringUtils.translate("fast-masa-config.gui.quick_messages.variables").split("\\n", -1).length;
+        return this.getQuickMessageVariablesY() + lineCount * (this.font.lineHeight + 2) + 14;
     }
 
     private int getRowIndexAt(int mouseX, int mouseY, int rowCount) {

@@ -152,13 +152,16 @@ final class EntityRenderSelectionScreen extends GuiBase {
                     : StringUtils.translate("fast-masa-config.gui.tools.entities.add");
             int buttonWidth = 58;
             int buttonX = this.width - MARGIN - buttonWidth - 6;
+            boolean buttonHovered = GuiHitTest.isInside(mouseX, mouseY, buttonX, y + 5, buttonWidth, BUTTON_HEIGHT);
+            int buttonColor = active ? FullConfigPalette.ACTION_REMOVE : FullConfigPalette.ACTION_ADD;
             RenderUtils.drawRect(context, buttonX, y + 5, buttonWidth, BUTTON_HEIGHT,
-                    active ? FullConfigPalette.ACTION_REMOVE : FullConfigPalette.ACTION_ADD);
-            RenderUtils.drawRect(context, buttonX, y + 5, buttonWidth, 1, FullConfigPalette.BORDER);
-            RenderUtils.drawRect(context, buttonX, y + BUTTON_HEIGHT + 4, buttonWidth, 1, FullConfigPalette.BORDER);
-            RenderUtils.drawRect(context, buttonX, y + 5, 1, BUTTON_HEIGHT, FullConfigPalette.BORDER);
+                    buttonHovered ? lighten(buttonColor) : buttonColor);
+            int buttonBorder = buttonHovered ? FullConfigPalette.BORDER_HOVER : FullConfigPalette.BORDER;
+            RenderUtils.drawRect(context, buttonX, y + 5, buttonWidth, 1, buttonBorder);
+            RenderUtils.drawRect(context, buttonX, y + BUTTON_HEIGHT + 4, buttonWidth, 1, buttonBorder);
+            RenderUtils.drawRect(context, buttonX, y + 5, 1, BUTTON_HEIGHT, buttonBorder);
             RenderUtils.drawRect(context, buttonX + buttonWidth - 1, y + 5, 1, BUTTON_HEIGHT,
-                    FullConfigPalette.BORDER);
+                    buttonBorder);
             this.drawString(context, toggle, buttonX + (buttonWidth - this.getStringWidth(toggle)) / 2, y + 11,
                     0xFFFFFFFF);
         }
@@ -190,6 +193,13 @@ final class EntityRenderSelectionScreen extends GuiBase {
 
     private String fit(String text, int maxWidth) {
         return FloatingGroupPanel.fitText(text, maxWidth, this::getStringWidth);
+    }
+
+    private static int lighten(int color) {
+        int red = Math.min(255, ((color >> 16) & 0xFF) + 24);
+        int green = Math.min(255, ((color >> 8) & 0xFF) + 24);
+        int blue = Math.min(255, (color & 0xFF) + 24);
+        return (color & 0xFF000000) | red << 16 | green << 8 | blue;
     }
 
     private static int clamp(int value, int min, int max) {

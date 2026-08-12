@@ -16,6 +16,9 @@ public final class EntityRenderFilter {
 
     public static Set<String> normalizedIds(List<String> ids) {
         Set<String> result = new HashSet<>();
+        if (ids == null) {
+            return result;
+        }
         for (String id : ids) {
             String normalized = normalize(id);
             if (normalized.contains(":")) {

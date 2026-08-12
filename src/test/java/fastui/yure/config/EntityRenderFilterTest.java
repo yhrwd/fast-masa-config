@@ -37,4 +37,14 @@ class EntityRenderFilterTest {
         assertTrue(state.shouldRender("minecraft:item"));
         assertTrue(state.shouldRender("minecraft:player"));
     }
+
+    @Test
+    void disabledFilterNeverTurnsBlacklistIntoAnImplicitWhitelist() {
+        EntityRenderFilter.State state = EntityRenderFilter.State.from(false, false,
+                List.of("minecraft:item", "minecraft:zombie"));
+
+        assertTrue(state.shouldRender("minecraft:item"));
+        assertTrue(state.shouldRender("minecraft:zombie"));
+        assertTrue(state.shouldRender("minecraft:cow"));
+    }
 }
