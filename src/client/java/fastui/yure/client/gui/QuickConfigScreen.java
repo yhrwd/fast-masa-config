@@ -14,7 +14,7 @@ import fastui.yure.config.QuickMessageStore;
 import fastui.yure.config.ShortcutControlType;
 import fi.dy.masa.malilib.config.ConfigManager;
 import fi.dy.masa.malilib.hotkeys.KeybindMulti;
-import fi.dy.masa.malilib.util.KeyCodes;
+import fi.dy.masa.malilib.util.input.KeyCodes;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -288,7 +288,7 @@ public final class QuickConfigScreen extends Screen {
             return handleNumericInputKey(event);
         }
         int keyCode = event.key();
-        int scanCode = event.scancode();
+        int scanCode = event.keycode();
         Minecraft mc = Minecraft.getInstance();
         if (!FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() && isOpenHotkeyPressedAgain(keyCode)) {
             this.onClose();

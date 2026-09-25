@@ -277,7 +277,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
         // MaLiLib 的 GuiBase 会在文本框聚焦时消费按键。左 Shift 是常用的中英文切换键，
         // 非热键录制状态下放行，但仍保留 GuiBase.keyPressed() 的输入计数和事件链。
-        if (keyCode == fi.dy.masa.malilib.util.KeyCodes.KEY_LEFT_SHIFT && this.activeKeybindButton == null) {
+        if (keyCode == fi.dy.masa.malilib.util.input.KeyCodes.KEY_LEFT_SHIFT && this.activeKeybindButton == null) {
             this.ensureTextInputEnabled();
             return false;
         }
@@ -335,7 +335,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private void ensureTextInputEnabled() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.gui.screen() == this) {
-            minecraft.textInputManager().startTextInput();
+            minecraft.textInputManager().startTextInput(this);
         }
     }
 

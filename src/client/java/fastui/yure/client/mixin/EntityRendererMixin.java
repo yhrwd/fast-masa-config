@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 abstract class EntityRendererMixin<T extends Entity> {
     @Inject(method = "shouldRender", at = @At("RETURN"), cancellable = true)
     private void fastui$applyEntityRenderFilter(T entity, Frustum frustum, double x, double y, double z,
-            CallbackInfoReturnable<Boolean> cir) {
+            float partialTick, CallbackInfoReturnable<Boolean> cir) {
         // 只收紧原版已经判定为可渲染的实体；关闭过滤时完全保留原版结果。
         if (!Boolean.TRUE.equals(cir.getReturnValue())) {
             return;
