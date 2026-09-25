@@ -93,10 +93,7 @@
   "fast-masa-config.config.generic.name.closeOnInventoryKey": "Close On Inventory Key",
   "fast-masa-config.config.generic.comment.closeOnInventoryKey": "Close the quick panel when the inventory key or Escape is pressed.",
   "fast-masa-config.config.generic.prettyName.closeOnInventoryKey": "Close On Inventory Key",
-  "fast-masa-config.config.shortcuts.name.shortcuts": "Shortcut IDs",
-  "fast-masa-config.config.shortcuts.comment.shortcuts": "One shortcut target per line. Use modId/groupId/configName or modId:configName.",
-  "fast-masa-config.config.shortcuts.prettyName.shortcuts": "Shortcut IDs"
-  ,"fast-masa-config.config.tools.name.entityRenderFilter": "Entity Render Filter"
+  "fast-masa-config.config.tools.name.entityRenderFilter": "Entity Render Filter"
   ,"fast-masa-config.config.tools.comment.entityRenderFilter": "Enable entity rendering filtering."
   ,"fast-masa-config.config.tools.prettyName.entityRenderFilter": "Entity Render Filter"
   ,"fast-masa-config.config.tools.name.entityRenderWhitelist": "Use Whitelist"

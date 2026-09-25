@@ -18,7 +18,8 @@ class ShortcutResolverTest {
                         "fastBlockPlacement", "Generic value", null),
                 new ConfigIndexEntry("tweakeroo", "Tweakeroo", "Hotkeys", "Hotkeys",
                         "fastBlockPlacement", "Hotkey value", null));
-        ShortcutEntry shortcut = ShortcutEntry.fromManualId("tweakeroo/Hotkeys/fastBlockPlacement");
+        ShortcutEntry shortcut = new ShortcutEntry("tweakeroo", "Hotkeys", "fastBlockPlacement", "",
+                null, Double.NaN, null, null);
 
         Map<ConfigIndexService.Target, ConfigIndexEntry> indexByTarget = Map.of(
                 new ConfigIndexService.Target("tweakeroo", "Generic", "fastBlockPlacement"), index.get(0),

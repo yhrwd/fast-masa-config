@@ -4,11 +4,8 @@
 
 - This is a single-module Fabric Loom project; use the Gradle wrapper (`gradlew`/`gradlew.bat`), not a system Gradle installation.
 - Java 25 is required by `build.gradle`, `fabric.mod.json`, and CI. The README's older Java 21 note is stale.
-- On Windows PowerShell, set the repository's required JDK before Gradle commands when Java 25 is not already active:
-  ```powershell
-  $env:JAVA_HOME="C:\Users\Yhrza\AppData\Local\Programs\Eclipse Adoptium\jdk-25.0.2.10-hotspot"
-  $env:JDK25_HOME="C:\Users\Yhrza\AppData\Local\Programs\Eclipse Adoptium\jdk-25.0.2.10-hotspot"
-  ```
+- No per-shell JDK environment variables are needed: the machine-scope Temurin install at `C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot` is auto-detected by Gradle toolchains (Windows Registry). The user-level `JAVA_HOME` intentionally stays on JDK 21 (`C:\Program Files\Microsoft\jdk-21.0.3.9-hotspot`) for other Java 21 projects; the Gradle daemon may run on 21 while the Java 25 toolchain compiles and runs.
+- If the Java 25 toolchain is ever not found, register it in the user-level `%USERPROFILE%\.gradle\gradle.properties` via `org.gradle.java.installations.paths=C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot`.
 - Loom configuration cache is intentionally disabled in `gradle.properties` because of the Fabric Loom/IntelliJ compatibility issue; do not enable it casually.
 
 ## Source Layout

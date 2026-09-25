@@ -93,10 +93,7 @@
   "fast-masa-config.config.generic.name.closeOnInventoryKey": "背包键关闭",
   "fast-masa-config.config.generic.comment.closeOnInventoryKey": "按背包键或 ESC 时关闭快捷面板。",
   "fast-masa-config.config.generic.prettyName.closeOnInventoryKey": "背包键关闭",
-  "fast-masa-config.config.shortcuts.name.shortcuts": "快捷方式 ID",
-  "fast-masa-config.config.shortcuts.comment.shortcuts": "每行一个快捷方式目标。格式为 modId/groupId/configName 或 modId:configName。",
-  "fast-masa-config.config.shortcuts.prettyName.shortcuts": "快捷方式 ID"
-  ,"fast-masa-config.config.tools.name.entityRenderFilter": "实体渲染过滤"
+  "fast-masa-config.config.tools.name.entityRenderFilter": "实体渲染过滤"
   ,"fast-masa-config.config.tools.comment.entityRenderFilter": "启用实体渲染过滤。"
   ,"fast-masa-config.config.tools.prettyName.entityRenderFilter": "实体渲染过滤"
   ,"fast-masa-config.config.tools.name.entityRenderWhitelist": "使用白名单"

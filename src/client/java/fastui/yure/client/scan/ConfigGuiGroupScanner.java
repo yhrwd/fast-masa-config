@@ -40,7 +40,7 @@ public final class ConfigGuiGroupScanner {
         List<GroupCandidate> candidates = new ArrayList<>();
 
         for (CandidateOwner owner : collectCandidateOwners(screen)) {
-            for (Field field : getAllFields(owner.value().getClass())) {
+            for (Field field : GuiReflectionAccess.getAllFields(owner.value().getClass())) {
                 addEnumCandidate(candidates, field, getFieldOwner(owner.value(), field), owner.priority(),
                         getFieldPath(owner, field));
             }
@@ -60,7 +60,7 @@ public final class ConfigGuiGroupScanner {
 
         for (Field field : screen.getClass().getDeclaredFields()) {
             if (isObjectContainerField(field)) {
-                readFieldValue(field, getFieldOwner(screen, field))
+                GuiReflectionAccess.readFieldValue(field, getFieldOwner(screen, field))
                         .ifPresent(value -> addCandidateOwner(owners, seenOwners, value, field.getName(), 1));
             }
         }
@@ -91,7 +91,8 @@ public final class ConfigGuiGroupScanner {
                     values.add(new SelectorValue(enumValue, enumValue));
                 }
 
-                candidates.add(new GroupCandidate(new FieldSelectorAccess(field, owner), path, priority, values));
+                candidates.add(new GroupCandidate(new GuiReflectionAccess.FieldSelectorAccess(field, owner), path,
+                        priority, values));
             }
         }
     }
@@ -179,14 +180,15 @@ public final class ConfigGuiGroupScanner {
         }
 
         String path = stateHolderClass.getName() + "." + getter.getName() + "()";
-        return Optional.of(new GroupCandidate(new MethodSelectorAccess(getter, setter), path, 3, values));
+        return Optional.of(new GroupCandidate(new GuiReflectionAccess.MethodSelectorAccess(getter, setter), path, 3,
+                values));
     }
 
     private static void addIndexedListCandidates(List<GroupCandidate> candidates, CandidateOwner owner) {
-        List<Field> indexFields = getAllFields(owner.value().getClass()).stream()
+        List<Field> indexFields = GuiReflectionAccess.getAllFields(owner.value().getClass()).stream()
                 .filter(ConfigGuiGroupScanner::isIndexField)
                 .toList();
-        List<Field> listFields = getAllFields(owner.value().getClass()).stream()
+        List<Field> listFields = GuiReflectionAccess.getAllFields(owner.value().getClass()).stream()
                 .filter(ConfigGuiGroupScanner::isGroupListField)
                 .toList();
 
@@ -194,7 +196,8 @@ public final class ConfigGuiGroupScanner {
             for (Field listField : listFields) {
                 readGroupValues(listField, getFieldOwner(owner.value(), listField))
                         .ifPresent(values -> candidates.add(new GroupCandidate(
-                                new FieldSelectorAccess(indexField, getFieldOwner(owner.value(), indexField)),
+                                new GuiReflectionAccess.FieldSelectorAccess(indexField,
+                                        getFieldOwner(owner.value(), indexField)),
                                 getFieldPath(owner, indexField) + ":" + getFieldPath(owner, listField),
                                 owner.priority() + 2,
                                 values)));
@@ -203,7 +206,7 @@ public final class ConfigGuiGroupScanner {
     }
 
     private static Optional<List<SelectorValue>> readGroupValues(Field listField, Object owner) {
-        Optional<Object> value = readFieldValue(listField, owner);
+        Optional<Object> value = GuiReflectionAccess.readFieldValue(listField, owner);
 
         if (value.isEmpty()) {
             return Optional.empty();
@@ -234,15 +237,6 @@ public final class ConfigGuiGroupScanner {
         }
 
         return Optional.of(values);
-    }
-
-    private static Optional<Object> readFieldValue(Field field, Object owner) {
-        try {
-            field.setAccessible(true);
-            return Optional.ofNullable(field.get(owner));
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
-            return Optional.empty();
-        }
     }
 
     private static boolean isObjectContainerField(Field field) {
@@ -442,7 +436,7 @@ public final class ConfigGuiGroupScanner {
         }
 
         try {
-            Method method = findNoArgMethod(target.getClass(), methodName);
+            Method method = GuiReflectionAccess.findNoArgMethod(target.getClass(), methodName);
 
             if (method == null) {
                 return Optional.empty();
@@ -461,32 +455,6 @@ public final class ConfigGuiGroupScanner {
         return Optional.empty();
     }
 
-    private static Method findNoArgMethod(Class<?> type, String methodName) {
-        Class<?> currentClass = type;
-
-        while (currentClass != null && currentClass != Object.class) {
-            try {
-                return currentClass.getDeclaredMethod(methodName);
-            } catch (NoSuchMethodException ignored) {
-                currentClass = currentClass.getSuperclass();
-            }
-        }
-
-        return null;
-    }
-
-    private static List<Field> getAllFields(Class<?> type) {
-        List<Field> fields = new ArrayList<>();
-        Class<?> currentClass = type;
-
-        while (currentClass != null && currentClass != Object.class) {
-            fields.addAll(List.of(currentClass.getDeclaredFields()));
-            currentClass = currentClass.getSuperclass();
-        }
-
-        return fields;
-    }
-
     public record Group(String id, String displayName, String sourceId,
             List<GuiConfigsBase.ConfigOptionWrapper> configs) {
     }
@@ -494,41 +462,8 @@ public final class ConfigGuiGroupScanner {
     private record CandidateOwner(Object value, String path, int priority) {
     }
 
-    private interface SelectorAccess {
-        Object get() throws ReflectiveOperationException;
-
-        void set(Object value) throws ReflectiveOperationException;
-    }
-
-    private record FieldSelectorAccess(Field field, Object owner) implements SelectorAccess {
-        @Override
-        public Object get() throws ReflectiveOperationException {
-            this.field.setAccessible(true);
-            return this.field.get(this.owner);
-        }
-
-        @Override
-        public void set(Object value) throws ReflectiveOperationException {
-            this.field.setAccessible(true);
-            this.field.set(this.owner, value);
-        }
-    }
-
-    private record MethodSelectorAccess(Method getter, Method setter) implements SelectorAccess {
-        @Override
-        public Object get() throws ReflectiveOperationException {
-            this.getter.setAccessible(true);
-            return this.getter.invoke(null);
-        }
-
-        @Override
-        public void set(Object value) throws ReflectiveOperationException {
-            this.setter.setAccessible(true);
-            this.setter.invoke(null, value);
-        }
-    }
-
-    private record GroupCandidate(SelectorAccess access, String path, int priority, List<SelectorValue> values) {
+    private record GroupCandidate(GuiReflectionAccess.SelectorAccess access, String path, int priority,
+            List<SelectorValue> values) {
     }
 
     private record SelectorValue(Object selectorValue, Object groupValue) {

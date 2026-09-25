@@ -167,15 +167,15 @@ class ConfigGroupStoreTest {
         assertFalse(ConfigGroupStore.remove(defaultGroup.id()));
 
         List<ShortcutEntry> shortcuts = List.of(
-                ShortcutEntry.fromManualId("tweakeroo/Generic/fastBlockPlacement"),
-                ShortcutEntry.fromManualId("tweakeroo/Hotkeys/fastBlockPlacement"));
+                shortcut("tweakeroo", "Generic", "fastBlockPlacement"),
+                shortcut("tweakeroo", "Hotkeys", "fastBlockPlacement"));
 
         ConfigGroupStore.migrateShortcutsIfEmpty(shortcuts);
 
         assertEquals(1, ConfigGroupStore.getGroups().size());
         assertEquals(2, defaultGroup.items().size());
 
-        ConfigGroupStore.migrateShortcutsIfEmpty(List.of(ShortcutEntry.fromManualId("minihud:fontScale")));
+        ConfigGroupStore.migrateShortcutsIfEmpty(List.of(shortcut("minihud", "", "fontScale")));
 
         assertEquals(1, ConfigGroupStore.getGroups().size());
         assertEquals(3, defaultGroup.items().size());
@@ -186,7 +186,7 @@ class ConfigGroupStoreTest {
         ConfigGroupStore.clear();
         JsonObject root = new JsonObject();
         root.addProperty("Groups", "invalid");
-        List<ShortcutEntry> shortcuts = List.of(ShortcutEntry.fromManualId("minihud:fontScale"));
+        List<ShortcutEntry> shortcuts = List.of(shortcut("minihud", "", "fontScale"));
 
         FastMasaConfigHandler.loadGroups(root, shortcuts);
 
@@ -200,7 +200,7 @@ class ConfigGroupStoreTest {
         JsonObject root = new JsonObject();
         root.add("Groups", JsonParser.parseString("[null,{\"id\":\"bad\"}]").getAsJsonArray());
 
-        FastMasaConfigHandler.loadGroups(root, List.of(ShortcutEntry.fromManualId("minihud:fontScale")));
+        FastMasaConfigHandler.loadGroups(root, List.of(shortcut("minihud", "", "fontScale")));
 
         assertEquals(1, ConfigGroupStore.getGroups().size());
         assertEquals(1, ConfigGroupStore.getGroups().getFirst().items().size());
@@ -212,7 +212,7 @@ class ConfigGroupStoreTest {
         JsonObject root = new JsonObject();
         root.add("Groups", JsonParser.parseString("[{\"id\":\"7bbd91b5-31eb-4a44-a181-7698c7d4cb8e\",\"name\":\"建筑\"}]").getAsJsonArray());
 
-        FastMasaConfigHandler.loadGroups(root, List.of(ShortcutEntry.fromManualId("minihud:fontScale")));
+        FastMasaConfigHandler.loadGroups(root, List.of(shortcut("minihud", "", "fontScale")));
 
         assertEquals(1, ConfigGroupStore.getGroups().size());
         assertTrue(ConfigGroupStore.getGroups().getFirst().items().isEmpty());
@@ -230,7 +230,7 @@ class ConfigGroupStoreTest {
     @Test
     void clearsStaleShortcutsBeforeLoadingMissingOrMalformedShortcutData() {
         ShortcutConfigStore.clear();
-        ShortcutConfigStore.add(ShortcutEntry.fromManualId("minihud:fontScale"));
+        ShortcutConfigStore.add(shortcut("minihud", "", "fontScale"));
         JsonObject root = new JsonObject();
         root.addProperty("Shortcuts", "invalid");
 
@@ -242,4 +242,7 @@ class ConfigGroupStoreTest {
         assertTrue(ConfigGroupStore.getGroups().getFirst().items().isEmpty());
     }
 
+    private static ShortcutEntry shortcut(String modId, String groupId, String configName) {
+        return new ShortcutEntry(modId, groupId, configName, "", ShortcutControlType.TOGGLE, 1.0, null, null);
+    }
 }

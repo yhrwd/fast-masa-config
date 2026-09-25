@@ -26,11 +26,6 @@ class FloatingGroupInteractionTest {
     }
 
     @Test
-    void recoveryOpensTheDefaultGroupOnAllConfigs() {
-        assertEquals("default", FastMasaConfigGui.recoveryTargetGroupId());
-    }
-
-    @Test
     void unresolvedRowsAreNotAvailableForMutation() {
         GroupItem staleItem = new GroupItem("missing-mod", "missing-group", "missing-config", false);
 

@@ -129,90 +129,100 @@ public final class QuickConfigScreen extends Screen {
         int y = (int) mouseY;
         for (QuickConfigPanel.FloatingWindow window : this.panel.floatingWindows().reversed()) {
             if (window instanceof QuickConfigPanel.MessageWindow messageWindow) {
-                FloatingMessagePanel floating = messageWindow.panel();
-                GroupWindowHitTest.Result hit = floating.hitTest(x, y);
-                if (hit.target() == GroupWindowHitTest.Target.NONE) {
-                    continue;
-                }
-                // 数值输入是单一焦点状态，切换到消息窗口前必须结束它，避免后续按键被旧输入框吞掉。
-                if (shouldCommitNumericInputBeforeWindowInteraction(true, hit.target())) {
-                    commitNumericInput();
-                }
-                this.panel.raiseFloatingMessageGroup(floating.groupId());
-                if (hit.target() == GroupWindowHitTest.Target.HEADER) {
-                    if (floating.isCollapseHit(x, y)) {
-                        floating.toggleCollapsed();
-                        persistRuntimeGroupState();
-                    } else {
-                        this.activeFloatingMessageGroupId = floating.groupId();
-                        this.floatingDragOffsetX = x - floating.x();
-                        this.floatingDragOffsetY = y - floating.y();
-                    }
+                if (this.handleMessageWindowClick(messageWindow.panel(), x, y)) {
                     return true;
                 }
-                if (hit.target() == GroupWindowHitTest.Target.ROW) {
-                    QuickMessageSender.send(floating.messageAt(hit.itemIndex()));
-                }
-                return true;
-            }
-
-            FloatingGroupPanel floating = ((QuickConfigPanel.ConfigWindow) window).panel();
-            GroupWindowHitTest.Result hit = floating.hitTest(x, y);
-            if (hit.target() == GroupWindowHitTest.Target.NONE) {
                 continue;
             }
-            this.panel.raiseFloatingGroup(floating.groupId());
-            ResolvedShortcut shortcut = floating.shortcutAt(hit.itemIndex());
-            if (hit.target() == GroupWindowHitTest.Target.VALUE && shortcut != null) {
-                beginNumericInput(floating, hit.itemIndex(), shortcut);
-                return true;
-            }
-            if (hit.target() == GroupWindowHitTest.Target.RESET && shortcut != null) {
-                commitNumericInput();
-                ShortcutControl.reset(shortcut);
-                return true;
-            }
-            commitNumericInput();
-            if (hit.target() == GroupWindowHitTest.Target.HEADER) {
-                if (floating.isCollapseHit(x, y)) {
-                    floating.toggleCollapsed();
-                    persistRuntimeGroupState();
-                } else {
-                    this.activeFloatingGroupId = floating.groupId();
-                    this.floatingDragOffsetX = x - floating.x();
-                    this.floatingDragOffsetY = y - floating.y();
-                }
-                return true;
-            }
 
-            if (shouldOpenSystemConfigRow(hit.target(), floating.isSystemConfigRow(hit.itemIndex()))) {
-                Minecraft.getInstance().setScreenAndShow(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes(), floating.groupId()));
+            if (this.handleConfigWindowClick(((QuickConfigPanel.ConfigWindow) window).panel(), x, y)) {
                 return true;
             }
-            if (shortcut == null) {
-                return true;
-            }
-            if (hit.target() == GroupWindowHitTest.Target.ROW
-                    && ShortcutControl.getControlType(shortcut.configEntry().config()) == ShortcutControlType.TOGGLE) {
-                ShortcutControl.toggle(shortcut);
-                return true;
-            }
-            if (hit.target() == GroupWindowHitTest.Target.ROW || hit.target() == GroupWindowHitTest.Target.EXPAND) {
-                if (ShortcutControl.isNumeric(shortcut.configEntry().config())) {
-                    toggleExpanded(floating.groupId(), floating.groupItemIndexAt(hit.itemIndex()));
-                }
-                return true;
-            }
-            if (hit.target() == GroupWindowHitTest.Target.SLIDER) {
-                this.activeFloatingSliderGroupId = floating.groupId();
-                this.activeFloatingSliderIndex = hit.itemIndex();
-                ShortcutControl.setSliderValue(shortcut, floating.sliderRatioAt(hit.itemIndex(), x));
-                return true;
-            }
-            return true;
         }
         commitNumericInput();
         return false;
+    }
+
+    private boolean handleMessageWindowClick(FloatingMessagePanel floating, int x, int y) {
+        GroupWindowHitTest.Result hit = floating.hitTest(x, y);
+        if (hit.target() == GroupWindowHitTest.Target.NONE) {
+            return false;
+        }
+
+        // 数值输入是单一焦点状态，切换到消息窗口前必须结束它，避免后续按键被旧输入框吞掉。
+        if (shouldCommitNumericInputBeforeWindowInteraction(true, hit.target())) {
+            commitNumericInput();
+        }
+        this.panel.raiseFloatingMessageGroup(floating.groupId());
+        if (hit.target() == GroupWindowHitTest.Target.HEADER) {
+            if (floating.isCollapseHit(x, y)) {
+                floating.toggleCollapsed();
+                persistRuntimeGroupState();
+            } else {
+                this.activeFloatingMessageGroupId = floating.groupId();
+                this.floatingDragOffsetX = x - floating.x();
+                this.floatingDragOffsetY = y - floating.y();
+            }
+        } else if (hit.target() == GroupWindowHitTest.Target.ROW) {
+            QuickMessageSender.send(floating.messageAt(hit.itemIndex()));
+        }
+        return true;
+    }
+
+    private boolean handleConfigWindowClick(FloatingGroupPanel floating, int x, int y) {
+        GroupWindowHitTest.Result hit = floating.hitTest(x, y);
+        if (hit.target() == GroupWindowHitTest.Target.NONE) {
+            return false;
+        }
+
+        this.panel.raiseFloatingGroup(floating.groupId());
+        ResolvedShortcut shortcut = floating.shortcutAt(hit.itemIndex());
+        if (hit.target() == GroupWindowHitTest.Target.VALUE && shortcut != null) {
+            beginNumericInput(floating, hit.itemIndex(), shortcut);
+            return true;
+        }
+        if (hit.target() == GroupWindowHitTest.Target.RESET && shortcut != null) {
+            commitNumericInput();
+            ShortcutControl.reset(shortcut);
+            return true;
+        }
+
+        commitNumericInput();
+        if (hit.target() == GroupWindowHitTest.Target.HEADER) {
+            if (floating.isCollapseHit(x, y)) {
+                floating.toggleCollapsed();
+                persistRuntimeGroupState();
+            } else {
+                this.activeFloatingGroupId = floating.groupId();
+                this.floatingDragOffsetX = x - floating.x();
+                this.floatingDragOffsetY = y - floating.y();
+            }
+            return true;
+        }
+        if (shouldOpenSystemConfigRow(hit.target(), floating.isSystemConfigRow(hit.itemIndex()))) {
+            Minecraft.getInstance().setScreenAndShow(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes(), floating.groupId()));
+            return true;
+        }
+        if (shortcut == null) {
+            return true;
+        }
+        if (hit.target() == GroupWindowHitTest.Target.ROW
+                && ShortcutControl.getControlType(shortcut.configEntry().config()) == ShortcutControlType.TOGGLE) {
+            ShortcutControl.toggle(shortcut);
+            return true;
+        }
+        if (hit.target() == GroupWindowHitTest.Target.ROW || hit.target() == GroupWindowHitTest.Target.EXPAND) {
+            if (ShortcutControl.isNumeric(shortcut.configEntry().config())) {
+                toggleExpanded(floating.groupId(), floating.groupItemIndexAt(hit.itemIndex()));
+            }
+            return true;
+        }
+        if (hit.target() == GroupWindowHitTest.Target.SLIDER) {
+            this.activeFloatingSliderGroupId = floating.groupId();
+            this.activeFloatingSliderIndex = hit.itemIndex();
+            ShortcutControl.setSliderValue(shortcut, floating.sliderRatioAt(hit.itemIndex(), x));
+        }
+        return true;
     }
 
     public boolean handleMouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {

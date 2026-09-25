@@ -159,10 +159,6 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         }
     }
 
-    static String recoveryTargetGroupId() {
-        return "default";
-    }
-
     @Override
     public void initGui() {
         super.initGui();
