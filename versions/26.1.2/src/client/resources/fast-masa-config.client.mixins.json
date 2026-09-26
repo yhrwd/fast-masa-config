@@ -5,6 +5,7 @@
   "client": [
     "ClientLevelRendererAccessor",
     "ClientPlayerInteractionManagerAccessor",
+    "EntityRendererMixin",
     "LevelRendererBlockBreakOverlayMixin",
     "ShaderManagerMixin"
   ],

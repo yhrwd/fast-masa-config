@@ -1,5 +1,6 @@
 package fastui.yure.client.gui;
 
+import fastui.yure.client.compat.TargetCompat;
 import fastui.yure.FastMasaConfig;
 import fastui.yure.client.index.ConfigIndexEntry;
 import fastui.yure.client.index.ConfigIndexService;
@@ -314,7 +315,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
         // MaLiLib 的 GuiBase 会在文本框聚焦时消费按键。左 Shift 是常用的中英文切换键，
         // 非热键录制状态下放行，但仍保留 GuiBase.keyPressed() 的输入计数和事件链。
-        if (keyCode == fi.dy.masa.malilib.util.input.KeyCodes.KEY_LEFT_SHIFT && this.activeKeybindButton == null) {
+        if (keyCode == TargetCompat.KEY_LEFT_SHIFT && this.activeKeybindButton == null) {
             this.ensureTextInputEnabled();
             return false;
         }
@@ -323,14 +324,14 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             // 数值编辑：直接把事件喂给输入框并重申焦点，绕过 malilib 的 wrapper 焦点链，
             // 避免第一次点击后焦点被其他事件的 setFocused(false) 清掉而需要点两下。
             this.numericValueField.setFocused(true);
-            if (keyCode == fi.dy.masa.malilib.util.input.KeyCodes.KEY_RETURN
-                    || keyCode == fi.dy.masa.malilib.util.input.KeyCodes.KEY_KP_ENTER
-                    || keyCode == fi.dy.masa.malilib.util.input.KeyCodes.KEY_RETURN2) {
+            if (keyCode == TargetCompat.KEY_RETURN
+                    || keyCode == TargetCompat.KEY_KP_ENTER
+                    || keyCode == TargetCompat.KEY_RETURN2) {
                 this.commitValueEditing();
                 this.ensureTextInputEnabled();
                 return true;
             }
-            if (keyCode == fi.dy.masa.malilib.util.input.KeyCodes.KEY_ESCAPE) {
+            if (keyCode == TargetCompat.KEY_ESCAPE) {
                 this.cancelValueEditing();
                 this.ensureTextInputEnabled();
                 return true;
@@ -346,7 +347,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             return true;
         }
 
-        if (keyCode == fi.dy.masa.malilib.util.input.KeyCodes.KEY_RETURN && this.tab == ConfigGuiTab.QUICK_MESSAGES
+        if (keyCode == TargetCompat.KEY_RETURN && this.tab == ConfigGuiTab.QUICK_MESSAGES
                 && this.quickMessageContentField != null && this.quickMessageContentField.isFocused()) {
             this.saveQuickMessage();
             this.ensureTextInputEnabled();
@@ -398,8 +399,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     private void ensureTextInputEnabled() {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.gui.screen() == this) {
-            minecraft.textInputManager().startTextInput(this);
+        if (TargetCompat.getCurrentScreen(minecraft) == this) {
+            TargetCompat.startTextInput(minecraft, this);
         }
     }
 
