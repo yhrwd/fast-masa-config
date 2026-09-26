@@ -1,360 +1,523 @@
 package fastui.yure.client.gui;
 
+import fastui.yure.FastMasaConfig;
+import fastui.yure.client.compat.TargetCompat;
 import fastui.yure.client.input.BoundKeyReader;
-import fastui.yure.client.index.ConfigIndexService;
+import fastui.yure.client.message.QuickMessageSender;
 import fastui.yure.client.shortcut.ResolvedShortcut;
 import fastui.yure.client.shortcut.ShortcutControl;
-import fastui.yure.client.shortcut.ShortcutResolver;
+import fastui.yure.config.ConfigGroup;
+import fastui.yure.config.ConfigGroupStore;
 import fastui.yure.config.FastMasaConfigs;
+import fastui.yure.config.GroupItem;
 import fastui.yure.config.MovementKeyPassthrough;
-import fastui.yure.config.ShortcutConfigStore;
+import fastui.yure.config.QuickMessageStore;
 import fastui.yure.config.ShortcutControlType;
-import fi.dy.masa.malilib.config.ConfigType;
-import fi.dy.masa.malilib.config.IConfigBoolean;
-import fi.dy.masa.malilib.util.KeyCodes;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.screen.ScreenTexts;
+import fi.dy.masa.malilib.config.ConfigManager;
 import fi.dy.masa.malilib.hotkeys.KeybindMulti;
+import fi.dy.masa.malilib.util.KeyCodes;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.screen.ScreenTexts;
 
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * 快捷配置面板 Screen。
- * 这个 Screen 不暂停游戏、不绘制背景，主要负责把键鼠事件转发给 QuickConfigPanel 和快捷项控制逻辑。
- */
+/** 按住热键时显示的非暂停浮动分组窗口。 */
 public final class QuickConfigScreen extends Screen {
     private final QuickConfigPanel panel;
     private final List<KeyBinding> movementKeys;
-    private List<QuickPanelItem> items = List.of();
-    private MovementKeyPassthrough movementKeyPassthrough = new MovementKeyPassthrough(java.util.Set.of());
-    private int activeSliderIndex = -1;
-    private int scrollOffset;
-    private QuickConfigPanel.PanelMode panelMode = QuickConfigPanel.PanelMode.SHORTCUTS;
+    private MovementKeyPassthrough movementKeyPassthrough = new MovementKeyPassthrough(Set.of());
+    private String activeFloatingGroupId;
+    private String activeFloatingMessageGroupId;
+    private int floatingDragOffsetX;
+    private int floatingDragOffsetY;
+    private String activeFloatingSliderGroupId;
+    private int activeFloatingSliderIndex = -1;
+    private String activeNumericInputGroupId;
+    private int activeNumericInputIndex = -1;
+    private String numericInputText = "";
+    private boolean replaceNumericInputOnType;
+    private boolean floatingDragDirty;
+    private boolean redirectToFullConfig;
 
-    /**
-     * 创建快捷面板并记录需要透传的移动键。
-     * 打开面板后玩家仍可能按着移动键，所以这些 KeyBinding 需要在 Screen 里继续同步状态。
-     */
     public QuickConfigScreen() {
         super(ScreenTexts.EMPTY);
-        this.panel = new QuickConfigPanel(MinecraftClient.getInstance());
-        this.movementKeys = List.of(
-                MinecraftClient.getInstance().options.forwardKey,
-                MinecraftClient.getInstance().options.backKey,
-                MinecraftClient.getInstance().options.leftKey,
-                MinecraftClient.getInstance().options.rightKey,
-                MinecraftClient.getInstance().options.jumpKey,
-                MinecraftClient.getInstance().options.sneakKey,
-                MinecraftClient.getInstance().options.sprintKey);
+        MinecraftClient mc = MinecraftClient.getInstance();
+        this.panel = new QuickConfigPanel(mc);
+        this.movementKeys = List.of(mc.options.forwardKey, mc.options.backKey, mc.options.leftKey, mc.options.rightKey,
+                mc.options.jumpKey, mc.options.sneakKey, mc.options.sprintKey);
     }
 
     @Override
-    /**
-     * 初始化时解析当前快捷方式并同步移动键状态。
-     * 快捷方式 Store 可能在全屏 UI 中被修改，因此每次打开都重新 resolve。
-     */
-    protected void init() {
-        this.refreshShortcuts();
-        this.movementKeyPassthrough = createMovementPassthrough(this.client);
-        this.syncHeldMovementKeys();
+    public void init() {
+        super.init();
+        ConfigGroupStore.ensureDefaultGroup();
+        if (!hasVisibleFloatingWindows()) {
+            // Screen.added() 仍处于 Fabric 事件初始化阶段，不能在这里直接 setScreen。
+            // 延迟到首个 tick()，既保留“全隐藏时打开完整配置”的入口，也不会触发未初始化崩溃。
+            this.redirectToFullConfig = true;
+            return;
+        }
+        this.movementKeyPassthrough = createMovementPassthrough(MinecraftClient.getInstance());
+        syncHeldMovementKeys();
+    }
+
+    private static boolean hasVisibleFloatingWindows() {
+        return ConfigGroupStore.getGroups().stream().anyMatch(group -> !group.hidden())
+                || QuickMessageStore.getGroups().stream().anyMatch(group -> !group.hidden());
     }
 
     @Override
-    /**
-     * 每 tick 检查“松开关闭”逻辑。
-     * MaLiLib 的 keybind 状态在 Screen 打开后不可靠，所以这里读物理按键状态。
-     */
     public void tick() {
-        if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() &&
-                isOpenHotkeyPhysicallyHeld() == false) {
+        if (this.redirectToFullConfig) {
+            this.redirectToFullConfig = false;
+            MinecraftClient.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes()));
+            return;
+        }
+        syncHeldMovementKeys();
+        if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() && this.activeNumericInputGroupId == null
+                && !isOpenHotkeyPhysicallyHeld()) {
             this.close();
         }
     }
 
     @Override
-    /**
-     * 渲染快捷面板本体。
-     * 所有布局计算在 QuickConfigPanel 内完成，Screen 只传入当前窗口尺寸和鼠标状态。
-     */
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        this.panel.render(context, this.width, this.height, mouseX, mouseY, this.items, this.scrollOffset,
-                this.panelMode);
+    public void removed() {
+        clearNumericInput();
+        syncHeldMovementKeys();
+        flushPendingDragPersistence();
+        super.removed();
     }
 
     @Override
-    /**
-     * 不绘制默认背景。
-     * 快捷面板是游戏内叠层，保留世界画面能减少“打开菜单”的割裂感。
-     */
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        // 快捷弹层不绘制背景，不触发 vanilla 菜单背景/模糊效果。
+    public void render(net.minecraft.client.gui.DrawContext gfx, int mouseX, int mouseY, float delta) {
+        this.panel.render(gfx, this.width, this.height, mouseX, mouseY);
     }
 
     @Override
-    /**
-     * 处理面板点击。
-     * 设置按钮会进入全屏 UI；快捷项点击会根据类型切换布尔值或开始拖动滑条。
-     */
+    public void renderBackground(net.minecraft.client.gui.DrawContext gfx, int mouseX, int mouseY, float delta) {
+    }
+
+    @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        return this.handleMouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragXAmount,
+            double dragYAmount) {
+        return this.handleMouseDragged(mouseX, mouseY, button, dragXAmount, dragYAmount);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        return this.handleMouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        return this.handleMouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    public boolean handleMouseClicked(double mouseX, double mouseY, int button) {
         int x = (int) mouseX;
         int y = (int) mouseY;
-
-        if (isOpeningMouseHotkeyPress(FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue(),
-                FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys(), button)
-                && this.isOpenHotkeyPressedAgain(button - 100)) {
-            this.close();
-            return true;
-        }
-
-        if (this.panel.isSettingsButtonHovered(x, y)) {
-            // 人手松开热键有延迟，进入全屏 UI 时先记录仍按住的打开键，交给全屏页吞掉首轮输入。
-            this.client.setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes()));
-            return true;
-        }
-
-        QuickConfigPanel.PanelMode mode = this.panel.getModeAt(x, y);
-
-        if (mode != null) {
-            this.panelMode = mode;
-            this.scrollOffset = 0;
-            this.refreshShortcuts();
-            return true;
-        }
-
-        int index = this.panel.getShortcutIndexAt(x, y, this.items.size());
-
-        if (index >= 0) {
-            QuickPanelItem item = this.items.get(index);
-            ResolvedShortcut shortcut = new ResolvedShortcut(item.shortcut(), item.configEntry());
-
-            if (ShortcutControl.getControlType(shortcut.configEntry().config()) == ShortcutControlType.TOGGLE) {
-                ShortcutControl.toggle(shortcut);
-
-                if (this.panelMode == QuickConfigPanel.PanelMode.ENABLED_BOOLEANS) {
-                    this.refreshShortcuts();
+        for (QuickConfigPanel.FloatingWindow window : this.panel.floatingWindows().reversed()) {
+            if (window instanceof QuickConfigPanel.MessageWindow messageWindow) {
+                if (this.handleMessageWindowClick(messageWindow.panel(), x, y)) {
+                    return true;
                 }
-            } else {
-                this.activeSliderIndex = index;
-                ShortcutControl.setSliderValue(shortcut, this.panel.getSliderRatioAt(x, index));
+                continue;
             }
 
-            return true;
+            if (this.handleConfigWindowClick(((QuickConfigPanel.ConfigWindow) window).panel(), x, y)) {
+                return true;
+            }
         }
-
-        return super.mouseClicked(mouseX, mouseY, button);
+        commitNumericInput();
+        return false;
     }
 
-    @Override
-    /**
-     * 拖动当前激活的滑条。
-     * activeSliderIndex 在鼠标按下数值快捷项时设置，释放鼠标后清空。
-     */
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
-        if (this.activeSliderIndex >= 0 && this.activeSliderIndex < this.items.size()) {
-            QuickPanelItem item = this.items.get(this.activeSliderIndex);
-            ShortcutControl.setSliderValue(new ResolvedShortcut(item.shortcut(), item.configEntry()),
-                    this.panel.getSliderRatioAt((int) mouseX, this.activeSliderIndex));
-            return true;
-        }
-
-        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
-    }
-
-    @Override
-    /**
-     * 处理快捷面板滚轮。
-     * 只有滚动偏移实际变化时才消费事件，否则交回父类处理。
-     */
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        int nextOffset = this.panel.scroll(this.scrollOffset, verticalAmount);
-
-        if (nextOffset != this.scrollOffset) {
-            this.scrollOffset = nextOffset;
-            return true;
-        }
-
-        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
-    }
-
-    @Override
-    /**
-     * 鼠标释放时结束滑条拖动。
-     * 不区分按钮类型，避免异常情况下滑条一直保持激活。
-     */
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        this.activeSliderIndex = -1;
-        return super.mouseReleased(mouseX, mouseY, button);
-    }
-
-    @Override
-    /**
-     * 处理键盘按下事件。
-     * 移动键透传给游戏；背包键和 ESC 用于关闭面板，其它按键维持原 Screen 行为。
-     */
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() == false
-                && this.isOpenHotkeyPressedAgain(keyCode)) {
-            this.close();
-            return true;
-        }
-
-        if (this.movementKeyPassthrough.shouldPassThrough(keyCode)) {
-            this.setMovementKeyPressed(keyCode, scanCode, true);
+    private boolean handleMessageWindowClick(FloatingMessagePanel floating, int x, int y) {
+        GroupWindowHitTest.Result hit = floating.hitTest(x, y);
+        if (hit.target() == GroupWindowHitTest.Target.NONE) {
             return false;
         }
 
-        if (FastMasaConfigs.Generic.CLOSE_ON_INVENTORY_KEY.getBooleanValue()
-                && this.client.options.inventoryKey.matchesKey(keyCode, scanCode)) {
-            this.close();
+        // 数值输入是单一焦点状态，切换到消息窗口前必须结束它，避免后续按键被旧输入框吞掉。
+        if (shouldCommitNumericInputBeforeWindowInteraction(true, hit.target())) {
+            commitNumericInput();
+        }
+        this.panel.raiseFloatingMessageGroup(floating.groupId());
+        if (hit.target() == GroupWindowHitTest.Target.HEADER) {
+            if (floating.isCollapseHit(x, y)) {
+                floating.toggleCollapsed();
+                persistRuntimeGroupState();
+            } else {
+                this.activeFloatingMessageGroupId = floating.groupId();
+                this.floatingDragOffsetX = x - floating.x();
+                this.floatingDragOffsetY = y - floating.y();
+            }
+        } else if (hit.target() == GroupWindowHitTest.Target.ROW) {
+            QuickMessageSender.send(floating.messageAt(hit.itemIndex()));
+        }
+        return true;
+    }
+
+    private boolean handleConfigWindowClick(FloatingGroupPanel floating, int x, int y) {
+        GroupWindowHitTest.Result hit = floating.hitTest(x, y);
+        if (hit.target() == GroupWindowHitTest.Target.NONE) {
+            return false;
+        }
+
+        this.panel.raiseFloatingGroup(floating.groupId());
+        ResolvedShortcut shortcut = floating.shortcutAt(hit.itemIndex());
+        if (hit.target() == GroupWindowHitTest.Target.VALUE && shortcut != null) {
+            beginNumericInput(floating, hit.itemIndex(), shortcut);
+            return true;
+        }
+        if (hit.target() == GroupWindowHitTest.Target.RESET && shortcut != null) {
+            commitNumericInput();
+            ShortcutControl.reset(shortcut);
             return true;
         }
 
+        commitNumericInput();
+        if (hit.target() == GroupWindowHitTest.Target.HEADER) {
+            if (floating.isCollapseHit(x, y)) {
+                floating.toggleCollapsed();
+                persistRuntimeGroupState();
+            } else {
+                this.activeFloatingGroupId = floating.groupId();
+                this.floatingDragOffsetX = x - floating.x();
+                this.floatingDragOffsetY = y - floating.y();
+            }
+            return true;
+        }
+        if (shouldOpenSystemConfigRow(hit.target(), floating.isSystemConfigRow(hit.itemIndex()))) {
+            MinecraftClient.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes(), floating.groupId()));
+            return true;
+        }
+        if (shortcut == null) {
+            return true;
+        }
+        if (hit.target() == GroupWindowHitTest.Target.ROW
+                && ShortcutControl.getControlType(shortcut.configEntry().config()) == ShortcutControlType.TOGGLE) {
+            ShortcutControl.toggle(shortcut);
+            return true;
+        }
+        if (hit.target() == GroupWindowHitTest.Target.ROW || hit.target() == GroupWindowHitTest.Target.EXPAND) {
+            if (ShortcutControl.isNumeric(shortcut.configEntry().config())) {
+                toggleExpanded(floating.groupId(), floating.groupItemIndexAt(hit.itemIndex()));
+            }
+            return true;
+        }
+        if (hit.target() == GroupWindowHitTest.Target.SLIDER) {
+            this.activeFloatingSliderGroupId = floating.groupId();
+            this.activeFloatingSliderIndex = hit.itemIndex();
+            ShortcutControl.setSliderValue(shortcut, floating.sliderRatioAt(hit.itemIndex(), x));
+        }
+        return true;
+    }
+
+    public boolean handleMouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+        if (this.activeFloatingMessageGroupId != null) {
+            this.floatingDragDirty |= this.panel.moveFloatingMessageGroup(this.activeFloatingMessageGroupId,
+                    (int) mouseX - this.floatingDragOffsetX, (int) mouseY - this.floatingDragOffsetY,
+                    this.width, this.height);
+            return true;
+        }
+        if (this.activeFloatingGroupId != null) {
+            this.floatingDragDirty |= this.panel.moveFloatingGroup(this.activeFloatingGroupId,
+                    (int) mouseX - this.floatingDragOffsetX, (int) mouseY - this.floatingDragOffsetY,
+                    this.width, this.height);
+            return true;
+        }
+        if (this.activeFloatingSliderGroupId != null) {
+            for (FloatingGroupPanel floating : this.panel.floatingPanels()) {
+                if (floating.groupId().equals(this.activeFloatingSliderGroupId)) {
+                    ResolvedShortcut shortcut = floating.shortcutAt(this.activeFloatingSliderIndex);
+                    if (shortcut != null) {
+                        ShortcutControl.setSliderValue(shortcut,
+                                floating.sliderRatioAt(this.activeFloatingSliderIndex, (int) mouseX));
+                    }
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public boolean handleMouseScrolled(double mouseX, double mouseY, double h, double v) {
+        for (QuickConfigPanel.FloatingWindow window : this.panel.floatingWindows().reversed()) {
+            GroupWindowHitTest.Result hit;
+            if (window instanceof QuickConfigPanel.MessageWindow messageWindow) {
+                hit = messageWindow.panel().hitTest((int) mouseX, (int) mouseY);
+            } else {
+                hit = ((QuickConfigPanel.ConfigWindow) window).panel().hitTest((int) mouseX, (int) mouseY);
+            }
+            if (hit.target() != GroupWindowHitTest.Target.NONE && hit.target() != GroupWindowHitTest.Target.HEADER) {
+                if (window instanceof QuickConfigPanel.MessageWindow messageWindow) {
+                    messageWindow.panel().scroll(v);
+                } else {
+                    ((QuickConfigPanel.ConfigWindow) window).panel().scroll(v);
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean handleMouseReleased(double mouseX, double mouseY, int button) {
+        this.activeFloatingGroupId = null;
+        this.activeFloatingMessageGroupId = null;
+        this.activeFloatingSliderGroupId = null;
+        this.activeFloatingSliderIndex = -1;
+        flushPendingDragPersistence();
+        return false;
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (this.activeNumericInputGroupId != null) {
+            return handleNumericInputKey(keyCode);
+        }
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (!FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() && isOpenHotkeyPressedAgain(keyCode)) {
+            this.close();
+            return true;
+        }
+        if (this.movementKeyPassthrough.shouldPassThrough(keyCode)) {
+            setMovementKeyPressed(keyCode, scanCode, true);
+            return false;
+        }
+        if (FastMasaConfigs.Generic.CLOSE_ON_INVENTORY_KEY.getBooleanValue()
+                && mc.options.inventoryKey.matchesKey(keyCode, scanCode)) {
+            this.close();
+            return true;
+        }
         if (keyCode == KeyCodes.KEY_ESCAPE) {
             this.close();
             return true;
         }
-
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
-    /**
-     * 处理键盘释放事件。
-     * 移动键释放也要透传到 KeyBinding，否则关闭面板后可能出现卡键。
-     */
-    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
-        if (this.movementKeyPassthrough.shouldPassThrough(keyCode)) {
-            this.setMovementKeyPressed(keyCode, scanCode, false);
-            return false;
+    public boolean charTyped(char chr, int modifiers) {
+        if (this.activeNumericInputGroupId == null) {
+            return super.charTyped(chr, modifiers);
         }
+        int codepoint = chr;
+        if (codepoint >= 0 && codepoint <= Character.MAX_VALUE && isNumericInputCharacter((char) codepoint)
+                && this.numericInputText.length() < 24) {
+            if (this.replaceNumericInputOnType) {
+                this.numericInputText = "";
+                this.replaceNumericInputOnType = false;
+            }
+            this.numericInputText += (char) codepoint;
+            updateNumericInputDisplay();
+        }
+        return true;
+    }
 
+    @Override
+    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
+        // 复刻 26.3 afterKeyboardAction 的语义：每次按键状态变化后重新同步移动键。
+        syncHeldMovementKeys();
         return super.keyReleased(keyCode, scanCode, modifiers);
     }
 
     @Override
-    /**
-     * 快捷叠层不暂停游戏。
-     * 这样玩家可以按住面板快速切配置，同时游戏逻辑继续运行。
-     */
     public boolean shouldPause() {
         return false;
     }
 
     @Override
-    /**
-     * 保留 ESC 关闭能力。
-     * 具体关闭逻辑也在 keyPressed 中处理，用于兼容 MaLiLib 的 KeyCodes 判断。
-     */
     public boolean shouldCloseOnEsc() {
         return true;
     }
 
-    /**
-     * 从持久化 Store 重新解析可用快捷项。
-     * 解析失败的条目会在 ShortcutResolver 中被过滤，因此面板只显示当前能操作的配置。
-     */
-    private void refreshShortcuts() {
-        if (this.panelMode == QuickConfigPanel.PanelMode.ENABLED_BOOLEANS) {
-            this.items = ConfigIndexService.scanSupportedConfigs().stream()
-                    .filter(entry -> entry.config().getType() == ConfigType.BOOLEAN)
-                    .filter(entry -> entry.config() instanceof IConfigBoolean booleanConfig
-                            && booleanConfig.getBooleanValue())
-                    .map(QuickPanelItem::fromEnabledConfig)
-                    .toList();
-        } else {
-            this.items = ShortcutResolver.resolve(ShortcutConfigStore.getEntries()).stream()
-                    .map(QuickPanelItem::fromShortcut)
-                    .toList();
+    private void beginNumericInput(FloatingGroupPanel floating, int itemIndex, ResolvedShortcut shortcut) {
+        if (this.activeNumericInputGroupId != null
+                && (!this.activeNumericInputGroupId.equals(floating.groupId()) || this.activeNumericInputIndex != itemIndex)) {
+            commitNumericInput();
         }
-
-        this.scrollOffset = Math.min(this.scrollOffset, Math.max(0, this.items.size() - 1));
+        this.activeNumericInputGroupId = floating.groupId();
+        this.activeNumericInputIndex = itemIndex;
+        this.numericInputText = ShortcutControl.getValueText(shortcut.configEntry().config());
+        this.replaceNumericInputOnType = true;
+        floating.beginEditingValue(itemIndex, this.numericInputText);
     }
 
-    /**
-     * 构造移动键透传白名单。
-     * client 为空时返回空白名单，便于测试或异常初始化路径安全退出。
-     */
-    private static MovementKeyPassthrough createMovementPassthrough(MinecraftClient client) {
-        if (client == null) {
-            return new MovementKeyPassthrough(java.util.Set.of());
+    private boolean handleNumericInputKey(int keyCode) {
+        if (keyCode == TargetCompat.KEY_RETURN || keyCode == TargetCompat.KEY_KP_ENTER
+                || keyCode == TargetCompat.KEY_RETURN2) { // Enter and keypad Enter
+            commitNumericInput();
+            return true;
         }
-
-        return new MovementKeyPassthrough(java.util.Set.of(
-                BoundKeyReader.getBoundKeyCode(client.options.forwardKey),
-                BoundKeyReader.getBoundKeyCode(client.options.backKey),
-                BoundKeyReader.getBoundKeyCode(client.options.leftKey),
-                BoundKeyReader.getBoundKeyCode(client.options.rightKey),
-                BoundKeyReader.getBoundKeyCode(client.options.jumpKey),
-                BoundKeyReader.getBoundKeyCode(client.options.sneakKey),
-                BoundKeyReader.getBoundKeyCode(client.options.sprintKey)));
+        if (keyCode == KeyCodes.KEY_ESCAPE) {
+            clearNumericInput();
+            return true;
+        }
+        if (keyCode == KeyCodes.KEY_BACKSPACE || keyCode == KeyCodes.KEY_DELETE) {
+            if (this.replaceNumericInputOnType) {
+                this.numericInputText = "";
+                this.replaceNumericInputOnType = false;
+            } else if (!this.numericInputText.isEmpty()) {
+                this.numericInputText = this.numericInputText.substring(0, this.numericInputText.length() - 1);
+            }
+            updateNumericInputDisplay();
+        }
+        // A focused numeric field owns every key event, including configured numeric hotkeys.
+        return true;
     }
 
-    /**
-     * 打开 Screen 后同步已经按住的移动键。
-     * 没有这一步时，玩家按住前进键打开面板会突然停下。
-     */
+    private void commitNumericInput() {
+        ResolvedShortcut shortcut = getActiveNumericInputShortcut();
+        if (shortcut != null) {
+            ShortcutControl.setTypedValue(shortcut, this.numericInputText);
+        }
+        clearNumericInput();
+    }
+
+    private ResolvedShortcut getActiveNumericInputShortcut() {
+        if (this.activeNumericInputGroupId == null) {
+            return null;
+        }
+        for (FloatingGroupPanel floating : this.panel.floatingPanels()) {
+            if (floating.groupId().equals(this.activeNumericInputGroupId)) {
+                return floating.shortcutAt(this.activeNumericInputIndex);
+            }
+        }
+        return null;
+    }
+
+    private void updateNumericInputDisplay() {
+        if (this.activeNumericInputGroupId == null) {
+            return;
+        }
+        for (FloatingGroupPanel floating : this.panel.floatingPanels()) {
+            if (floating.groupId().equals(this.activeNumericInputGroupId)) {
+                floating.updateEditingValue(this.numericInputText);
+                return;
+            }
+        }
+    }
+
+    private void clearNumericInput() {
+        if (this.activeNumericInputGroupId != null) {
+            for (FloatingGroupPanel floating : this.panel.floatingPanels()) {
+                if (floating.groupId().equals(this.activeNumericInputGroupId)) {
+                    floating.clearEditingValue();
+                    break;
+                }
+            }
+        }
+        this.activeNumericInputGroupId = null;
+        this.activeNumericInputIndex = -1;
+        this.numericInputText = "";
+        this.replaceNumericInputOnType = false;
+    }
+
+    private static boolean isNumericInputCharacter(char value) {
+        return value >= '0' && value <= '9' || value == '-' || value == '+' || value == '.' || value == ','
+                || value == 'e' || value == 'E';
+    }
+
+    private void toggleExpanded(String groupId, int itemIndex) {
+        ConfigGroupStore.get(groupId).ifPresent(group -> {
+            if (isValidToggleItemIndex(itemIndex, group.items().size())) {
+                GroupItem item = group.items().get(itemIndex);
+                if (ConfigGroupStore.setItemExpanded(group.id(), itemIndex, !item.expanded())) {
+                    persistRuntimeGroupState();
+                }
+            }
+        });
+    }
+
+    private static void persistRuntimeGroupState() {
+        ConfigManager.getInstance().onConfigsChanged(FastMasaConfig.MOD_ID);
+    }
+
+    private void flushPendingDragPersistence() {
+        if (shouldFlushPendingDrag(this.floatingDragDirty)) {
+            persistRuntimeGroupState();
+            this.floatingDragDirty = false;
+        }
+    }
+
+    static boolean shouldFlushPendingDrag(boolean positionChanged) {
+        return positionChanged;
+    }
+
+    static boolean shouldOpenSystemConfigRow(GroupWindowHitTest.Target target, boolean systemConfigRow) {
+        return target == GroupWindowHitTest.Target.ROW && systemConfigRow;
+    }
+
+    static boolean shouldCommitNumericInputBeforeWindowInteraction(boolean messageWindow,
+            GroupWindowHitTest.Target target) {
+        return messageWindow && target != GroupWindowHitTest.Target.NONE;
+    }
+
+    static boolean isValidToggleItemIndex(int itemIndex, int itemCount) {
+        return itemIndex >= 0 && itemIndex < itemCount;
+    }
+
+    private static MovementKeyPassthrough createMovementPassthrough(MinecraftClient mc) {
+        return new MovementKeyPassthrough(normalizeMovementKeyCodes(List.of(BoundKeyReader.getBoundKeyCode(mc.options.forwardKey),
+                BoundKeyReader.getBoundKeyCode(mc.options.backKey), BoundKeyReader.getBoundKeyCode(mc.options.leftKey),
+                BoundKeyReader.getBoundKeyCode(mc.options.rightKey), BoundKeyReader.getBoundKeyCode(mc.options.jumpKey),
+                BoundKeyReader.getBoundKeyCode(mc.options.sneakKey), BoundKeyReader.getBoundKeyCode(mc.options.sprintKey))));
+    }
+
+    static Set<Integer> normalizeMovementKeyCodes(List<Integer> keyCodes) {
+        Set<Integer> normalized = new LinkedHashSet<>();
+        for (Integer keyCode : keyCodes) {
+            if (keyCode != null) {
+                normalized.add(keyCode);
+            }
+        }
+        return Set.copyOf(normalized);
+    }
+
     private void syncHeldMovementKeys() {
-        for (KeyBinding keyBinding : this.movementKeys) {
-            keyBinding.setPressed(KeybindMulti.isKeyDown(BoundKeyReader.getBoundKeyCode(keyBinding)));
+        for (KeyBinding movementKey : this.movementKeys) {
+            movementKey.setPressed(KeybindMulti.isKeyDown(BoundKeyReader.getBoundKeyCode(movementKey)));
         }
     }
 
-    /**
-     * 检查打开快捷面板的组合键是否仍被物理按住。
-     * 这里不能依赖 MaLiLib 的 isKeybindHeld，因为 Screen 打开后它的上下文状态会变化。
-     */
     private boolean isOpenHotkeyPhysicallyHeld() {
         for (int keyCode : FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys()) {
-            if (KeybindMulti.isKeyDown(keyCode) == false) {
+            if (!KeybindMulti.isKeyDown(keyCode)) {
                 return false;
             }
         }
-
         return true;
     }
 
     private boolean isOpenHotkeyPressedAgain(int pressedKeyCode) {
-        List<Integer> keyCodes = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys();
-
-        if (keyCodes.contains(pressedKeyCode) == false) {
+        List<Integer> keys = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys();
+        if (!keys.contains(pressedKeyCode)) {
             return false;
         }
-
-        for (int keyCode : keyCodes) {
-            if (keyCode != pressedKeyCode && KeybindMulti.isKeyDown(keyCode) == false) {
+        for (int keyCode : keys) {
+            if (keyCode != pressedKeyCode && !KeybindMulti.isKeyDown(keyCode)) {
                 return false;
             }
         }
-
         return true;
     }
 
-    /**
-     * MaLiLib 使用 button - 100 表示鼠标按键。
-     */
-    static boolean isOpeningMouseHotkeyPress(boolean releaseToClose, List<Integer> openingHotkeyCodes, int button) {
-        return releaseToClose == false && openingHotkeyCodes.contains(button - 100);
-    }
-
-    /**
-     * 收集进入全屏 UI 时仍按住的打开热键。
-     * 全屏 UI 会临时吞掉这些按键对应的字符事件，防止搜索框被自动输入。
-     */
     private static Set<Integer> getHeldOpenHotkeyCodes() {
         return FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys().stream()
-                .filter(keyCode -> KeybindMulti.isKeyDown(keyCode))
-                .collect(Collectors.toSet());
+                .filter(KeybindMulti::isKeyDown).collect(Collectors.toSet());
     }
 
-    /**
-     * 将键盘事件同步到 Minecraft 原版移动 KeyBinding。
-     * 使用 matchesKey 同时匹配 keyCode 和 scanCode，兼容用户改键后的绑定。
-     */
     private void setMovementKeyPressed(int keyCode, int scanCode, boolean pressed) {
         for (KeyBinding movementKey : this.movementKeys) {
             if (movementKey.matchesKey(keyCode, scanCode)) {

@@ -1,7 +1,6 @@
 package fastui.yure.config;
 
 import com.google.gson.JsonObject;
-import fi.dy.masa.malilib.util.data.json.JsonUtils;
 
 public record ShortcutEntry(
         String modId,
@@ -55,14 +54,14 @@ public record ShortcutEntry(
 
     public static ShortcutEntry fromJson(JsonObject object) {
         return new ShortcutEntry(
-                JsonUtils.getStringOrDefault(object, "modId", ""),
-                JsonUtils.getStringOrDefault(object, "groupId", ""),
-                JsonUtils.getStringOrDefault(object, "configName", ""),
-                JsonUtils.getStringOrDefault(object, "labelOverride", ""),
-                ShortcutControlType.fromId(JsonUtils.getStringOrDefault(object, "controlType", "toggle")),
-                JsonUtils.getDoubleOrDefault(object, "sliderStep", 1.0),
-                JsonUtils.hasDouble(object, "minOverride") ? JsonUtils.getDouble(object, "minOverride") : null,
-                JsonUtils.hasDouble(object, "maxOverride") ? JsonUtils.getDouble(object, "maxOverride") : null);
+                MalilibCompat.getStringOrDefault(object, "modId", ""),
+                MalilibCompat.getStringOrDefault(object, "groupId", ""),
+                MalilibCompat.getStringOrDefault(object, "configName", ""),
+                MalilibCompat.getStringOrDefault(object, "labelOverride", ""),
+                ShortcutControlType.fromId(MalilibCompat.getStringOrDefault(object, "controlType", "toggle")),
+                MalilibCompat.getDoubleOrDefault(object, "sliderStep", 1.0),
+                MalilibCompat.hasDouble(object, "minOverride") ? MalilibCompat.getDouble(object, "minOverride") : null,
+                MalilibCompat.hasDouble(object, "maxOverride") ? MalilibCompat.getDouble(object, "maxOverride") : null);
     }
 
     private static String normalizedText(String value) {

@@ -6,8 +6,7 @@ import com.google.gson.JsonPrimitive;
 import fastui.yure.FastMasaConfig;
 import fi.dy.masa.malilib.config.ConfigUtils;
 import fi.dy.masa.malilib.config.IConfigHandler;
-import fi.dy.masa.malilib.util.FileUtils;
-import fi.dy.masa.malilib.util.data.json.JsonUtils;
+
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,10 +22,10 @@ public final class FastMasaConfigHandler implements IConfigHandler {
         ConfigGroupStore.clear();
         ShortcutConfigStore.clear();
         QuickMessageStore.clear();
-        Path configFile = FileUtils.getConfigDirectory().resolve(CONFIG_FILE_NAME);
+        Path configFile = MalilibCompat.getConfigDirectory().resolve(CONFIG_FILE_NAME);
 
         if (Files.exists(configFile) && Files.isReadable(configFile)) {
-            JsonElement element = JsonUtils.parseJsonFile(configFile);
+            JsonElement element = MalilibCompat.parseJsonFile(configFile);
 
             if (element != null && element.isJsonObject()) {
                 JsonObject root = element.getAsJsonObject();
@@ -71,10 +70,10 @@ public final class FastMasaConfigHandler implements IConfigHandler {
     @Override
     public void save() {
         // 保存也只写 fast-masa-config.json，不会覆盖 tweakeroo/minihud/malilib 自己的配置文件。
-        Path dir = FileUtils.getConfigDirectory();
+        Path dir = MalilibCompat.getConfigDirectory();
 
         if (!Files.exists(dir)) {
-            FileUtils.createDirectoriesIfMissing(dir);
+            MalilibCompat.createDirectoriesIfMissing(dir);
         }
 
         if (Files.isDirectory(dir)) {
@@ -85,7 +84,7 @@ public final class FastMasaConfigHandler implements IConfigHandler {
             root.add("Groups", ConfigGroupStore.toJson());
             root.add("QuickMessageGroups", QuickMessageStore.toJson());
             root.add("config_version", new JsonPrimitive(CONFIG_VERSION));
-            JsonUtils.writeJsonToFile(root, dir.resolve(CONFIG_FILE_NAME));
+            MalilibCompat.writeJsonToFile(root, dir.resolve(CONFIG_FILE_NAME));
         } else {
             FastMasaConfig.LOGGER.error("配置目录不存在: {}", dir.toAbsolutePath());
         }

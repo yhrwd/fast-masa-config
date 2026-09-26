@@ -36,7 +36,7 @@ public final class MasaConfigEditor {
             case OPTION_LIST -> applyOptionList(config, rawValue);
             case HOTKEY -> applyHotkey(config, rawValue);
             case STRING_LIST -> applyStringList(config, rawValue);
-            default -> ConfigEditResult.failure(config, "暂不支持修改该配置类型: " + config.getType().getSerializedName());
+            default -> ConfigEditResult.failure(config, "暂不支持修改该配置类型: " + MalilibCompat.configTypeString(config.getType()));
         };
     }
 
