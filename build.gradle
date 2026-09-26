@@ -32,11 +32,6 @@ apply plugin: 'maven-publish'
 version = targetProp('mod_version')
 group = project.maven_group
 
-// Per-target artifact output so building one target never clobbers another's jars.
-base {
-	libsDirectory = file("build/libs/${target}")
-}
-
 repositories {
 	maven { url = 'https://masa.dy.fi/maven' }
 	maven { url = 'https://maven.terraformersmc.com/releases/' }

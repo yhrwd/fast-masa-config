@@ -19,12 +19,16 @@ jobs:
       - name: resolve version target from tag
         id: resolve
         run: |
-          # mc26.2-v5.3.0 -> target 26.2; mc1.21.8-v2.3.1 -> target 1.21.8
+          # mc1.21.6-1.21.8-v5.4.0 -> target 1.21.6-1.21.8, feat version 5.4.0
           target="${GITHUB_REF_NAME#mc}"
           target="${target%%-v*}"
           if [[ "$target" == 1.* ]]; then java_version=21; else java_version=25; fi
+          # Modrinth game versions for the target (comma-separated in its properties)
+          game_versions="$(grep '^game_versions=' "versions/${target}/gradle.properties" | cut -d= -f2-)"
+          if [ -z "${game_versions}" ]; then game_versions="${target}"; fi
           echo "target=${target}" >> "$GITHUB_OUTPUT"
           echo "java=${java_version}" >> "$GITHUB_OUTPUT"
+          echo "game_versions=${game_versions}" >> "$GITHUB_OUTPUT"
 
       - name: validate gradle wrapper
         uses: gradle/actions/wrapper-validation@v6
@@ -74,13 +78,13 @@ jobs:
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_PROJECT_ID: 4Qx0KEY6
+          GAME_VERSIONS: ${{ steps.resolve.outputs.game_versions }}
         run: |
           set -euo pipefail
           jar_file="$(find release -maxdepth 1 -type f -name '*.jar' | head -n 1)"
           jar_name="$(basename "${jar_file}")"
           version_number="${GITHUB_REF_NAME#mc}"
           version_number="${version_number/-v/-}"
-          game_version="${version_number%%-*}"
           changelog="$(cat release-notes.md)"
           jq -n \
             --arg project_id "${MODRINTH_PROJECT_ID}" \
@@ -88,11 +92,11 @@ jobs:
             --arg version_title "Fast Masa Config UI ${version_number}" \
             --arg changelog "${changelog}" \
             --arg jar_name "${jar_name}" \
-            --arg game_version "${game_version}" \
+            --arg game_versions "${GAME_VERSIONS}" \
             '{project_id: $project_id, version_number: $version_number,
               version_title: $version_title, changelog: $changelog,
               version_type: "release", loaders: ["fabric"],
-              game_versions: [$game_version], dependencies: [], featured: false,
+              game_versions: ($game_versions | split(",")), dependencies: [], featured: false,
               file_parts: [$jar_name]}' > release/metadata.json
           curl --fail-with-body --request PATCH \
             --header "Authorization: ${MODRINTH_TOKEN}" \
@@ -108,10 +112,10 @@ jobs:
             update_metadata="$(jq -n \
               --arg version_title "Fast Masa Config UI ${version_number}" \
               --arg changelog "${changelog}" \
-              --arg game_version "${game_version}" \
+              --arg game_versions "${GAME_VERSIONS}" \
               '{name: $version_title, changelog: $changelog,
                 version_type: "release", loaders: ["fabric"],
-                game_versions: [$game_version], featured: false}')"
+                game_versions: ($game_versions | split(",")), featured: false}')"
             curl --fail-with-body --request PATCH \
               --header "Authorization: ${MODRINTH_TOKEN}" \
               --header 'Content-Type: application/json' \
