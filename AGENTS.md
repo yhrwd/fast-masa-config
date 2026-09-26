@@ -2,14 +2,17 @@
 
 ## Toolchain
 
-- This is a single-module Fabric Loom project; use the Gradle wrapper (`gradlew`/`gradlew.bat`), not a system Gradle installation.
-- Java 25 is required by `build.gradle`, `fabric.mod.json`, and CI. The README's older Java 21 note is stale.
-- No per-shell JDK environment variables are needed: the machine-scope Temurin install at `C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot` is auto-detected by Gradle toolchains (Windows Registry). The user-level `JAVA_HOME` intentionally stays on JDK 21 (`C:\Program Files\Microsoft\jdk-21.0.3.9-hotspot`) for other Java 21 projects; the Gradle daemon may run on 21 while the Java 25 toolchain compiles and runs.
-- If the Java 25 toolchain is ever not found, register it in the user-level `%USERPROFILE%\.gradle\gradle.properties` via `org.gradle.java.installations.paths=C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot`.
+- This is a single-module Fabric Loom project with multi-version targets; use the Gradle wrapper (`gradlew`/`gradlew.bat`), not a system Gradle installation.
+- One Loom release (`loom_version` in root `gradle.properties`) builds every target; the two plugin ids (`net.fabricmc.fabric-loom` for 26.x, `net.fabricmc.fabric-loom-remap` for 1.21.x yarn/intermediary) are conditionally applied per target and must not be mixed within one target.
+- Java release is per target (`java_release`): 25 for 26.x, 21 for 1.21.x. No per-shell JDK environment variables are needed: the machine-scope Temurin install at `C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot` is auto-detected by Gradle toolchains (Windows Registry), and the Microsoft JDK 21 install is detected via `JAVA_HOME`. The Gradle daemon may run on 21 while a Java 25 toolchain compiles and runs.
+- If a toolchain is ever not found, register it in the user-level `%USERPROFILE%\.gradle\gradle.properties` via `org.gradle.java.installations.paths=...`.
 - Loom configuration cache is intentionally disabled in `gradle.properties` because of the Fabric Loom/IntelliJ compatibility issue; do not enable it casually.
 
 ## Source Layout
 
+- Single main branch hosts all Minecraft versions. `src/` is the common baseline and always targets the newest game version; new features land here first, then get ported to older targets.
+- `versions/<target>/gradle.properties` declares one build target (minecraft/loader/fabric api/malilib/mod versions, `loom_pipeline`, `java_release`). Build it with `./gradlew -Ptarget=<target> ...`; no `-Ptarget` means `26.3`.
+- `versions/<target>/src/{main,client}/...` holds version-specific overrides: a file there replaces the same-path file in `src/`. Overrides shrink as common code is made version-agnostic — prefer deleting an override over editing both copies.
 - `src/main/java` contains environment-independent configuration models, stores, and MaLiLib config editing.
 - `src/client/java` contains all Minecraft client entrypoints, scanning, input handling, and custom GUI code; do not move client-only imports into `src/main`.
 - `src/main/resources` contains `fabric.mod.json`, translations, and assets. Keep new visible UI strings in both `zh_cn.json` and `en_us.json`.
@@ -17,7 +20,8 @@
 
 ## Commands
 
-- Full tests: `./gradlew test` or Windows `./gradlew.bat test`.
+- Full tests: `./gradlew test` or Windows `./gradlew.bat test` (default target 26.3).
+- Another version target: prefix any task with `-Ptarget=<target>`, e.g. `./gradlew -Ptarget=1.21.8 build`; dev clients run in `run/<target>/`.
 - Focused test: `./gradlew test --tests fully.qualified.TestClass`.
 - Client compilation: `./gradlew compileClientJava`.
 - CI-equivalent verification: `./gradlew build --no-daemon`.

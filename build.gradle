@@ -1,16 +1,36 @@
 plugins {
-	id 'net.fabricmc.fabric-loom' version "${loom_version}"
-	id 'maven-publish'
+	id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
+	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}" apply false
 }
 
-version = project.mod_version
+// Single-repo multi-version builds (see versions/<target>/gradle.properties).
+// src/ is the common baseline (newest target); files under versions/<target>/src
+// replace same-path files when building that target.
+def target = project.findProperty('target') ?: '26.3'
+def targetPropsFile = file("versions/${target}/gradle.properties")
+if (!targetPropsFile.isFile()) {
+	throw new GradleException("Unknown build target '${target}': expected ${targetPropsFile} (use -Ptarget=<name>)")
+}
+def targetProps = new Properties()
+targetPropsFile.withReader('UTF-8') { targetProps.load(it) }
+
+// Command-line -P and root gradle.properties win over the target file.
+def targetProp = { String name ->
+	if (project.hasProperty(name)) return project.property(name)
+	def v = targetProps.getProperty(name)
+	if (v != null) return v
+	throw new GradleException("Missing property '${name}' for target '${target}' (see ${targetPropsFile.name})")
+}
+
+// Two build pipelines share this script:
+//   standard = 26.x targets on the MojMap pipeline, no intermediary remapping.
+//   remap    = 1.21.x targets on yarn/intermediary, mod* dependency configurations.
+def remapPipeline = targetProp('loom_pipeline') == 'remap'
+apply plugin: remapPipeline ? 'net.fabricmc.fabric-loom-remap' : 'net.fabricmc.fabric-loom'
+apply plugin: 'maven-publish'
+
+version = targetProp('mod_version')
 group = project.maven_group
-
-java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(25)
-	}
-}
 
 repositories {
 	maven { url = 'https://masa.dy.fi/maven' }
@@ -23,6 +43,12 @@ repositories {
 loom {
 	splitEnvironmentSourceSets()
 
+	runs {
+		client {
+			runDir = "run/${target}"
+		}
+	}
+
 	mods {
 		"fast-masa-config" {
 			sourceSet sourceSets.main
@@ -32,22 +58,65 @@ loom {
 
 }
 
+// A common source file is shadowed when the override tree contains the same path.
+def shadowedBy = { java.nio.file.Path commonRoot, java.nio.file.Path overrideRoot ->
+	return { element ->
+		def f = element.file
+		if (!f.isFile()) return false
+		def p = f.toPath()
+		if (!p.startsWith(commonRoot)) return false
+		overrideRoot.resolve(commonRoot.relativize(p)).toFile().exists()
+	}
+}
+
+sourceSets {
+	main {
+		java {
+			srcDir "versions/${target}/src/main/java"
+			exclude shadowedBy(file('src/main/java').toPath(), file("versions/${target}/src/main/java").toPath())
+		}
+		resources {
+			srcDir "versions/${target}/src/main/resources"
+			exclude shadowedBy(file('src/main/resources').toPath(), file("versions/${target}/src/main/resources").toPath())
+		}
+	}
+	client {
+		java {
+			srcDir "versions/${target}/src/client/java"
+			exclude shadowedBy(file('src/client/java').toPath(), file("versions/${target}/src/client/java").toPath())
+		}
+		resources {
+			srcDir "versions/${target}/src/client/resources"
+			exclude shadowedBy(file('src/client/resources').toPath(), file("versions/${target}/src/client/resources").toPath())
+		}
+	}
+}
+
 dependencies {
 	// To change the versions see the gradle.properties file
-	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	minecraft "com.mojang:minecraft:${targetProp('minecraft_version')}"
 
-	// Fabric API. This is technically optional, but you probably want it anyway.
-	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-	implementation "com.github.sakura-ryoko:malilib:${project.malilib_version}"
-	compileOnly "com.terraformersmc:modmenu:${project.mod_menu_version}"
-	// 仅开发环境加载 ModMenu，方便从主菜单直接进配置页；发布 jar 不包含它。
-	clientRuntimeOnly "com.terraformersmc:modmenu:${project.mod_menu_version}"
+	if (remapPipeline) {
+		mappings "net.fabricmc:yarn:${targetProp('yarn_mappings')}:v2"
+		modImplementation "net.fabricmc:fabric-loader:${targetProp('loader_version')}"
+		modImplementation "net.fabricmc.fabric-api:fabric-api:${targetProp('fabric_api_version')}"
+		modImplementation "com.github.sakura-ryoko:malilib:${targetProp('malilib_version')}"
+		modCompileOnly "com.terraformersmc:modmenu:${targetProp('mod_menu_version')}"
+	} else {
+		implementation "net.fabricmc:fabric-loader:${targetProp('loader_version')}"
+
+		// Fabric API. This is technically optional, but you probably want it anyway.
+		implementation "net.fabricmc.fabric-api:fabric-api:${targetProp('fabric_api_version')}"
+		implementation "com.github.sakura-ryoko:malilib:${targetProp('malilib_version')}"
+		compileOnly "com.terraformersmc:modmenu:${targetProp('mod_menu_version')}"
+		// 仅开发环境加载 ModMenu，方便从主菜单直接进配置页；发布 jar 不包含它。
+		clientRuntimeOnly "com.terraformersmc:modmenu:${targetProp('mod_menu_version')}"
+	}
 
 	testImplementation platform("org.junit:junit-bom:5.10.2")
 	testImplementation "org.junit.jupiter:junit-jupiter"
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
-	
+
 }
 
 test {
@@ -63,8 +132,9 @@ processResources {
 	}
 }
 
+def javaRelease = targetProp('java_release') as Integer
 tasks.withType(JavaCompile).configureEach {
-	it.options.release = 25
+	it.options.release = javaRelease
 }
 
 java {
@@ -73,8 +143,9 @@ java {
 	// If you remove this line, sources will not be generated.
 	withSourcesJar()
 
-	sourceCompatibility = JavaVersion.VERSION_25
-	targetCompatibility = JavaVersion.VERSION_25
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(javaRelease)
+	}
 }
 
 jar {

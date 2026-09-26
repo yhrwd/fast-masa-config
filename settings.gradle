@@ -9,5 +9,14 @@ pluginManagement {
 	}
 }
 
+// Single-repo multi-version builds: validate the requested version target early.
+// Per-target values are loaded by build.gradle from versions/<target>/gradle.properties.
+// Select with -Ptarget=<dir under versions/>; the default target is 26.3.
+def target = startParameter.projectProperties.get('target') ?: '26.3'
+def targetPropsFile = new File(settingsDir, "versions/${target}/gradle.properties")
+if (!targetPropsFile.isFile()) {
+	throw new GradleException("Unknown build target '${target}': expected ${targetPropsFile} (use -Ptarget=<name>)")
+}
+
 // Should match your modid
 rootProject.name = 'fast-masa-config'
