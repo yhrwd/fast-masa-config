@@ -41,6 +41,8 @@ dependencies {
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 	implementation "com.github.sakura-ryoko:malilib:${project.malilib_version}"
 	compileOnly "com.terraformersmc:modmenu:${project.mod_menu_version}"
+	// 仅开发环境加载 ModMenu，方便从主菜单直接进配置页；发布 jar 不包含它。
+	clientRuntimeOnly "com.terraformersmc:modmenu:${project.mod_menu_version}"
 
 	testImplementation platform("org.junit:junit-bom:5.10.2")
 	testImplementation "org.junit.jupiter:junit-jupiter"

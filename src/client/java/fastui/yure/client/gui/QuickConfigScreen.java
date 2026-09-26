@@ -77,6 +77,11 @@ public final class QuickConfigScreen extends Screen {
             return;
         }
         syncHeldMovementKeys();
+        // 26.3 的 SDL 输入下，字符事件只在文本输入启用时送达；vanilla 会在没有焦点文本框时关闭它，
+        // 数值输入框不是真实文本框，所以手动输入期间需要持续开启。
+        if (this.activeNumericInputGroupId != null) {
+            Minecraft.getInstance().textInputManager().startTextInput(this);
+        }
         if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() && this.activeNumericInputGroupId == null
                 && !isOpenHotkeyPhysicallyHeld()) {
             this.onClose();
@@ -86,6 +91,7 @@ public final class QuickConfigScreen extends Screen {
     @Override
     public void removed() {
         clearNumericInput();
+        Minecraft.getInstance().textInputManager().stopTextInput();
         syncHeldMovementKeys();
         flushPendingDragPersistence();
         super.removed();
@@ -357,7 +363,8 @@ public final class QuickConfigScreen extends Screen {
 
     private boolean handleNumericInputKey(net.minecraft.client.input.KeyEvent event) {
         int keyCode = event.key();
-        if (keyCode == 257 || keyCode == 335) { // Enter and keypad Enter
+        if (keyCode == KeyCodes.KEY_RETURN || keyCode == KeyCodes.KEY_KP_ENTER
+                || keyCode == KeyCodes.KEY_RETURN2) { // Enter and keypad Enter
             commitNumericInput();
             return true;
         }
@@ -365,7 +372,7 @@ public final class QuickConfigScreen extends Screen {
             clearNumericInput();
             return true;
         }
-        if (keyCode == 259 || keyCode == 261) { // Backspace and Delete
+        if (keyCode == KeyCodes.KEY_BACKSPACE || keyCode == KeyCodes.KEY_DELETE) {
             if (this.replaceNumericInputOnType) {
                 this.numericInputText = "";
                 this.replaceNumericInputOnType = false;

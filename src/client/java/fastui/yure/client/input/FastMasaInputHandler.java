@@ -81,12 +81,8 @@ public final class FastMasaInputHandler implements IKeybindProvider {
         }
 
         private static Screen getCurrentScreen(Minecraft client) {
-            try {
-                Object screen = Minecraft.class.getMethod("screen").invoke(client);
-                return screen instanceof Screen value ? value : null;
-            } catch (ReflectiveOperationException ignored) {
-                return null;
-            }
+            // 26.3 起 Minecraft.screen() 已移除，屏幕统一从 Gui 上读取。
+            return client.gui.screen();
         }
 
         private static Set<Integer> getHeldOpenHotkeyCodes() {

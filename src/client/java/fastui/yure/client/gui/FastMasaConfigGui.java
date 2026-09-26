@@ -34,6 +34,7 @@ import fi.dy.masa.malilib.gui.button.ConfigButtonKeybind;
 import fi.dy.masa.malilib.gui.interfaces.IConfigInfoProvider;
 import fi.dy.masa.malilib.gui.interfaces.IDialogHandler;
 import fi.dy.masa.malilib.gui.interfaces.IKeybindConfigGui;
+import fi.dy.masa.malilib.gui.wrappers.TextFieldWrapper;
 import fi.dy.masa.malilib.gui.widgets.WidgetDropDownList;
 import fi.dy.masa.malilib.hotkeys.IKeybind;
 import fi.dy.masa.malilib.hotkeys.KeybindSettings;
@@ -55,6 +56,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Fast Masa Config 的全屏配置界面。
@@ -98,6 +100,11 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private ConfigButtonKeybind openQuickConfigButton;
     private ButtonGeneric hotkeySettingsButton;
     private IConfigBase activeNumericSliderConfig;
+    private IConfigBase editingValueConfig;
+    private GuiTextFieldGeneric numericValueField;
+    private FilterDropdownList modFilterDropdown;
+    private FilterDropdownList groupFilterDropdown;
+    private WidgetDropDownList<ModInfo> modSwitchWidget;
 
     private List<IConfigBase> filteredGenericConfigs = List.of();
     private List<ConfigIndexEntry> configIndex = List.of();
@@ -162,6 +169,12 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     @Override
     public void initGui() {
         super.initGui();
+        // super.initGui 的 clearElements 已清空 textFields，这里只需重置编辑状态。
+        this.editingValueConfig = null;
+        this.numericValueField = null;
+        this.modFilterDropdown = null;
+        this.groupFilterDropdown = null;
+        this.modSwitchWidget = null;
         this.ensureTextInputEnabled();
         ConfigGroupStore.ensureDefaultGroup();
         if (tab == ConfigGuiTab.ALL_CONFIGS) {
@@ -211,6 +224,19 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.quickMessageLabelFieldFocused = this.isQuickMessageLabelFieldHit(mouseX, mouseY);
         this.quickMessageContentFieldFocused = this.isQuickMessageContentFieldHit(mouseX, mouseY);
 
+        // 点击编辑框以外的地方时先提交数值编辑，避免缓冲值滞留。
+        if (this.editingValueConfig != null && this.numericValueField != null
+                && this.numericValueField.isMouseOver(mouseX, mouseY) == false) {
+            this.commitValueEditing();
+        }
+
+        // GuiBase 先派发按钮后派发 widget，展开的下拉会盖住分组操作按钮，
+        // 必须在这里优先接管命中下拉的点击；区域外的点击先收起并吞掉，防止误触下层。
+        if (this.handleFilterDropdownClick(click, doubleClick, mouseX, mouseY)) {
+            this.ensureTextInputEnabled();
+            return true;
+        }
+
         if (super.onMouseClicked(click, doubleClick)) {
             this.ensureTextInputEnabled();
             return true;
@@ -257,6 +283,17 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             return true;
         }
 
+        // malilib 的下拉滚轮处理固定返回 false，鼠标悬在展开下拉上时要吞掉滚动，
+        // 避免背后的配置行跟着一起滚。
+        if (this.isOpenFilterDropdownAt((int) mouseX, (int) mouseY)) {
+            return true;
+        }
+
+        // 滚动会让编辑框脱离所在行，先提交再滚动。
+        if (this.editingValueConfig != null) {
+            this.commitValueEditing();
+        }
+
         if (this.isInsideList((int) mouseX, (int) mouseY)) {
             int previous = this.scrollOffset;
             this.scrollOffset = clamp(this.scrollOffset + (verticalAmount < 0 ? 1 : -1), 0,
@@ -282,6 +319,26 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             return false;
         }
 
+        if (this.editingValueConfig != null && this.numericValueField != null) {
+            // 数值编辑：直接把事件喂给输入框并重申焦点，绕过 malilib 的 wrapper 焦点链，
+            // 避免第一次点击后焦点被其他事件的 setFocused(false) 清掉而需要点两下。
+            this.numericValueField.setFocused(true);
+            if (keyCode == fi.dy.masa.malilib.util.input.KeyCodes.KEY_RETURN
+                    || keyCode == fi.dy.masa.malilib.util.input.KeyCodes.KEY_KP_ENTER
+                    || keyCode == fi.dy.masa.malilib.util.input.KeyCodes.KEY_RETURN2) {
+                this.commitValueEditing();
+                this.ensureTextInputEnabled();
+                return true;
+            }
+            if (keyCode == fi.dy.masa.malilib.util.input.KeyCodes.KEY_ESCAPE) {
+                this.cancelValueEditing();
+                this.ensureTextInputEnabled();
+                return true;
+            }
+            this.ensureTextInputEnabled();
+            return this.numericValueField.keyPressedWrapper(input);
+        }
+
         if (this.activeKeybindButton != null) {
             this.activeKeybindButton.onKeyPressed(keyCode);
             this.notifyOwnConfigChanged(true);
@@ -289,7 +346,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             return true;
         }
 
-        if (keyCode == 257 && this.tab == ConfigGuiTab.QUICK_MESSAGES
+        if (keyCode == fi.dy.masa.malilib.util.input.KeyCodes.KEY_RETURN && this.tab == ConfigGuiTab.QUICK_MESSAGES
                 && this.quickMessageContentField != null && this.quickMessageContentField.isFocused()) {
             this.saveQuickMessage();
             this.ensureTextInputEnabled();
@@ -306,7 +363,12 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         if (this.inputSuppressor.shouldSuppressChar()) {
             return true;
         }
-
+        if (this.editingValueConfig != null && this.numericValueField != null) {
+            this.numericValueField.setFocused(true);
+            boolean handled = this.numericValueField.charTypedWrapper(input);
+            this.ensureTextInputEnabled();
+            return handled;
+        }
         return super.onCharTyped(input);
     }
 
@@ -320,6 +382,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     @Override
     public void removed() {
         Minecraft.getInstance().textInputManager().stopTextInput();
+        this.editingValueConfig = null;
+        this.numericValueField = null;
         if (this.activeKeybindButton != null) {
             this.setActiveKeybindButton(null);
         }
@@ -423,7 +487,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
         if (thisMod != null && MaLiLibConfigs.Generic.ENABLE_CONFIG_SWITCHER.getBooleanValue()) {
             ModInfo selectedMod = thisMod;
-            WidgetDropDownList<ModInfo> modSwitchWidget = new WidgetDropDownList<>(
+            this.modSwitchWidget = new WidgetDropDownList<>(
                     GuiUtils.getScaledWindowWidth() - 155, 6, 130, 18, 200, 10,
                     Registry.CONFIG_SCREEN.getAllModsWithConfigScreens()) {
                 {
@@ -449,7 +513,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                 }
             };
 
-            this.addWidget(modSwitchWidget);
+            this.addWidget(this.modSwitchWidget);
         }
     }
 
@@ -487,17 +551,14 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         int modButtonWidth = !supportsConfigFilters ? 0 : (compactFilters ? 60 : 118);
         int groupButtonWidth = !supportsConfigFilters ? 0 : (compactFilters ? 60 : 118);
         int searchY = this.getSearchY();
+        // 三个筛选控件的间距合计 24px（6+6+12），扣准后分组下拉右缘恰好对齐右边距。
         int searchWidth = wrapFilters ? Math.max(80, this.width - MARGIN * 2) : Math.min(220,
-                Math.max(80, this.width - MARGIN * 2 - filterButtonWidth - modButtonWidth - groupButtonWidth - 18));
+                Math.max(80, this.width - MARGIN * 2 - filterButtonWidth - modButtonWidth - groupButtonWidth - 24));
         this.searchField = new GuiTextFieldGeneric(MARGIN, searchY, searchWidth, 18, this.font);
         this.searchFieldWidth = searchWidth;
         this.searchField.setMaxLength(128);
         this.searchField.setSuggestion("");
-        this.addTextField(this.searchField, field -> {
-            this.scrollOffset = 0;
-            this.refreshVisibleRows();
-            return true;
-        });
+        this.registerSearchField();
 
         if (tab == ConfigGuiTab.ALL_CONFIGS) {
             int filterY = wrapFilters ? searchY + BUTTON_HEIGHT + 4 : searchY - 1;
@@ -508,20 +569,13 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                         this.scrollOffset = 0;
                         this.initGui();
                     });
-            this.addButton(new ButtonGeneric(filterX + filterButtonWidth + 6, filterY,
-                    modButtonWidth, BUTTON_HEIGHT, this.getModFilterButtonText()), (button, mouseButton) -> {
-                        this.cycleModFilter();
-                        this.scrollOffset = 0;
-                        this.initGui();
-                    });
-            this.addButton(
-                    new ButtonGeneric(filterX + filterButtonWidth + modButtonWidth + 12, filterY,
-                            groupButtonWidth, BUTTON_HEIGHT, this.getGroupFilterButtonText()),
-                    (button, mouseButton) -> {
-                        this.cycleGroupFilter();
-                        this.scrollOffset = 0;
-                        this.initGui();
-                    });
+            // 模组/分组筛选条目多，循环按钮换成可直接跳选的下拉；后加入的 widget 渲染在最上层。
+            this.modFilterDropdown = this.createModFilterDropdown(filterX + filterButtonWidth + 6, filterY,
+                    modButtonWidth);
+            this.addWidget(this.modFilterDropdown);
+            this.groupFilterDropdown = this.createGroupFilterDropdown(
+                    filterX + filterButtonWidth + modButtonWidth + 12, filterY, groupButtonWidth);
+            this.addWidget(this.groupFilterDropdown);
         } else if (tab == ConfigGuiTab.GENERIC) {
             this.createGenericButtons();
         }
@@ -748,10 +802,23 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                 GuiHitTest.isInside(mouseX, mouseY, buttonX, y + 5, 64, BUTTON_HEIGHT));
     }
 
+    /** 搜索框的 textFields 注册；数值编辑的 clearTextFields 会连带清掉它，清完后调用本方法补回。 */
+    private void registerSearchField() {
+        if (this.searchField == null) {
+            return;
+        }
+        this.addTextField(this.searchField, field -> {
+            this.scrollOffset = 0;
+            this.refreshVisibleRows();
+            return true;
+        });
+    }
+
     private void drawListHeader(GuiContext context, int visibleCount, int totalCount) {
+        // 计数放进顶部标题栏右侧；右上角有模组切换下拉时留出它的宽度，避免相互覆盖。
         String text = visibleCount + " / " + totalCount;
-        this.drawString(context, text, this.width - MARGIN - this.getStringWidth(text), this.getSearchY() + 5,
-                COLOR_MUTED);
+        int rightEdge = this.modSwitchWidget != null ? this.modSwitchWidget.getX() - 8 : this.width - MARGIN;
+        this.drawString(context, text, rightEdge - this.getStringWidth(text), 9, COLOR_MUTED);
     }
 
     private void drawSearchSuggestion(GuiContext context) {
@@ -863,7 +930,10 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private void drawNumericControl(GuiContext context, IConfigBase config, NumericControlLayout layout, int y,
             int mouseX, int mouseY,
             String valueText, double ratio) {
-        this.drawValueBox(context, layout.valueX(), y, layout.valueWidth(), valueText);
+        // 编辑中的行由 GuiBase.drawTextFields 绘制真实输入框（含光标和 vanilla 边框），这里跳过自绘值框。
+        if (this.editingValueConfig != config) {
+            this.drawValueBox(context, layout.valueX(), y, layout.valueWidth(), valueText);
+        }
         this.drawNumericSlider(context, layout.sliderX(), y, layout.sliderWidth(), ratio,
                 GuiHitTest.isInside(mouseX, mouseY, layout.sliderX(), y, layout.sliderWidth(), BUTTON_HEIGHT));
         this.drawResetButton(context, config, layout.resetX(), y, layout.resetWidth(), mouseX, mouseY);
@@ -918,6 +988,23 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             }
         } else if (config instanceof IConfigInteger || config instanceof IConfigDouble) {
             NumericControlLayout layout = NumericControlLayout.calculate(this.width);
+            boolean clickedValueBox = GuiHitTest.isInside(mouseX, mouseY, layout.valueX(), y, layout.valueWidth(),
+                    BUTTON_HEIGHT);
+            if (this.editingValueConfig != null && this.editingValueConfig != config) {
+                this.commitValueEditing();
+            }
+            if (clickedValueBox) {
+                if (this.editingValueConfig == config) {
+                    this.commitValueEditing();
+                } else {
+                    this.beginValueEditing(config, layout, y);
+                }
+                return true;
+            }
+            if (this.editingValueConfig == config) {
+                // 编辑同一行时点击滑块/重置，先提交再执行原逻辑。
+                this.commitValueEditing();
+            }
             if (this.handleNumericSliderClick(config, mouseX, mouseY, layout, y)) {
                 return true;
             }
@@ -1622,47 +1709,113 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         return this.filterMode.next();
     }
 
-    private String getModFilterButtonText() {
-        if (this.isCompactFilterLayout()) {
-            return StringUtils.translate("fast-masa-config.gui.full.filter.mod.compact");
-        }
-        String label = this.selectedModId.isBlank()
-                ? StringUtils.translate("fast-masa-config.gui.full.filter.value_all")
-                : this.getSelectedModName();
-        return StringUtils.translate("fast-masa-config.gui.full.filter.mod", label);
-    }
-
-    private String getGroupFilterButtonText() {
-        if (this.isCompactFilterLayout()) {
-            return StringUtils.translate("fast-masa-config.gui.full.filter.group.compact");
-        }
-        String label = this.selectedConfigGroupId.isBlank()
-                ? StringUtils.translate("fast-masa-config.gui.full.filter.value_all")
-                : this.getSelectedGroupName();
-        return StringUtils.translate("fast-masa-config.gui.full.filter.group", label);
-    }
-
-    private void cycleModFilter() {
-        List<String> modIds = this.configIndex.stream()
-                .map(entry -> entry.modId())
+    private FilterDropdownList createModFilterDropdown(int x, int y, int width) {
+        List<FilterDropdownList.Option> options = new ArrayList<>();
+        options.add(new FilterDropdownList.Option("",
+                StringUtils.translate("fast-masa-config.gui.full.filter.value_all")));
+        this.configIndex.stream()
+                .map(ConfigIndexEntry::modId)
                 .distinct()
-                .toList();
-        int index = modIds.indexOf(this.selectedModId);
-        this.selectedModId = index < 0 ? (modIds.isEmpty() ? "" : modIds.get(0))
-                : (index + 1 >= modIds.size() ? "" : modIds.get(index + 1));
-        this.selectedConfigGroupId = "";
+                .forEach(modId -> options.add(new FilterDropdownList.Option(modId, this.modDisplayName(modId))));
+        return this.createFilterDropdown(x, y, width, options, this.selectedModId, option -> {
+            if (option.id().equals(this.selectedModId) == false) {
+                this.selectedModId = option.id();
+                this.selectedConfigGroupId = "";
+                this.scrollOffset = 0;
+                this.initGui();
+            }
+        });
     }
 
-    private void cycleGroupFilter() {
-        List<String> groupIds = this.configIndex.stream()
+    private FilterDropdownList createGroupFilterDropdown(int x, int y, int width) {
+        List<FilterDropdownList.Option> options = new ArrayList<>();
+        options.add(new FilterDropdownList.Option("",
+                StringUtils.translate("fast-masa-config.gui.full.filter.value_all")));
+        this.configIndex.stream()
                 .filter(entry -> this.selectedModId.isBlank() || entry.modId().equals(this.selectedModId))
-                .map(entry -> entry.groupId())
+                .map(ConfigIndexEntry::groupId)
                 .filter(groupId -> groupId.isBlank() == false)
                 .distinct()
-                .toList();
-        int index = groupIds.indexOf(this.selectedConfigGroupId);
-        this.selectedConfigGroupId = index < 0 ? (groupIds.isEmpty() ? "" : groupIds.get(0))
-                : (index + 1 >= groupIds.size() ? "" : groupIds.get(index + 1));
+                .forEach(groupId -> options.add(new FilterDropdownList.Option(groupId, this.groupDisplayName(groupId))));
+        return this.createFilterDropdown(x, y, width, options, this.selectedConfigGroupId, option -> {
+            if (option.id().equals(this.selectedConfigGroupId) == false) {
+                this.selectedConfigGroupId = option.id();
+                this.scrollOffset = 0;
+                this.initGui();
+            }
+        });
+    }
+
+    private FilterDropdownList createFilterDropdown(int x, int y, int width, List<FilterDropdownList.Option> options,
+            String selectedId, Consumer<FilterDropdownList.Option> onChanged) {
+        FilterDropdownList dropdown = new FilterDropdownList(x, y, width, BUTTON_HEIGHT, 200, 10, options);
+        options.stream()
+                .filter(option -> option.id().equals(selectedId))
+                .findFirst()
+                .ifPresent(dropdown::setSelectedEntry);
+        dropdown.setChangedHandler(onChanged);
+        return dropdown;
+    }
+
+    /** 展开中的下拉要挡住下层按钮和列表：命中下拉的点击直接交给下拉，其余点击收起并吞掉。 */
+    private boolean handleFilterDropdownClick(net.minecraft.client.input.MouseButtonEvent click, boolean doubleClick,
+            int mouseX, int mouseY) {
+        if (tab != ConfigGuiTab.ALL_CONFIGS || this.modFilterDropdown == null || this.groupFilterDropdown == null) {
+            return false;
+        }
+        boolean modOpen = this.modFilterDropdown.isOpenDropdown();
+        boolean groupOpen = this.groupFilterDropdown.isOpenDropdown();
+        if (modOpen == false && groupOpen == false) {
+            return false;
+        }
+
+        FilterDropdownList open = modOpen ? this.modFilterDropdown : this.groupFilterDropdown;
+        FilterDropdownList target = open.isMouseOver(mouseX, mouseY) ? open
+                : (this.modFilterDropdown.isMouseOver(mouseX, mouseY) ? this.modFilterDropdown
+                        : (this.groupFilterDropdown.isMouseOver(mouseX, mouseY) ? this.groupFilterDropdown : null));
+        if (target == null) {
+            this.closeFilterDropdowns();
+            return true;
+        }
+
+        if (target != open) {
+            open.closeDropdown();
+        }
+        target.onMouseClicked(click, doubleClick);
+        return true;
+    }
+
+    private boolean isOpenFilterDropdownAt(int mouseX, int mouseY) {
+        return this.modFilterDropdown != null && this.modFilterDropdown.isOpenDropdown()
+                && this.modFilterDropdown.isMouseOver(mouseX, mouseY)
+                || this.groupFilterDropdown != null && this.groupFilterDropdown.isOpenDropdown()
+                        && this.groupFilterDropdown.isMouseOver(mouseX, mouseY);
+    }
+
+    private void closeFilterDropdowns() {
+        if (this.modFilterDropdown != null) {
+            this.modFilterDropdown.closeDropdown();
+        }
+        if (this.groupFilterDropdown != null) {
+            this.groupFilterDropdown.closeDropdown();
+        }
+    }
+
+    private String modDisplayName(String modId) {
+        return this.configIndex.stream()
+                .filter(entry -> entry.modId().equals(modId))
+                .map(ConfigIndexEntry::modName)
+                .findFirst()
+                .orElse(modId);
+    }
+
+    private String groupDisplayName(String groupId) {
+        return this.configIndex.stream()
+                .filter(entry -> this.selectedModId.isBlank() || entry.modId().equals(this.selectedModId))
+                .filter(entry -> entry.groupId().equals(groupId))
+                .map(ConfigIndexEntry::groupName)
+                .findFirst()
+                .orElse(groupId);
     }
 
     private void normalizeSelectedFilters(List<ConfigIndexEntry> index) {
@@ -1679,21 +1832,58 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         }
     }
 
-    private String getSelectedModName() {
-        return this.configIndex.stream()
-                .filter(entry -> entry.modId().equals(this.selectedModId))
-                .map(entry -> entry.modName())
-                .findFirst()
-                .orElse(this.selectedModId);
+    private void beginValueEditing(IConfigBase config, NumericControlLayout layout, int y) {
+        this.cancelValueEditing();
+        this.editingValueConfig = config;
+        String current = config instanceof IConfigInteger integerConfig ? integerConfig.getStringValue()
+                : (config instanceof IConfigDouble doubleConfig ? formatDouble(doubleConfig.getDoubleValue()) : "");
+        // 每次编辑新建输入框：malilib 的 GuiTextFieldGeneric 构造函数会同步其内部全部坐标状态，
+        // 事后 setX/setY 只更新它的影子字段，文本和光标仍会画在旧位置（表现为空白）。
+        this.numericValueField = new GuiTextFieldGeneric(layout.valueX(), y, layout.valueWidth(), BUTTON_HEIGHT,
+                this.font);
+        this.numericValueField.setValue(current);
+        this.numericValueField.setMaxLength(16);
+        this.numericValueField.setFocused(true);
+        this.addTextField(this.numericValueField, field -> true);
     }
 
-    private String getSelectedGroupName() {
-        return this.configIndex.stream()
-                .filter(entry -> this.selectedModId.isBlank() || entry.modId().equals(this.selectedModId))
-                .filter(entry -> entry.groupId().equals(this.selectedConfigGroupId))
-                .map(entry -> entry.groupName())
-                .findFirst()
-                .orElse(this.selectedConfigGroupId);
+    private void commitValueEditing() {
+        GuiTextFieldGeneric field = this.numericValueField;
+        IConfigBase config = this.editingValueConfig;
+        String text = field != null ? field.getValue().trim() : "";
+        this.cancelValueEditing();
+        if (config == null) {
+            return;
+        }
+        try {
+            if (config instanceof IConfigInteger integerConfig) {
+                int value = Math.max(integerConfig.getMinIntegerValue(),
+                        Math.min(integerConfig.getMaxIntegerValue(), Integer.parseInt(text)));
+                if (value != integerConfig.getIntegerValue()) {
+                    integerConfig.setIntegerValue(value);
+                    this.notifyOwnConfigChanged(false);
+                }
+            } else if (config instanceof IConfigDouble doubleConfig) {
+                double value = Math.max(doubleConfig.getMinDoubleValue(),
+                        Math.min(doubleConfig.getMaxDoubleValue(), Double.parseDouble(text)));
+                if (value != doubleConfig.getDoubleValue()) {
+                    doubleConfig.setDoubleValue(value);
+                    this.notifyOwnConfigChanged(false);
+                }
+            }
+        } catch (NumberFormatException ignored) {
+            // 非法输入直接放弃本次编辑，显示回原值。
+        }
+    }
+
+    private void cancelValueEditing() {
+        this.editingValueConfig = null;
+        this.numericValueField = null;
+        if (this.searchField != null) {
+            // 注销编辑框的唯一途径是清空 textFields，清完把搜索框补注册回来。
+            this.clearTextFields();
+            this.registerSearchField();
+        }
     }
 
     private double getIntegerRatio(IConfigInteger config) {
@@ -1768,8 +1958,15 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             int sliderWidth = screenWidth <= 360 ? 42 : NUMERIC_SLIDER_WIDTH;
             int resetWidth = 54;
             int totalWidth = valueWidth + 6 + sliderWidth + 6 + resetWidth;
-            int rightEdge = screenWidth - MARGIN - SCROLLBAR_WIDTH;
-            int valueX = Math.max(MARGIN + 96, rightEdge - totalWidth);
+            // 值输入框左缘对齐其他行开关按钮的左缘（即 getControlX），整组放不下时退回右对齐。
+            int controlX = Math.max(MARGIN + 120, screenWidth - MARGIN - 184);
+            int rightEdge = screenWidth - MARGIN;
+            int valueX;
+            if (controlX + totalWidth <= rightEdge) {
+                valueX = controlX;
+            } else {
+                valueX = Math.max(MARGIN + 96, rightEdge - totalWidth);
+            }
             int sliderX = valueX + valueWidth + 6;
             int resetX = sliderX + sliderWidth + 6;
             return new NumericControlLayout(valueX, valueWidth, sliderX, sliderWidth, resetX, resetWidth);
