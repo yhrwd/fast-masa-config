@@ -1,0 +1,5 @@
+# Common mixins target 26.x MojMap names; this target ships yarn equivalents.
+client/java/fastui/yure/client/mixin/ClientLevelRendererAccessor.java
+client/java/fastui/yure/client/mixin/EntityRendererMixin.java
+client/java/fastui/yure/client/mixin/LevelRendererBlockBreakOverlayMixin.java
+client/java/fastui/yure/client/mixin/ShaderManagerMixin.java

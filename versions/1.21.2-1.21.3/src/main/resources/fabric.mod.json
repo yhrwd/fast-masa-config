@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "fast-masa-config",
+  "version": "${version}",
+  "name": "Fast Masa Config",
+  "description": "给 MaLiLib 配置加一块随叫随到的快捷面板：按住热键，常用开关和滑条立刻到手边。",
+  "authors": ["YureHiran"],
+  "contact": {
+    "sources": ""
+  },
+  "license": "GPL-3.0-or-later",
+  "icon": "assets/fast-masa-config/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["fastui.yure.client.FastMasaConfigClient"],
+    "modmenu": ["fastui.yure.client.compat.modmenu.FastMasaModMenuImpl"]
+  },
+  "mixins": [
+    "fast-masa-config.client.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.4",
+    "minecraft": ">=1.21.2 <=1.21.3",
+    "java": ">=21",
+    "fabric-api": "*",
+    "malilib": ">=0.22.0- <0.23.0-"
+  }
+}
