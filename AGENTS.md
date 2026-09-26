@@ -12,7 +12,7 @@
 
 - Single main branch hosts all Minecraft versions. `src/` is the common baseline and always targets the newest game version; new features land here first, then get ported to older targets.
 - `versions/<target>/gradle.properties` declares one build target (minecraft/loader/fabric api/malilib/mod versions, `loom_pipeline`, `java_release`). Build it with `./gradlew -Ptarget=<target> ...`; no `-Ptarget` means `26.3`.
-- `versions/<target>/src/{main,client}/...` holds version-specific overrides: a file there replaces the same-path file in `src/`. Overrides shrink as common code is made version-agnostic — prefer deleting an override over editing both copies.
+- `versions/<target>/src/{main,client,test}/...` holds version-specific overrides: a file there replaces the same-path file in `src/`. `versions/<target>/common-excluded.txt` lists `src/`-relative paths of common files that do not exist for that target's feature generation. Overrides shrink as common code is made version-agnostic — prefer deleting an override over editing both copies.
 - `src/main/java` contains environment-independent configuration models, stores, and MaLiLib config editing.
 - `src/client/java` contains all Minecraft client entrypoints, scanning, input handling, and custom GUI code; do not move client-only imports into `src/main`.
 - `src/main/resources` contains `fabric.mod.json`, translations, and assets. Keep new visible UI strings in both `zh_cn.json` and `en_us.json`.

@@ -32,6 +32,11 @@ apply plugin: 'maven-publish'
 version = targetProp('mod_version')
 group = project.maven_group
 
+// Per-target artifact output so building one target never clobbers another's jars.
+base {
+	libsDirectory = file("build/libs/${target}")
+}
+
 repositories {
 	maven { url = 'https://masa.dy.fi/maven' }
 	maven { url = 'https://maven.terraformersmc.com/releases/' }
@@ -58,13 +63,28 @@ loom {
 
 }
 
-// A common source file is shadowed when the override tree contains the same path.
+// Common files listed in versions/<target>/common-excluded.txt (src/-relative paths)
+// do not exist for this target's feature generation and are left out of the build.
+def commonExcluded = new HashSet<String>()
+def commonExcludedFile = file("versions/${target}/common-excluded.txt")
+if (commonExcludedFile.isFile()) {
+	commonExcludedFile.eachLine { line ->
+		def trimmed = line.trim()
+		if (trimmed && !trimmed.startsWith('#')) commonExcluded << trimmed
+	}
+}
+
+// A common source file is dropped when it is excluded for this target, or shadowed
+// by the same path in the override tree.
+def srcRoot = file('src').toPath()
 def shadowedBy = { java.nio.file.Path commonRoot, java.nio.file.Path overrideRoot ->
 	return { element ->
 		def f = element.file
 		if (!f.isFile()) return false
 		def p = f.toPath()
 		if (!p.startsWith(commonRoot)) return false
+		def srcRelative = srcRoot.relativize(p).toString().replace(File.separatorChar, '/' as char)
+		if (commonExcluded.contains(srcRelative)) return true
 		overrideRoot.resolve(commonRoot.relativize(p)).toFile().exists()
 	}
 }
@@ -88,6 +108,12 @@ sourceSets {
 		resources {
 			srcDir "versions/${target}/src/client/resources"
 			exclude shadowedBy(file('src/client/resources').toPath(), file("versions/${target}/src/client/resources").toPath())
+		}
+	}
+	test {
+		java {
+			srcDir "versions/${target}/src/test/java"
+			exclude shadowedBy(file('src/test/java').toPath(), file("versions/${target}/src/test/java").toPath())
 		}
 	}
 }

@@ -16,25 +16,35 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@v6
 
+      - name: resolve version target from tag
+        id: resolve
+        run: |
+          # mc26.2-v5.3.0 -> target 26.2; mc1.21.8-v2.3.1 -> target 1.21.8
+          target="${GITHUB_REF_NAME#mc}"
+          target="${target%%-v*}"
+          if [[ "$target" == 1.* ]]; then java_version=21; else java_version=25; fi
+          echo "target=${target}" >> "$GITHUB_OUTPUT"
+          echo "java=${java_version}" >> "$GITHUB_OUTPUT"
+
       - name: validate gradle wrapper
         uses: gradle/actions/wrapper-validation@v6
 
       - name: setup jdk
         uses: actions/setup-java@v5
         with:
-          java-version: '25'
+          java-version: '${{ steps.resolve.outputs.java }}'
           distribution: 'microsoft'
 
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
 
       - name: build
-        run: ./gradlew build
+        run: ./gradlew -Ptarget=${{ steps.resolve.outputs.target }} build --no-daemon
 
       - name: collect release jars
         run: |
           mkdir -p release
-          find build/libs -maxdepth 1 -type f -name '*.jar' \
+          find build/libs -type f -name '*.jar' \
             ! -name '*-sources.jar' \
             ! -name '*-dev.jar' \
             -exec cp {} release/ \;

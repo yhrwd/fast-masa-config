@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "fast-masa-config",
+  "version": "${version}",
+  "name": "Fast Masa Config",
+  "description": "为 MaLiLib 配置提供可自定义的悬浮快捷面板、快捷消息、实体渲染过滤和挖掘进度工具。",
+  "authors": ["YureHiran"],
+  "contact": {
+    "sources": ""
+  },
+  "license": "GPL-3.0-or-later",
+  "icon": "assets/fast-masa-config/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["fastui.yure.client.FastMasaConfigClient"],
+    "modmenu": ["fastui.yure.client.compat.modmenu.FastMasaModMenuImpl"]
+  },
+  "mixins": [
+    "fast-masa-config.client.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.4",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": "*",
+    "malilib": ">=0.28.8-"
+  }
+}
