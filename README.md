@@ -17,6 +17,7 @@ Fast Masa Config 的设计初衷很直接：Minecraft 中便于使用的按键�
 以下截图展示的是旧版用户界面，仅用于说明功能和交互方式；当前版本的界面布局与视觉样式可能有所不同。
 
 ![旧版快捷面板](https://cdn.modrinth.com/data/cached_images/f0539a0eb95e5877f503e5cf3af1f2d63f23362f.png)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fyhrwd%2Ffast-masa-config.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fyhrwd%2Ffast-masa-config?ref=badge_shield)
 
 ![旧版快捷面板](https://cdn.modrinth.com/data/cached_images/2fcc46a9a05af551c4221e2f52e53923a2cb2aea.png)
 
@@ -223,3 +224,7 @@ versions/<目标>/                        版本目标：gradle.properties、覆
 本项目使用 `GPL-3.0-or-later` 许可证。悬浮窗口的部分视觉行为参考了 [Meteor Client](https://github.com/MeteorDevelopment/meteor-client) 的公开实现，相关源码文件保留了来源和 GPL-3.0 许可证说明。
 
 Fast Masa Config 是独立项目，与 Meteor Client 及其开发团队没有官方隶属或背书关系。修改版发布时需要保留作者和许可证声明，并按 GPL 要求提供对应源码；本项目按原样提供，不包含任何担保。详见 [LICENSE](LICENSE)。
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fyhrwd%2Ffast-masa-config.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fyhrwd%2Ffast-masa-config?ref=badge_large)
