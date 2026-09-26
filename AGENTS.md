@@ -13,6 +13,7 @@
 - Single main branch hosts all Minecraft versions. `src/` is the common baseline and always targets the newest game version; new features land here first, then get ported to older targets.
 - `versions/<target>/gradle.properties` declares one build target (minecraft/loader/fabric api/malilib/mod versions, `loom_pipeline`, `java_release`, `game_versions`). Build it with `./gradlew -Ptarget=<target> ...`; no `-Ptarget` means `26.3`.
 - Target folders that ship one jar across a compatible line use range names matching the shared group (`1.21-1.21.1`, `1.21.6-1.21.8`); their `fabric.mod.json` declares the full depends range (`">=1.21.6 <=1.21.8"`). 26.x targets are single-version (`26.2`, `26.3`) because the API churns every release. `game_versions` lists the Modrinth game versions a release covers; release tags follow `mc<target>-v<feature>`, e.g. `mc1.21.6-1.21.8-v5.4.0`.
+- To add a new version target: copy the nearest `versions/<target>/`, update its properties (`loom_pipeline`, `java_release`, deps, `mod_version`, `game_versions`) and `fabric.mod.json` depends range, then add same-path override files in its `src/` only where the API differs. The step-by-step recipe is in README 本地开发.
 - `versions/<target>/src/{main,client,test}/...` holds version-specific overrides: a file there replaces the same-path file in `src/`. `versions/<target>/common-excluded.txt` lists `src/`-relative paths of common files that do not exist for that target's feature generation. Overrides shrink as common code is made version-agnostic — prefer deleting an override over editing both copies.
 - `src/main/java` contains environment-independent configuration models, stores, and MaLiLib config editing.
 - `src/client/java` contains all Minecraft client entrypoints, scanning, input handling, and custom GUI code; do not move client-only imports into `src/main`.
@@ -22,7 +23,7 @@
 ## Commands
 
 - Full tests: `./gradlew test` or Windows `./gradlew.bat test` (default target 26.3).
-- Another version target: prefix any task with `-Ptarget=<target>`, e.g. `./gradlew -Ptarget=1.21.8 build`; dev clients run in `run/<target>/`.
+- Another version target: prefix any task with `-Ptarget=<target>`, e.g. `./gradlew -Ptarget=1.21.6-1.21.8 build`; valid targets are the directory names under `versions/` (no flag = `26.3`). Dev clients run in `run/<target>/`; jars accumulate in `build/libs/` with the target version in the filename.
 - Focused test: `./gradlew test --tests fully.qualified.TestClass`.
 - Client compilation: `./gradlew compileClientJava`.
 - Build every target from a shell (no helper script): PowerShell `gci versions -Directory | % { ./gradlew.bat "-Ptarget=$($_.Name)" build }`; bash `for t in versions/*/; do ./gradlew "-Ptarget=$(basename $t)" build; done`. Jars accumulate in `build/libs/` (filenames embed the target version, so nothing clobbers).

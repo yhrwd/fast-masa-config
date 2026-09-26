@@ -65,14 +65,6 @@ Fast Masa Config 的设计初衷很直接：Minecraft 中便于使用的按键�
 - 实体列表为可搜索的二级选择页，可按实体名称或命名空间 ID 搜索并点选，不需要手动输入 ID。
 - 挖掘进度相关设置也集中在工具页，方便在游戏中快速调整。
 
-### 5.2.0 更新
-
-- 全屏配置界面改用 MaLiLib 风格的半透明背景、暗色主题和更清晰的控件对比度。
-- 工具页的实体过滤开关、白名单开关和实体选择器重新整理；搜索输入会保持焦点。
-- 实体过滤在原版可见性判断之后执行，不会覆盖距离、视锥或其他渲染条件。
-- 白名单开启时只渲染列表内实体；关闭时隐藏列表内实体；关闭过滤时完全不影响实体渲染。
-- 快捷消息变量说明、快捷面板主题色和本模组可加入快捷菜单的配置项均已补充。
-
 ### 扫描与诊断
 
 - 提供客户端命令扫描当前已加载的 MaLiLib 配置项。
@@ -80,15 +72,17 @@ Fast Masa Config 的设计初衷很直接：Minecraft 中便于使用的按键�
 
 ## 支持环境
 
-当前主线面向以下环境开发：
+本仓库在单一 main 分支上同时维护多个 Minecraft 版本目标，每个目标产出一个独立 jar：
 
-- Minecraft `26.2`
-- Fabric Loader `0.19.3` 或更高版本
-- Java `25` 或更高版本
-- Fabric API
-- MaLiLib `0.29.x`
+| 构建目标 | 覆盖的 Minecraft 版本 | MaLiLib |
+|---|---|---|
+| `26.3`（默认） | 26.3 | 0.30.x |
+| `26.2` | 26.2 | 0.29.x |
+| `26.1.2` | 26.1.2 | 0.28.x |
+| `1.21.6-1.21.8` | 1.21.6 ~ 1.21.8（单 jar 覆盖） | 0.25.x |
+| `1.21-1.21.1` | 1.21 ~ 1.21.1（单 jar 覆盖） | 0.21.x |
 
-不同 Minecraft 版本对应的 Fabric API、MaLiLib、Mod Menu 和 Yarn mappings 版本不同，请以对应分支的 `gradle.properties` 和 `fabric.mod.json` 为准。
+各目标依赖的 Fabric API、MaLiLib、Mod Menu 和 mappings 版本，以 `versions/<目标>/gradle.properties` 与对应 `fabric.mod.json` 为准。Java 要求：26.x 目标为 25，1.21.x 目标为 21。
 
 ## 依赖
 
@@ -155,39 +149,62 @@ Fast Masa Config 主要依赖 MaLiLib 配置界面暴露出来的信息。大多
 
 ## 本地开发
 
-需要 Java 25。构建项目：
+仓库采用"单仓多版本"结构：`src/` 是公共基线，永远面向最新版本；每个 Minecraft 版本目标在 `versions/<目标>/` 下，用覆盖文件表达版本差异。
+
+### 环境要求
+
+- JDK 25（默认目标 26.3 使用；Gradle 工具链自动探测，无需设置 `JAVA_HOME`）。
+- 构建 1.21.x 目标时需要本机有 JDK 21 工具链。
+- Windows / Linux / macOS 均可，使用仓库自带的 Gradle wrapper。
+
+### 构建指定版本
+
+可用目标就是 `versions/` 下的目录名：
 
 ```bash
-./gradlew build
+./gradlew -Ptarget=1.21.6-1.21.8 build     # 构建指定目标（含测试）
+./gradlew build                             # 不带参数 = 默认目标 26.3
+./gradlew -Ptarget=1.21-1.21.1 test         # 只跑指定目标的测试
+./gradlew -Ptarget=26.2 compileClientJava   # 只编译指定目标的客户端代码
 ```
 
-运行测试：
+jar 统一输出到 `build/libs/`，文件名自带目标版本号（例如 `fast-masa-config-1.21.6-1.21.8-2.3.1.jar`），多个目标的产物可以共存。
 
-```bash
-./gradlew test
-```
-
-编译客户端源码（包括 Fabric 客户端入口和 Mixin）：
-
-```bash
-./gradlew compileClientJava
-```
-
-Windows 环境可以使用：
+### 构建全部目标
 
 ```powershell
-.\gradlew.bat build
-.\gradlew.bat test
-.\gradlew.bat compileClientJava
+gci versions -Directory | % { .\gradlew.bat "-Ptarget=$($_.Name)" build }   # PowerShell
 ```
 
-本地开发时主要关注这些配置文件：
+```bash
+for t in versions/*/; do ./gradlew "-Ptarget=$(basename $t)" build; done     # bash
+```
 
-- `gradle.properties`：Minecraft、Yarn、Fabric Loader、Fabric API、MaLiLib、Mod Menu 和 Mod 版本。
-- `build.gradle`：Loom、源码集、依赖来源、打包和测试配置。
-- `src/main/resources/fabric.mod.json`：Mod 元数据、入口点、运行环境和依赖范围。
+CI 在每次 push 到 main 时会对所有目标执行同样的构建矩阵。
 
-`libs/` 目录用于本地开发和兼容性测试，其中可能放有大量测试用 Mod jar。它们不是全部发布依赖，实际依赖请以 `gradle.properties`、`build.gradle` 和 `fabric.mod.json` 为准。
+### 运行开发客户端
+
+```bash
+./gradlew -Ptarget=26.3 runClient
+```
+
+每个目标使用独立的运行目录 `run/<目标>/`，配置和存档互不干扰。首次以某目标运行会自动下载对应的 Minecraft、mappings 和依赖。
+
+### 新增一个版本目标
+
+1. 复制最接近的 `versions/<目标>/` 目录并改名；可共用的版本线用区间命名（如 `1.21.9-1.21.10`）。
+2. 修改 `gradle.properties`：依赖版本、`loom_pipeline`（26.x 为 `standard`，1.21.x 为 `remap`）、`java_release`、`mod_version`、`game_versions`。
+3. 修改目标覆盖目录里的 `fabric.mod.json` 依赖区间，使其覆盖整个组。
+4. 该版本 API 有差异时，把差异文件按相同路径放进 `versions/<目标>/src/` 覆盖公共代码；该目标不存在的公共类登记到 `common-excluded.txt`。
+
+### 主要配置文件
+
+- `gradle.properties`：全局构建参数和 Loom 版本（所有目标共用一个 Loom）。
+- `versions/<目标>/gradle.properties`：该目标的 Minecraft、依赖、管线和 Java 版本。
+- `versions/<目标>/src/`：版本覆盖源码与资源（含 `fabric.mod.json`）。
+- `src/main/resources/fabric.mod.json`：默认目标的 Mod 元数据和依赖范围。
+
+更新日志见 [MODRINTH.md](MODRINTH.md)。
 
 ## 项目结构
 
@@ -195,12 +212,11 @@ Windows 环境可以使用：
 src/main/java/fastui/yure/config/       通用配置、快捷项存储和配置编辑逻辑
 src/client/java/fastui/yure/client/     Fabric 客户端入口、扫描、输入和 GUI
 src/main/resources/                     fabric.mod.json、图标和语言文件
-src/test/java/                          单元测试
-libs/                                   本地兼容性测试用 jar，不代表全部依赖
-docs/                                   开发文档和计划记录
+src/test/java/                          单元测试（无 Minecraft 依赖，随每个目标构建运行）
+versions/<目标>/                        版本目标：gradle.properties、覆盖源码、common-excluded.txt
 ```
 
-客户端代码使用 Loom 的 split environment source sets，Minecraft 客户端相关代码放在 `src/client/java`，通用配置和数据结构放在 `src/main/java`。
+客户端代码使用 Loom 的 split environment source sets，Minecraft 客户端相关代码放在 `src/client/java`，通用配置和数据结构放在 `src/main/java`。构建 1.21.x 目标时走 yarn/intermediary 重映射管线（`fabric-loom-remap` 插件），26.x 目标走新的 MojMap 管线，由目标属性自动选择。
 
 ## 许可证
 
