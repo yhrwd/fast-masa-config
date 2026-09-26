@@ -72,7 +72,7 @@ jobs:
           version_number="${version_number/-v/-}"
           game_version="${version_number%%-*}"
           changelog="$(cat release-notes.md)"
-          metadata="$(jq -n \
+          jq -n \
             --arg project_id "${MODRINTH_PROJECT_ID}" \
             --arg version_number "${version_number}" \
             --arg version_title "Fast Masa Config UI ${version_number}" \
@@ -83,7 +83,7 @@ jobs:
               version_title: $version_title, changelog: $changelog,
               version_type: "release", loaders: ["fabric"],
               game_versions: [$game_version], dependencies: [], featured: false,
-              file_parts: [$jar_name]}')"
+              file_parts: [$jar_name]}' > release/metadata.json
           curl --fail-with-body --request PATCH \
             --header "Authorization: ${MODRINTH_TOKEN}" \
             --header 'Content-Type: application/json' \
@@ -110,7 +110,7 @@ jobs:
           else
             curl --fail-with-body --request POST \
               --header "Authorization: ${MODRINTH_TOKEN}" \
-              --form "data=${metadata};type=application/json" \
+              --form "data=@release/metadata.json;type=application/json" \
               --form "${jar_name}=@${jar_file}" \
               https://api.modrinth.com/v2/version
           fi
