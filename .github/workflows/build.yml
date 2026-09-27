@@ -1,4 +1,5 @@
 name: Build
+
 on:
   push:
     branches: [main]
@@ -8,10 +9,22 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     strategy:
       fail-fast: false
       matrix:
-        target: [26.3, 26.2, 26.1.2, 1.21.11, 1.21.9-1.21.10, 1.21.6-1.21.8, 1.21.5, 1.21.4, 1.21.2-1.21.3, 1.21-1.21.1]
+        target:
+          - 26.3
+          - 26.2
+          - 26.1.2
+          - 1.21.11
+          - 1.21.9-1.21.10
+          - 1.21.6-1.21.8
+          - 1.21.5
+          - 1.21.4
+          - 1.21.2-1.21.3
+          - 1.21-1.21.1
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,30 +33,110 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ startsWith(matrix.target, '1.') && '21' || '25' }}
-          distribution: "temurin"
+          distribution: temurin
 
       - name: Cache Gradle dependencies
         uses: actions/cache@v4
         with:
           path: ~/.gradle/caches
           key: gradle-${{ matrix.target }}-${{ hashFiles('build.gradle', 'gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: gradle-${{ matrix.target }}-
+          restore-keys: |
+            gradle-${{ matrix.target }}-
 
       - name: Grant execute permission
         run: chmod +x ./gradlew
 
-      # ========= Only for 1.21.4 ᗜ ‸ ᗜ =========
+      # ============================================================
+      # MaLiLib 1.21.4
+      #
+      # MaLiLib 0.23.5 is published by its own build as:
+      #
+      #   fi.dy.masa:malilib-fabric-1.21.4:0.23.5
+      #
+      # But this project intentionally uses the commit hash:
+      #
+      #   com.github.sakura-ryoko:malilib:aa2ace...
+      #
+      # Build MaLiLib locally, then create a Maven Local alias so
+      # the existing dependency declaration does not need to change.
+      # ============================================================
       - name: Build malilib (only for 1.21.4)
         if: matrix.target == '1.21.4'
+        shell: bash
         run: |
+          set -euo pipefail
+
+          MALILIB_COMMIT="aa2aceafbb50572035c3635e7b6d0c54d9d6b7c1"
+          MALILIB_VERSION="0.23.5"
+
           git clone https://github.com/sakura-ryoko/malilib.git
           cd malilib
-          git checkout aa2aceafbb50572035c3635e7b6d0c54d9d6b7c1
-          ./gradlew publishToMavenLocal
-        
+
+          git checkout "$MALILIB_COMMIT"
+
+          ./gradlew publishToMavenLocal --no-daemon
+
+          SRC="$HOME/.m2/repository/fi/dy/masa/malilib-fabric-1.21.4/$MALILIB_VERSION"
+          DST="$HOME/.m2/repository/com/github/sakura-ryoko/malilib/$MALILIB_COMMIT"
+
+          echo "MaLiLib source repository:"
+          echo "  $SRC"
+
+          echo "Maven alias:"
+          echo "  $DST"
+
+          test -f "$SRC/malilib-fabric-1.21.4-$MALILIB_VERSION.jar"
+          test -f "$SRC/malilib-fabric-1.21.4-$MALILIB_VERSION.pom"
+
+          mkdir -p "$DST"
+
+          # ----------------------------------------------------------
+          # Copy the actual MaLiLib JAR under the commit-based
+          # Maven coordinate expected by fast-masa-config.
+          # ----------------------------------------------------------
+          cp \
+            "$SRC/malilib-fabric-1.21.4-$MALILIB_VERSION.jar" \
+            "$DST/malilib-$MALILIB_COMMIT.jar"
+
+          # Sources are optional, but keeping them makes the local
+          # Maven artifact behave more like a normal published module.
+          if [ -f "$SRC/malilib-fabric-1.21.4-$MALILIB_VERSION-sources.jar" ]; then
+            cp \
+              "$SRC/malilib-fabric-1.21.4-$MALILIB_VERSION-sources.jar" \
+              "$DST/malilib-$MALILIB_COMMIT-sources.jar"
+          fi
+
+          # ----------------------------------------------------------
+          # Reuse the original MaLiLib POM, but rewrite its Maven
+          # coordinates to match:
+          #
+          # com.github.sakura-ryoko:malilib:$MALILIB_COMMIT
+          #
+          # This preserves MaLiLib's original dependency information.
+          # ----------------------------------------------------------
+          sed \
+            -e 's#<groupId>fi\.dy\.masa</groupId>#<groupId>com.github.sakura-ryoko</groupId>#' \
+            -e 's#<artifactId>malilib-fabric-1\.21\.4</artifactId>#<artifactId>malilib</artifactId>#' \
+            -e "s#<version>$MALILIB_VERSION</version>#<version>$MALILIB_COMMIT</version>#" \
+            "$SRC/malilib-fabric-1.21.4-$MALILIB_VERSION.pom" \
+            > "$DST/malilib-$MALILIB_COMMIT.pom"
+
+          # Maven metadata is not required for an exact-version
+          # dependency, so no maven-metadata.xml is necessary.
+
+          echo
+          echo "Generated Maven Local artifact:"
+          find "$DST" -maxdepth 1 -type f -print | sort
+
+      # ============================================================
+      # Build
+      # ============================================================
       - name: Build
         run: ./gradlew -Ptarget=${{ matrix.target }} build --no-daemon
 
+      # ============================================================
+      # Upload artifact
+      # ============================================================
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
