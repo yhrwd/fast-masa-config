@@ -19,7 +19,7 @@ import fi.dy.masa.malilib.config.ConfigManager;
 import fi.dy.masa.malilib.config.ConfigType;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.IConfigBoolean;
-import fi.dy.masa.malilib.config.IConfigColor;
+import fi.dy.masa.malilib.config.options.ConfigColor;
 import fi.dy.masa.malilib.config.IConfigDouble;
 import fi.dy.masa.malilib.config.IConfigInteger;
 import fi.dy.masa.malilib.config.IConfigResettable;
@@ -679,7 +679,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                     ? "fast-masa-config.gui.boolean.on" : "fast-masa-config.gui.boolean.off"), bg,
                     GuiHitTest.isInside(mouseX, mouseY, x, y, 64, BUTTON_HEIGHT));
             this.drawResetButton(context, config, x + 70, y, 54, mouseX, mouseY);
-        } else if (config instanceof IConfigInteger integerConfig) {
+        } else if (config instanceof IConfigInteger integerConfig && !(config instanceof ConfigColor)) {
             this.drawNumericControl(context, config, NumericControlLayout.calculate(this.width), y, mouseX, mouseY,
                     integerConfig.getStringValue(),
                     this.getIntegerRatio(integerConfig));
@@ -687,8 +687,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             this.drawNumericControl(context, config, NumericControlLayout.calculate(this.width), y, mouseX, mouseY,
                     formatDouble(doubleConfig.getDoubleValue()),
                     this.getDoubleRatio(doubleConfig));
-        } else if (config instanceof IConfigColor colorConfig) {
-            int swatch = colorConfig.getColor().toVanillaArgb();
+        } else if (config instanceof ConfigColor colorConfig) {
+            int swatch = colorConfig.getColor().intValue;
             boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, 64, BUTTON_HEIGHT);
             RenderUtils.drawRect(x, y, 64, BUTTON_HEIGHT, hovered ? lighten(swatch) : swatch);
             RenderUtils.drawRect(x, y, 64, 1, COLOR_BORDER);
@@ -982,7 +982,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             if (this.handleResetClick(config, mouseX, mouseY, controlX + 70, y, 54)) {
                 return true;
             }
-        } else if (config instanceof IConfigInteger || config instanceof IConfigDouble) {
+        } else if ((config instanceof IConfigInteger && !(config instanceof ConfigColor))
+                || config instanceof IConfigDouble) {
             NumericControlLayout layout = NumericControlLayout.calculate(this.width);
             boolean clickedValueBox = GuiHitTest.isInside(mouseX, mouseY, layout.valueX(), y, layout.valueWidth(),
                     BUTTON_HEIGHT);
@@ -1008,7 +1009,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             if (this.handleResetClick(config, mouseX, mouseY, layout.resetX(), y, layout.resetWidth())) {
                 return true;
             }
-        } else if (config instanceof IConfigColor colorConfig) {
+        } else if (config instanceof ConfigColor colorConfig) {
             if (GuiHitTest.isInside(mouseX, mouseY, controlX, y, 64, BUTTON_HEIGHT)) {
                 this.openColorEditor(colorConfig);
                 return true;
@@ -1173,7 +1174,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         return false;
     }
 
-    private void openColorEditor(IConfigColor config) {
+    private void openColorEditor(ConfigColor config) {
         IDialogHandler dialogHandler = new IDialogHandler() {
             @Override
             public void openDialog(fi.dy.masa.malilib.gui.GuiBase dialog) {

@@ -3,7 +3,7 @@ package fastui.yure.client.render;
 import fastui.yure.client.mixin.ClientPlayerInteractionManagerAccessor;
 import fastui.yure.client.mixin.WorldRendererAccessor;
 import fastui.yure.config.FastMasaConfigs;
-import fi.dy.masa.malilib.render.MaLiLibPipelines;
+import fi.dy.masa.malilib.render.RenderUtils;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerInteractionManager;
@@ -20,9 +20,7 @@ import net.minecraft.world.World;
 
 /** Renders the 1.21.8 equivalent of Meteor's expanding block-break indicator. */
 public final class BlockBreakIndicator {
-    private static final RenderLayer SIDE_LAYER = RenderLayer.of("fastui_block_break_indicator_sides", 1536, false,
-            true, MaLiLibPipelines.POSITION_COLOR_TRANSLUCENT_NO_DEPTH_NO_CULL,
-            RenderLayer.MultiPhaseParameters.builder().build(false));
+    private static final RenderLayer SIDE_LAYER = RenderLayer.getLines();
 
     private BlockBreakIndicator() {
     }
@@ -188,7 +186,7 @@ public final class BlockBreakIndicator {
     }
 
     private static int color(fi.dy.masa.malilib.config.options.ConfigColor config) {
-        return config.getColor().toVanillaArgb();
+        return config.getColor().intValue;
     }
 
     private static int lerpArgb(float delta, int start, int end) {

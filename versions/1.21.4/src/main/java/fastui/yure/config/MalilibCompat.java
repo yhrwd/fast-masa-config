@@ -57,6 +57,6 @@ public final class MalilibCompat
 
     public static String configTypeString(fi.dy.masa.malilib.config.ConfigType type)
     {
-        return type.asString();
+        return type.name();
     }
 }

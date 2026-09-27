@@ -2,4 +2,5 @@
 client/java/fastui/yure/client/mixin/ClientLevelRendererAccessor.java
 client/java/fastui/yure/client/mixin/EntityRendererMixin.java
 client/java/fastui/yure/client/mixin/LevelRendererBlockBreakOverlayMixin.java
+main/java/fastui/yure/config/MasaConfigEditor.java
 client/java/fastui/yure/client/mixin/ShaderManagerMixin.java
