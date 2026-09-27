@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "fastui.yure.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "EntityRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

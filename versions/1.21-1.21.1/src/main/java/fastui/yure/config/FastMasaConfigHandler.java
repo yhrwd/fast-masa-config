@@ -6,52 +6,85 @@ import com.google.gson.JsonPrimitive;
 import fastui.yure.FastMasaConfig;
 import fi.dy.masa.malilib.config.ConfigUtils;
 import fi.dy.masa.malilib.config.IConfigHandler;
-import fi.dy.masa.malilib.util.FileUtils;
-import fi.dy.masa.malilib.util.JsonUtils;
+
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 public final class FastMasaConfigHandler implements IConfigHandler {
     private static final String CONFIG_FILE_NAME = FastMasaConfig.MOD_ID + ".json";
-    private static final int CONFIG_VERSION = 1;
+    private static final int CONFIG_VERSION = 4;
 
     @Override
     public void load() {
         // 本 handler 只读取 fast-masa-config.json；首次安装时文件不存在就保持默认值，不碰其它 MaLiLib 模组配置。
-        Path configFile = FileUtils.getConfigDirectoryAsPath().resolve(CONFIG_FILE_NAME);
+        ConfigGroupStore.clear();
+        ShortcutConfigStore.clear();
+        QuickMessageStore.clear();
+        Path configFile = MalilibCompat.getConfigDirectory().resolve(CONFIG_FILE_NAME);
 
         if (Files.exists(configFile) && Files.isReadable(configFile)) {
-            JsonElement element = JsonUtils.parseJsonFileAsPath(configFile);
+            JsonElement element = MalilibCompat.parseJsonFile(configFile);
 
             if (element != null && element.isJsonObject()) {
                 JsonObject root = element.getAsJsonObject();
-                ConfigUtils.readConfigBase(root, "Generic", FastMasaConfigs.Generic.OPTIONS);
+                ConfigUtils.readConfigBase(root, "Generic", FastMasaConfigs.Generic.PERSISTED_OPTIONS);
+                ConfigUtils.readConfigBase(root, "Tools", FastMasaConfigs.Tools.OPTIONS);
 
-                if (root.has("Shortcuts") && root.get("Shortcuts").isJsonArray()) {
-                    ShortcutConfigStore.fromJson(root.getAsJsonArray("Shortcuts"));
-                }
+                loadShortcuts(root);
+                loadGroups(root, ShortcutConfigStore.getEntries());
+                loadQuickMessageGroups(root);
             } else {
                 FastMasaConfig.LOGGER.error("无法读取配置文件: {}", configFile.toAbsolutePath());
             }
+        }
+
+        ConfigGroupStore.ensureDefaultGroup();
+    }
+
+    static void loadQuickMessageGroups(JsonObject root) {
+        JsonElement groups = root == null ? null : root.get("QuickMessageGroups");
+        QuickMessageStore.fromJson(groups != null && groups.isJsonArray() ? groups.getAsJsonArray() : null);
+    }
+
+    static void loadShortcuts(JsonObject root) {
+        ShortcutConfigStore.clear();
+        JsonElement shortcuts = root == null ? null : root.get("Shortcuts");
+        if (shortcuts != null && shortcuts.isJsonArray()) {
+            ShortcutConfigStore.fromJson(shortcuts.getAsJsonArray());
+        }
+    }
+
+    static void loadGroups(JsonObject root, List<ShortcutEntry> shortcuts) {
+        JsonElement groups = root == null ? null : root.get("Groups");
+        if (groups != null && groups.isJsonArray()) {
+            ConfigGroupStore.fromJson(groups.getAsJsonArray());
+        }
+
+        if (groups == null || !groups.isJsonArray() || ConfigGroupStore.getGroups().isEmpty()) {
+            ConfigGroupStore.migrateShortcutsIfEmpty(shortcuts);
         }
     }
 
     @Override
     public void save() {
         // 保存也只写 fast-masa-config.json，不会覆盖 tweakeroo/minihud/malilib 自己的配置文件。
-        Path dir = FileUtils.getConfigDirectoryAsPath();
+        Path dir = MalilibCompat.getConfigDirectory();
 
         if (!Files.exists(dir)) {
-            FileUtils.createDirectoriesIfMissing(dir);
+            MalilibCompat.createDirectoriesIfMissing(dir);
         }
 
         if (Files.isDirectory(dir)) {
             JsonObject root = new JsonObject();
             ConfigUtils.writeConfigBase(root, "Generic", FastMasaConfigs.Generic.OPTIONS);
+            ConfigUtils.writeConfigBase(root, "Tools", FastMasaConfigs.Tools.OPTIONS);
             root.add("Shortcuts", ShortcutConfigStore.toJson());
+            root.add("Groups", ConfigGroupStore.toJson());
+            root.add("QuickMessageGroups", QuickMessageStore.toJson());
             root.add("config_version", new JsonPrimitive(CONFIG_VERSION));
-            JsonUtils.writeJsonToFileAsPath(root, dir.resolve(CONFIG_FILE_NAME));
+            MalilibCompat.writeJsonToFile(root, dir.resolve(CONFIG_FILE_NAME));
         } else {
             FastMasaConfig.LOGGER.error("配置目录不存在: {}", dir.toAbsolutePath());
         }

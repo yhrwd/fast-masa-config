@@ -1,4 +1,6 @@
 plugins {
+	// 注册 Fabric Loom 插件，先不应用，后续根据流水线动态选择
+	// Register Fabric Loom plugins, do not apply yet; select pipeline dynamically later
 	id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
 	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}" apply false
 }
@@ -6,6 +8,9 @@ plugins {
 // Single-repo multi-version builds (see versions/<target>/gradle.properties).
 // src/ is the common baseline (newest target); files under versions/<target>/src
 // replace same-path files when building that target.
+// 单仓库多版本构建（参考 versions/<target>/gradle.properties）
+// src/ 是公共基准源码（以最新版本为基准）；versions/<target>/src 下的文件
+// 在构建该版本时，会替换同路径的公共文件
 def target = project.findProperty('target') ?: '26.3'
 def targetPropsFile = file("versions/${target}/gradle.properties")
 if (!targetPropsFile.isFile()) {
@@ -15,6 +20,7 @@ def targetProps = new Properties()
 targetPropsFile.withReader('UTF-8') { targetProps.load(it) }
 
 // Command-line -P and root gradle.properties win over the target file.
+// 参数优先级：命令行 -P 参数 > 根目录 gradle.properties > 版本目录属性文件
 def targetProp = { String name ->
 	if (project.hasProperty(name)) return project.property(name)
 	def v = targetProps.getProperty(name)
@@ -25,6 +31,9 @@ def targetProp = { String name ->
 // Two build pipelines share this script:
 //   standard = 26.x targets on the MojMap pipeline, no intermediary remapping.
 //   remap    = 1.21.x targets on yarn/intermediary, mod* dependency configurations.
+// 本脚本支持两条构建流水线：
+//   standard 标准流水线 = 26.x，使用 Mojang 官方映射，不需要 intermediary 重映射
+//   remap 重映射流水线 = 1.21.x，使用 Yarn/Intermediary，依赖使用 mod* 系列配置
 def remapPipeline = targetProp('loom_pipeline') == 'remap'
 apply plugin: remapPipeline ? 'net.fabricmc.fabric-loom-remap' : 'net.fabricmc.fabric-loom'
 apply plugin: 'maven-publish'
@@ -41,25 +50,28 @@ repositories {
 }
 
 loom {
+	// 拆分 main / client 源码集，区分客户端与服务端代码
+	// Split main/client source sets to separate client-only and common code
 	splitEnvironmentSourceSets()
-
 	runs {
 		client {
+			// 每个版本独立的运行目录，避免版本间运行文件冲突
+			// Separate run directory for each target to prevent cross-version run data conflict
 			runDir = "run/${target}"
 		}
 	}
-
 	mods {
 		"fast-masa-config" {
 			sourceSet sourceSets.main
 			sourceSet sourceSets.client
 		}
 	}
-
 }
 
 // Common files listed in versions/<target>/common-excluded.txt (src/-relative paths)
 // do not exist for this target's feature generation and are left out of the build.
+// versions/<target>/common-excluded.txt 内的公共文件（路径相对于src）
+// 当前版本构建时直接排除，不参与编译
 def commonExcluded = new HashSet<String>()
 def commonExcludedFile = file("versions/${target}/common-excluded.txt")
 if (commonExcludedFile.isFile()) {
@@ -71,6 +83,7 @@ if (commonExcludedFile.isFile()) {
 
 // A common source file is dropped when it is excluded for this target, or shadowed
 // by the same path in the override tree.
+// 公共源码文件满足以下任一条件就会被排除：在排除列表内、被版本覆盖目录同路径文件遮蔽
 def srcRoot = file('src').toPath()
 def shadowedBy = { java.nio.file.Path commonRoot, java.nio.file.Path overrideRoot ->
 	return { element ->
@@ -87,7 +100,11 @@ def shadowedBy = { java.nio.file.Path commonRoot, java.nio.file.Path overrideRoo
 sourceSets {
 	main {
 		java {
+			// 添加当前版本的覆盖源码目录
+			// Add override source directory for current target
 			srcDir "versions/${target}/src/main/java"
+			// 排除被遮蔽的公共源码
+			// Exclude shadowed common source files
 			exclude shadowedBy(file('src/main/java').toPath(), file("versions/${target}/src/main/java").toPath())
 		}
 		resources {
@@ -115,8 +132,8 @@ sourceSets {
 
 dependencies {
 	// To change the versions see the gradle.properties file
+	// 版本号配置请在各版本目录的 gradle.properties 修改
 	minecraft "com.mojang:minecraft:${targetProp('minecraft_version')}"
-
 	if (remapPipeline) {
 		mappings "net.fabricmc:yarn:${targetProp('yarn_mappings')}:v2"
 		modImplementation "net.fabricmc:fabric-loader:${targetProp('loader_version')}"
@@ -125,29 +142,31 @@ dependencies {
 		modCompileOnly "com.terraformersmc:modmenu:${targetProp('mod_menu_version')}"
 	} else {
 		implementation "net.fabricmc:fabric-loader:${targetProp('loader_version')}"
-
 		// Fabric API. This is technically optional, but you probably want it anyway.
+		// Fabric API，理论上可选，但模组开发一般都需要
 		implementation "net.fabricmc.fabric-api:fabric-api:${targetProp('fabric_api_version')}"
 		implementation "com.github.sakura-ryoko:malilib:${targetProp('malilib_version')}"
 		compileOnly "com.terraformersmc:modmenu:${targetProp('mod_menu_version')}"
 		// 仅开发环境加载 ModMenu，方便从主菜单直接进配置页；发布 jar 不包含它。
+		// Load ModMenu only in dev environment for config entry; not packaged into release jar
 		clientRuntimeOnly "com.terraformersmc:modmenu:${targetProp('mod_menu_version')}"
 	}
-
 	testImplementation platform("org.junit:junit-bom:5.10.2")
 	testImplementation "org.junit.jupiter:junit-jupiter"
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
-
 }
 
 test {
+	// 使用 JUnit 5 平台执行单元测试
+	// Use JUnit 5 platform for tests
 	useJUnitPlatform()
 }
 
 processResources {
 	def version = project.version
 	inputs.property "version", version
-
+	// 替换 fabric.mod.json 中的 ${version} 占位符
+	// Substitute ${version} placeholder inside fabric.mod.json
 	filesMatching("fabric.mod.json") {
 		expand "version": version
 	}
@@ -155,6 +174,8 @@ processResources {
 
 def javaRelease = targetProp('java_release') as Integer
 tasks.withType(JavaCompile).configureEach {
+	// 设置编译目标Java版本
+	// Set Java compile release target
 	it.options.release = javaRelease
 }
 
@@ -162,8 +183,8 @@ java {
 	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
 	// if it is present.
 	// If you remove this line, sources will not be generated.
+	// 开启源码Jar打包；Loom会自动关联重映射源码任务，删掉这行就不会输出sources.jar
 	withSourcesJar()
-
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(javaRelease)
 	}
@@ -172,25 +193,70 @@ java {
 jar {
 	def projectName = project.name
 	inputs.property "projectName", projectName
-
+	// 把许可证文件打进Jar，重命名防止多模块冲突
+	// Include LICENSE inside jar, rename to avoid name collision
 	from("LICENSE") {
 		rename { "${it}_$projectName"}
 	}
 }
 
 // configure the maven publication
+// 配置Maven发布
 publishing {
 	publications {
 		create("mavenJava", MavenPublication) {
 			from components.java
 		}
 	}
-
 	// See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
+	// 参考Gradle官方文档了解Maven发布配置
 	repositories {
 		// Add repositories to publish to here.
 		// Notice: This block does NOT have the same function as the block in the top level.
 		// The repositories here will be used for publishing your artifact, not for
 		// retrieving dependencies.
+		// 在这里配置发布仓库
+		// 注意：这个repositories和顶层的作用不同，这里是上传制品，不是拉依赖
 	}
+}
+
+// ===================== Multi-version build tasks 多版本批量构建任务 =====================
+// Scan versions directory and collect valid build targets
+// 扫描versions目录，收集合法的构建目标
+def getAllTargets() {
+    def targets = []
+    def versionsDir = file("versions")
+    if (versionsDir.exists()) {
+        versionsDir.listFiles({ f ->
+            f.isDirectory() && new File(f, "gradle.properties").exists()
+        })?.each { dir ->
+            targets << dir.name
+        }
+    }
+    return targets
+}
+
+def allTargets = getAllTargets()
+
+// Register individual build task for each target
+// 为每个版本单独注册构建任务，新开子Gradle进程执行
+allTargets.each { t ->
+    tasks.register("build_$t", JavaExec) {
+        group = "MultiVersion"
+        description = "Build version target '$t' | 构建版本目标 '$t'"
+        workingDir = rootProject.projectDir
+        classpath = files(rootProject.file("gradle/wrapper/gradle-wrapper.jar"))
+        mainClass = "org.gradle.wrapper.GradleWrapperMain"
+        args "build", "-Ptarget=$t"
+        // 继承JVM参数，可选
+        standardInput = System.in
+    }
+}
+
+// Serial all-version build task
+// 串行构建全部版本任务
+tasks.register("buildAll") {
+    group = "MultiVersion"
+    description = "Build all Minecraft targets sequentially | 串行构建所有MC版本"
+    dependsOn allTargets.collect { "build_$it" }
 }

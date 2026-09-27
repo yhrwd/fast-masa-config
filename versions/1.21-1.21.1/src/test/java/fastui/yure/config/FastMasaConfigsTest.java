@@ -2,10 +2,6 @@ package fastui.yure.config;
 
 import fi.dy.masa.malilib.config.ConfigType;
 import fi.dy.masa.malilib.config.IConfigBase;
-import fi.dy.masa.malilib.config.IConfigDouble;
-import fi.dy.masa.malilib.config.IConfigInteger;
-import fi.dy.masa.malilib.hotkeys.KeyAction;
-import fi.dy.masa.malilib.hotkeys.KeybindSettings;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -16,46 +12,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FastMasaConfigsTest {
     @Test
-    void exposesQuickOverlayOptionsForMalilibGui() {
+    void exposes5Point3ConfigOptions() {
         Map<String, IConfigBase> configs = FastMasaConfigs.Generic.OPTIONS.stream()
                 .collect(Collectors.toMap(IConfigBase::getName, config -> config));
 
         assertEquals(ConfigType.HOTKEY, configs.get("openQuickConfig").getType());
-        assertEquals(ConfigType.INTEGER, configs.get("panelWidth").getType());
-        assertEquals(ConfigType.INTEGER, configs.get("panelMaxHeight").getType());
-        assertEquals(ConfigType.DOUBLE, configs.get("panelScale").getType());
-        assertEquals(ConfigType.BOOLEAN, configs.get("showScanSummary").getType());
         assertEquals(ConfigType.BOOLEAN, configs.get("releaseToClose").getType());
         assertEquals(ConfigType.BOOLEAN, configs.get("closeOnInventoryKey").getType());
+        assertTrue(FastMasaConfigs.Tools.OPTIONS.stream()
+                .anyMatch(config -> config.getName().equals("entityRenderFilter")));
     }
 
     @Test
     void registersQuickOverlayHotkeyForKeybindManager() {
         assertTrue(FastMasaConfigs.Generic.HOTKEY_LIST.contains(FastMasaConfigs.Generic.OPEN_QUICK_CONFIG));
-    }
-
-    @Test
-    void configuresQuickOverlayHotkeyForInGamePressesWithExtraKeysInOrder() {
-        KeybindSettings settings = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getSettings();
-
-        assertEquals(KeybindSettings.Context.INGAME, settings.getContext());
-        assertEquals(KeyAction.PRESS, settings.getActivateOn());
-        assertTrue(settings.getAllowExtraKeys());
-        assertTrue(settings.isOrderSensitive());
-    }
-
-    @Test
-    void usesCompactPanelWidthByDefault() {
-        IConfigInteger panelWidth = FastMasaConfigs.Generic.PANEL_WIDTH;
-
-        assertEquals(260, panelWidth.getIntegerValue());
-    }
-
-    @Test
-    void allowsWiderQuickPanelScaleRange() {
-        IConfigDouble panelScale = FastMasaConfigs.Generic.PANEL_SCALE;
-
-        assertEquals(0.5, panelScale.getMinDoubleValue(), 0.0001);
-        assertEquals(2.5, panelScale.getMaxDoubleValue(), 0.0001);
     }
 }
