@@ -2,10 +2,11 @@ name: Build
 
 on:
   push:
-    branches: [main]
-
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build:
@@ -27,53 +28,49 @@ jobs:
           - 1.21-1.21.1
 
     steps:
-      # ============================================================
+      # ------------------------------------------------------------
       # Checkout
-      # ============================================================
+      # ------------------------------------------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ============================================================
-      # Java
-      # ============================================================
+      # ------------------------------------------------------------
+      # Setup JDK
+      # ------------------------------------------------------------
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           java-version: ${{ startsWith(matrix.target, '1.') && '21' || '25' }}
           distribution: temurin
 
-      # ============================================================
-      # Gradle cache
-      # ============================================================
+      # ------------------------------------------------------------
+      # Cache Gradle
+      # ------------------------------------------------------------
       - name: Cache Gradle dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.gradle/caches
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.m2/repository
           key: gradle-${{ matrix.target }}-${{ hashFiles('build.gradle', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             gradle-${{ matrix.target }}-
+            gradle-
 
-      # ============================================================
-      # Gradle wrapper
-      # ============================================================
-      - name: Grant execute permission
-        run: chmod +x ./gradlew
-
-      # ============================================================
+      # ------------------------------------------------------------
       # MaLiLib
       #
-      # 1.21.4 uses a MaLiLib commit that is not available from the
-      # Maven repository under the coordinates expected by this
-      # project.
+      # Only 1.21.4 needs the Git commit version of MaLiLib.
       #
-      # Build that exact commit locally and create a Maven Local
-      # alias:
+      # Your build.gradle expects:
       #
-      #   com.github.sakura-ryoko:malilib:
-      #   aa2aceafbb50572035c3635e7b6d0c54d9d6b7c1
+      # com.github.sakura-ryoko:malilib:
+      # aa2aceafbb50572035c3635e7b6d0c54d9d6b7c1
       #
-      # This keeps build.gradle unchanged.
-      # ============================================================
+      # So we build the exact MaLiLib commit locally and create
+      # a Maven Local alias with those coordinates.
+      # ------------------------------------------------------------
       - name: Build MaLiLib (1.21.4 only)
         if: matrix.target == '1.21.4'
         shell: bash
@@ -89,162 +86,142 @@ jobs:
           echo "Version: $MALILIB_VERSION"
           echo "============================================================"
 
-          # ----------------------------------------------------------
-          # Clone exact MaLiLib commit
-          # ----------------------------------------------------------
           git clone https://github.com/sakura-ryoko/malilib.git
-
           cd malilib
 
           git checkout "$MALILIB_COMMIT"
 
-          # ----------------------------------------------------------
-          # Publish MaLiLib to Maven Local
-          # ----------------------------------------------------------
+          echo
+          echo "MaLiLib commit:"
+          git rev-parse HEAD
+
+          echo
+          echo "Java version:"
+          java -version
+
+          echo
+          echo "Building and publishing MaLiLib to Maven Local..."
+
           ./gradlew publishToMavenLocal --no-daemon
 
-          # ----------------------------------------------------------
-          # MaLiLib's actual Maven coordinates
-          #
-          # fi.dy.masa:
-          #   malilib-fabric-1.21.4:
-          #   0.23.5
-          # ----------------------------------------------------------
-          SRC="$HOME/.m2/repository/fi/dy/masa/malilib-fabric-1.21.4/$MALILIB_VERSION"
+          cd ..
 
-          # ----------------------------------------------------------
-          # Coordinates expected by fast-masa-config
-          #
-          # com.github.sakura-ryoko:
-          #   malilib:
-          #   aa2ace...
-          # ----------------------------------------------------------
-          DST="$HOME/.m2/repository/com/github/sakura-ryoko/malilib/$MALILIB_COMMIT"
-
-          echo
-          echo "Source Maven directory:"
-          echo "  $SRC"
-
-          echo
-          echo "Target Maven directory:"
-          echo "  $DST"
-
-          # ----------------------------------------------------------
-          # Verify source directory
-          # ----------------------------------------------------------
-          if [ ! -d "$SRC" ]; then
-            echo "::error::MaLiLib Maven directory was not found:"
-            echo "$SRC"
-            exit 1
-          fi
-
-          # ----------------------------------------------------------
-          # Show exactly what MaLiLib published.
-          # This also makes future failures much easier to diagnose.
-          # ----------------------------------------------------------
+          # --------------------------------------------------------
+          # Inspect Maven Local
+          # --------------------------------------------------------
           echo
           echo "============================================================"
-          echo "Published MaLiLib files"
+          echo "Searching Maven Local for MaLiLib"
           echo "============================================================"
 
-          find "$SRC" -maxdepth 1 -type f -print | sort
+          echo "All MaLiLib artifacts currently in Maven Local:"
 
-          # ----------------------------------------------------------
-          # Find published artifacts without assuming their filenames.
-          # ----------------------------------------------------------
+          find "$HOME/.m2/repository" \
+            -type f \
+            \( -name '*.jar' -o -name '*.pom' -o -name '*.module' \) \
+            | grep -i 'malilib' \
+            | sort || true
+
+          # --------------------------------------------------------
+          # Find the actual published JAR.
+          #
+          # Do NOT assume the Maven path from the Gradle coordinates.
+          # MaLiLib's publication configuration uses its own artifactId.
+          # --------------------------------------------------------
           jar_file="$(
-            find "$SRC" \
-              -maxdepth 1 \
+            find "$HOME/.m2/repository" \
               -type f \
               -name '*.jar' \
               ! -name '*-sources.jar' \
+              ! -name '*-javadoc.jar' \
+              | grep -i 'malilib' \
               | head -n 1
           )"
 
-          sources_jar="$(
-            find "$SRC" \
-              -maxdepth 1 \
-              -type f \
-              -name '*-sources.jar' \
-              | head -n 1 || true
-          )"
+          if [ -z "$jar_file" ]; then
+            echo "::error::Could not find MaLiLib JAR in Maven Local."
 
+            echo
+            echo "Maven Local directory:"
+            find "$HOME/.m2/repository" \
+              -maxdepth 6 \
+              -type f \
+              | sort || true
+
+            exit 1
+          fi
+
+          echo
+          echo "Found MaLiLib JAR:"
+          echo "  $jar_file"
+
+          jar_dir="$(dirname "$jar_file")"
+
+          # --------------------------------------------------------
+          # Find POM next to the JAR
+          # --------------------------------------------------------
           pom_file="$(
-            find "$SRC" \
+            find "$jar_dir" \
               -maxdepth 1 \
               -type f \
               -name '*.pom' \
               | head -n 1
           )"
 
-          # ----------------------------------------------------------
-          # Verify required artifacts
-          # ----------------------------------------------------------
-          if [ -z "$jar_file" ]; then
-            echo "::error::MaLiLib JAR was not found in:"
-            echo "$SRC"
-            exit 1
-          fi
-
           if [ -z "$pom_file" ]; then
-            echo "::error::MaLiLib POM was not found in:"
-            echo "$SRC"
+            echo "::error::Could not find MaLiLib POM next to JAR:"
+            echo "  $jar_file"
+
+            echo
+            echo "Directory contents:"
+            find "$jar_dir" -maxdepth 1 -type f -print | sort
+
             exit 1
           fi
 
           echo
-          echo "Resolved MaLiLib JAR:"
-          echo "  $jar_file"
-
-          echo
-          echo "Resolved MaLiLib POM:"
+          echo "Found MaLiLib POM:"
           echo "  $pom_file"
 
-          if [ -n "$sources_jar" ]; then
-            echo
-            echo "Resolved MaLiLib sources:"
-            echo "  $sources_jar"
-          fi
+          # --------------------------------------------------------
+          # Optional sources JAR
+          # --------------------------------------------------------
+          sources_jar="$(
+            find "$jar_dir" \
+              -maxdepth 1 \
+              -type f \
+              -name '*-sources.jar' \
+              | head -n 1 || true
+          )"
 
-          # ----------------------------------------------------------
+          # --------------------------------------------------------
           # Create Maven Local alias
-          # ----------------------------------------------------------
+          #
+          # Expected by the main project:
+          #
+          # ~/.m2/repository/
+          #   com/github/sakura-ryoko/malilib/
+          #     aa2aceafbb50572035c3635e7b6d0c54d9d6b7c1/
+          #       malilib-aa2aceafbb50572035c3635e7b6d0c54d9d6b7c1.jar
+          #       malilib-aa2aceafbb50572035c3635e7b6d0c54d9d6b7c1.pom
+          # --------------------------------------------------------
+          DST="$HOME/.m2/repository/com/github/sakura-ryoko/malilib/$MALILIB_COMMIT"
+
           mkdir -p "$DST"
 
-          # ----------------------------------------------------------
-          # Copy main JAR
-          # ----------------------------------------------------------
           cp \
             "$jar_file" \
             "$DST/malilib-$MALILIB_COMMIT.jar"
 
-          # ----------------------------------------------------------
-          # Copy sources JAR when available
-          # ----------------------------------------------------------
           if [ -n "$sources_jar" ]; then
             cp \
               "$sources_jar" \
               "$DST/malilib-$MALILIB_COMMIT-sources.jar"
           fi
 
-          # ----------------------------------------------------------
-          # Rewrite the original POM coordinates.
-          #
-          # Original:
-          #
-          #   fi.dy.masa:
-          #   malilib-fabric-1.21.4:
-          #   0.23.5
-          #
-          # Becomes:
-          #
-          #   com.github.sakura-ryoko:
-          #   malilib:
-          #   aa2ace...
-          #
-          # All other dependency information in the original POM
-          # remains untouched.
-          # ----------------------------------------------------------
+          # --------------------------------------------------------
+          # Rewrite POM coordinates
+          # --------------------------------------------------------
           sed \
             -e 's#<groupId>fi\.dy\.masa</groupId>#<groupId>com.github.sakura-ryoko</groupId>#' \
             -e 's#<artifactId>malilib-fabric-1\.21\.4</artifactId>#<artifactId>malilib</artifactId>#' \
@@ -252,35 +229,41 @@ jobs:
             "$pom_file" \
             > "$DST/malilib-$MALILIB_COMMIT.pom"
 
-          # ----------------------------------------------------------
-          # Verify final Maven Local alias
-          # ----------------------------------------------------------
+          # --------------------------------------------------------
+          # Verify alias
+          # --------------------------------------------------------
           echo
           echo "============================================================"
           echo "Maven alias created"
           echo "============================================================"
 
-          find "$DST" -maxdepth 1 -type f -print | sort
+          find "$DST" \
+            -maxdepth 1 \
+            -type f \
+            -print \
+            | sort
 
-          echo
-          echo "Maven coordinate:"
-          echo "  com.github.sakura-ryoko:malilib:$MALILIB_COMMIT"
-
-          # ----------------------------------------------------------
-          # Verify required files exist
-          # ----------------------------------------------------------
           test -f "$DST/malilib-$MALILIB_COMMIT.jar"
           test -f "$DST/malilib-$MALILIB_COMMIT.pom"
 
           echo
-          echo "MaLiLib Maven alias is ready."
+          echo "MaLiLib alias is ready:"
+          echo
+          echo "  com.github.sakura-ryoko:malilib:$MALILIB_COMMIT"
+          echo
 
-          # Go back to the main repository.
-          cd ..
+          echo "POM:"
+          cat "$DST/malilib-$MALILIB_COMMIT.pom"
 
-      # ============================================================
-      # Build
-      # ============================================================
+      # ------------------------------------------------------------
+      # Gradle wrapper
+      # ------------------------------------------------------------
+      - name: Grant execute permission
+        run: chmod +x ./gradlew
+
+      # ------------------------------------------------------------
+      # Build project
+      # ------------------------------------------------------------
       - name: Build
         run: |
           ./gradlew \
@@ -288,11 +271,12 @@ jobs:
             build \
             --no-daemon
 
-      # ============================================================
-      # Upload build artifact
-      # ============================================================
+      # ------------------------------------------------------------
+      # Upload artifact
+      # ------------------------------------------------------------
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: fast-masa-config-${{ matrix.target }}
           path: build/libs/*.jar
+          if-no-files-found: error
