@@ -32,6 +32,15 @@ jobs:
       - name: Grant execute permission
         run: chmod +x ./gradlew
 
+      # ========= Only for 1.21.4 ᗜ ‸ ᗜ =========
+      - name: Build malilib (only for 1.21.4)
+        if: matrix.target == '1.21.4'
+        run: |
+          git clone https://github.com/sakura-ryoko/malilib.git
+          cd malilib
+          git checkout aa2aceafbb50572035c3635e7b6d0c54d9d6b7c1
+          ./gradlew publishToMavenLocal
+        
       - name: Build
         run: ./gradlew -Ptarget=${{ matrix.target }} build --no-daemon
 
