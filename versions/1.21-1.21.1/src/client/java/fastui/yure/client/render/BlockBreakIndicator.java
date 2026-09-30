@@ -7,7 +7,6 @@ import fastui.yure.client.mixin.WorldRendererBlockBreakingAccessor;
 import fastui.yure.config.FastMasaConfigs;
 import fi.dy.masa.malilib.config.options.ConfigColor;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.BufferBuilder;
@@ -26,6 +25,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.World;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,10 +34,11 @@ import java.util.SortedSet;
 /**
  * Yarn 1.21.1 port of the block-break indicator. There is no LevelRenderState
  * here: own progress comes from the interaction manager and remote progress
- * from the world renderer's breaking map. Drawing follows malilib's overlay
- * pattern for this game line: the global model-view stack already carries the
- * camera rotation during world rendering, so vertices are written
- * camera-relative through an identity matrix and only the GL state is touched.
+ * from the world renderer's breaking map. The renderer runs through malilib's
+ * world-last event and mirrors malilib's own overlay draw path for this game
+ * line: the camera-rotation matrix from {@code WorldRenderer.render} is
+ * multiplied into the global model-view stack, vertices are written in world
+ * coordinates, and the draw happens with the position-color shader.
  */
 public final class BlockBreakIndicator {
     private static final Matrix4f IDENTITY_MATRIX = new Matrix4f();
@@ -49,7 +50,7 @@ public final class BlockBreakIndicator {
     private BlockBreakIndicator() {
     }
 
-    public static void render(WorldRenderContext context) {
+    public static void render(Matrix4f positionMatrix) {
         if (!FastMasaConfigs.Generic.BLOCK_BREAK_INDICATOR.getBooleanValue()) {
             return;
         }
@@ -93,22 +94,15 @@ public final class BlockBreakIndicator {
             return;
         }
 
-        Vec3d cameraPosition = context.camera().getPos();
+        Vec3d cameraPosition = client.gameRenderer.getCamera().getPos();
         double projectionScale = projectionScale(client);
 
-        Tessellator tessellator = Tessellator.getInstance();
-        BufferBuilder buffer;
-        try {
-            buffer = tessellator.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-            for (Indicator indicator : indicators) {
-                addIndicator(client.world, indicator.position(), indicator.progress(), cameraPosition,
-                        projectionScale, style, buffer);
-            }
-        } catch (RuntimeException exception) {
-            FastMasaConfig.LOGGER.warn("Failed to render block break indicator", exception);
-            return;
-        }
-
+        Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+        modelViewStack.pushMatrix();
+        modelViewStack.mul(positionMatrix);
+        modelViewStack.translate((float) -cameraPosition.x, (float) -cameraPosition.y,
+                (float) -cameraPosition.z);
+        RenderSystem.applyModelViewMatrix();
         RenderSystem.setShader(GameRenderer::getPositionColorProgram);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
@@ -116,6 +110,12 @@ public final class BlockBreakIndicator {
         RenderSystem.depthMask(false);
         RenderSystem.disableCull();
         try {
+            Tessellator tessellator = Tessellator.getInstance();
+            BufferBuilder buffer = tessellator.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+            for (Indicator indicator : indicators) {
+                addIndicator(client.world, indicator.position(), indicator.progress(), projectionScale, style,
+                        buffer);
+            }
             BufferRenderer.drawWithGlobalProgram(buffer.end());
         } catch (RuntimeException exception) {
             FastMasaConfig.LOGGER.warn("Failed to render block break indicator", exception);
@@ -124,11 +124,13 @@ public final class BlockBreakIndicator {
             RenderSystem.depthMask(true);
             RenderSystem.enableDepthTest();
             RenderSystem.disableBlend();
+            modelViewStack.popMatrix();
+            RenderSystem.applyModelViewMatrix();
         }
     }
 
-    private static void addIndicator(World world, BlockPos position, float progress, Vec3d cameraPosition,
-            double projectionScale, RenderStyle style, BufferBuilder buffer) {
+    private static void addIndicator(World world, BlockPos position, float progress, double projectionScale,
+            RenderStyle style, BufferBuilder buffer) {
         BlockState state = world.getBlockState(position);
         VoxelShape shape = state.getOutlineShape(world, position);
         if (shape.isEmpty()) {
@@ -146,10 +148,7 @@ public final class BlockBreakIndicator {
         double hx = (bounds.maxX - bounds.minX) * scale / 2.0;
         double hy = (bounds.maxY - bounds.minY) * scale / 2.0;
         double hz = (bounds.maxZ - bounds.minZ) * scale / 2.0;
-        // Camera-relative coordinates: the global model-view stack already
-        // applies the camera rotation while our quads are being flushed.
-        Box box = new Box(cx - hx, cy - hy, cz - hz, cx + hx, cy + hy, cz + hz)
-                .offset(-cameraPosition.x, -cameraPosition.y, -cameraPosition.z);
+        Box box = new Box(cx - hx, cy - hy, cz - hz, cx + hx, cy + hy, cz + hz);
 
         int line = style.lines ? lerpColor(normalized, style.startLine, style.endLine) : 0;
         int fill = style.sides ? lerpColor(normalized, style.startSide, style.endSide) : 0;
