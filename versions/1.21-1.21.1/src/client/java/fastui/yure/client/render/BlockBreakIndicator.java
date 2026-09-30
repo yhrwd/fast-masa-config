@@ -10,7 +10,6 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerInteractionManager;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.GameRenderer;
@@ -35,10 +34,13 @@ import java.util.SortedSet;
 /**
  * Yarn 1.21.1 port of the block-break indicator. There is no LevelRenderState
  * here: own progress comes from the interaction manager and remote progress
- * from the world renderer's breaking map, and the quads are drawn directly on
- * the render thread with the position-color shader.
+ * from the world renderer's breaking map. Drawing follows malilib's overlay
+ * pattern for this game line: the global model-view stack already carries the
+ * camera rotation during world rendering, so vertices are written
+ * camera-relative through an identity matrix and only the GL state is touched.
  */
 public final class BlockBreakIndicator {
+    private static final Matrix4f IDENTITY_MATRIX = new Matrix4f();
     private static final int[][] EDGE_PAIRS = {
             {0, 1}, {0, 2}, {0, 4}, {1, 3}, {1, 5}, {2, 3},
             {2, 6}, {3, 7}, {4, 5}, {4, 6}, {5, 7}, {6, 7}
@@ -52,7 +54,7 @@ public final class BlockBreakIndicator {
             return;
         }
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client.world == null || client.interactionManager == null || context.matrixStack() == null) {
+        if (client.world == null || client.interactionManager == null) {
             return;
         }
 
@@ -73,7 +75,7 @@ public final class BlockBreakIndicator {
         }
         if (FastMasaConfigs.Generic.BLOCK_BREAK_REMOTE.getBooleanValue()
                 && client.worldRenderer instanceof WorldRendererBlockBreakingAccessor accessor) {
-            for (Long2ObjectMap.Entry<java.util.SortedSet<BlockBreakingInfo>> entry
+            for (Long2ObjectMap.Entry<SortedSet<BlockBreakingInfo>> entry
                     : accessor.fastui$getBlockBreakingProgressions().long2ObjectEntrySet()) {
                 SortedSet<BlockBreakingInfo> infos = entry.getValue();
                 if (infos == null || infos.isEmpty()) {
@@ -92,17 +94,15 @@ public final class BlockBreakIndicator {
         }
 
         Vec3d cameraPosition = context.camera().getPos();
-        Matrix4f positionMatrix = context.matrixStack().peek().getPositionMatrix();
         double projectionScale = projectionScale(client);
 
-        RenderLayer layer = RenderLayer.getDebugQuads();
         Tessellator tessellator = Tessellator.getInstance();
         BufferBuilder buffer;
         try {
             buffer = tessellator.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
             for (Indicator indicator : indicators) {
                 addIndicator(client.world, indicator.position(), indicator.progress(), cameraPosition,
-                        projectionScale, style, positionMatrix, buffer);
+                        projectionScale, style, buffer);
             }
         } catch (RuntimeException exception) {
             FastMasaConfig.LOGGER.warn("Failed to render block break indicator", exception);
@@ -128,7 +128,7 @@ public final class BlockBreakIndicator {
     }
 
     private static void addIndicator(World world, BlockPos position, float progress, Vec3d cameraPosition,
-            double projectionScale, RenderStyle style, Matrix4f positionMatrix, BufferBuilder buffer) {
+            double projectionScale, RenderStyle style, BufferBuilder buffer) {
         BlockState state = world.getBlockState(position);
         VoxelShape shape = state.getOutlineShape(world, position);
         if (shape.isEmpty()) {
@@ -146,6 +146,8 @@ public final class BlockBreakIndicator {
         double hx = (bounds.maxX - bounds.minX) * scale / 2.0;
         double hy = (bounds.maxY - bounds.minY) * scale / 2.0;
         double hz = (bounds.maxZ - bounds.minZ) * scale / 2.0;
+        // Camera-relative coordinates: the global model-view stack already
+        // applies the camera rotation while our quads are being flushed.
         Box box = new Box(cx - hx, cy - hy, cz - hz, cx + hx, cy + hy, cz + hz)
                 .offset(-cameraPosition.x, -cameraPosition.y, -cameraPosition.z);
 
@@ -153,20 +155,20 @@ public final class BlockBreakIndicator {
         int fill = style.sides ? lerpColor(normalized, style.startSide, style.endSide) : 0;
 
         if (fill != 0) {
-            addBoxSides(buffer, positionMatrix, box, fill);
+            addBoxSides(buffer, box, fill);
         }
         if (line != 0) {
             int lineWidth = style.lineWidth;
             int glowAlpha = (line >>> 24) / 4;
             if (glowAlpha > 0) {
-                addBoxEdges(buffer, positionMatrix, box, withAlpha(line, glowAlpha),
+                addBoxEdges(buffer, box, withAlpha(line, glowAlpha),
                         Math.max(lineWidth + 1, lineWidth * 3), projectionScale);
             }
-            addBoxEdges(buffer, positionMatrix, box, line, lineWidth, projectionScale);
+            addBoxEdges(buffer, box, line, lineWidth, projectionScale);
         }
     }
 
-    private static void addBoxSides(BufferBuilder buffer, Matrix4f matrix, Box box, int color) {
+    private static void addBoxSides(BufferBuilder buffer, Box box, int color) {
         double x1 = box.minX;
         double y1 = box.minY;
         double z1 = box.minZ;
@@ -174,25 +176,25 @@ public final class BlockBreakIndicator {
         double y2 = box.maxY;
         double z2 = box.maxZ;
 
-        quad(buffer, matrix, x1, y1, z1, x1, y1, z2, x1, y2, z2, x1, y2, z1, color);
-        quad(buffer, matrix, x2, y1, z1, x2, y2, z1, x2, y2, z2, x2, y1, z2, color);
-        quad(buffer, matrix, x1, y1, z1, x1, y2, z1, x2, y2, z1, x2, y1, z1, color);
-        quad(buffer, matrix, x1, y1, z2, x2, y1, z2, x2, y2, z2, x1, y2, z2, color);
-        quad(buffer, matrix, x1, y1, z1, x2, y1, z1, x2, y1, z2, x1, y1, z2, color);
-        quad(buffer, matrix, x1, y2, z1, x1, y2, z2, x2, y2, z2, x2, y2, z1, color);
+        quad(buffer, x1, y1, z1, x1, y1, z2, x1, y2, z2, x1, y2, z1, color);
+        quad(buffer, x2, y1, z1, x2, y2, z1, x2, y2, z2, x2, y1, z2, color);
+        quad(buffer, x1, y1, z1, x1, y2, z1, x2, y2, z1, x2, y1, z1, color);
+        quad(buffer, x1, y1, z2, x2, y1, z2, x2, y2, z2, x1, y2, z2, color);
+        quad(buffer, x1, y1, z1, x2, y1, z1, x2, y1, z2, x1, y1, z2, color);
+        quad(buffer, x1, y2, z1, x1, y2, z2, x2, y2, z2, x2, y2, z1, color);
     }
 
-    private static void addBoxEdges(BufferBuilder buffer, Matrix4f matrix, Box box, int color, int lineWidth,
+    private static void addBoxEdges(BufferBuilder buffer, Box box, int color, int lineWidth,
             double projectionScale) {
         for (int[] edge : EDGE_PAIRS) {
-            addLineQuad(buffer, matrix,
+            addLineQuad(buffer,
                     cornerX(box, edge[0]), cornerY(box, edge[0]), cornerZ(box, edge[0]),
                     cornerX(box, edge[1]), cornerY(box, edge[1]), cornerZ(box, edge[1]),
                     color, lineWidth, projectionScale);
         }
     }
 
-    private static void addLineQuad(BufferBuilder buffer, Matrix4f matrix, double startX, double startY,
+    private static void addLineQuad(BufferBuilder buffer, double startX, double startY,
             double startZ, double endX, double endY, double endZ, int color, int lineWidth,
             double projectionScale) {
         double directionX = endX - startX;
@@ -238,7 +240,7 @@ public final class BlockBreakIndicator {
         offsetX = offsetX / offsetLength * halfWidth;
         offsetY = offsetY / offsetLength * halfWidth;
         offsetZ = offsetZ / offsetLength * halfWidth;
-        quad(buffer, matrix,
+        quad(buffer,
                 startX + offsetX, startY + offsetY, startZ + offsetZ,
                 startX - offsetX, startY - offsetY, startZ - offsetZ,
                 endX - offsetX, endY - offsetY, endZ - offsetZ,
@@ -281,16 +283,16 @@ public final class BlockBreakIndicator {
         return Math.round(start + (end - start) * t);
     }
 
-    private static void quad(BufferBuilder buffer, Matrix4f matrix, double x1, double y1, double z1, double x2,
-            double y2, double z2, double x3, double y3, double z3, double x4, double y4, double z4, int color) {
-        vertex(buffer, matrix, x1, y1, z1, color);
-        vertex(buffer, matrix, x2, y2, z2, color);
-        vertex(buffer, matrix, x3, y3, z3, color);
-        vertex(buffer, matrix, x4, y4, z4, color);
+    private static void quad(BufferBuilder buffer, double x1, double y1, double z1, double x2, double y2,
+            double z2, double x3, double y3, double z3, double x4, double y4, double z4, int color) {
+        vertex(buffer, x1, y1, z1, color);
+        vertex(buffer, x2, y2, z2, color);
+        vertex(buffer, x3, y3, z3, color);
+        vertex(buffer, x4, y4, z4, color);
     }
 
-    private static void vertex(BufferBuilder buffer, Matrix4f matrix, double x, double y, double z, int color) {
-        buffer.vertex(matrix, (float) x, (float) y, (float) z)
+    private static void vertex(BufferBuilder buffer, double x, double y, double z, int color) {
+        buffer.vertex(IDENTITY_MATRIX, (float) x, (float) y, (float) z)
                 .color((color >>> 16) & 0xFF, (color >>> 8) & 0xFF, color & 0xFF, (color >>> 24) & 0xFF);
     }
 
