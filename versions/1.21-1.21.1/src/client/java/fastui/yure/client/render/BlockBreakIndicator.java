@@ -12,7 +12,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
@@ -24,7 +23,6 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.World;
-import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 
 import java.util.ArrayList;
@@ -34,14 +32,13 @@ import java.util.SortedSet;
 /**
  * Yarn 1.21.1 port of the block-break indicator. There is no LevelRenderState
  * here: own progress comes from the interaction manager and remote progress
- * from the world renderer's breaking map. The renderer runs through malilib's
- * world-last event and mirrors malilib's own overlay draw path for this game
- * line: the camera-rotation matrix from {@code WorldRenderer.render} is
- * multiplied into the global model-view stack, vertices are written in world
- * coordinates, and the draw happens with the position-color shader.
+ * from the world renderer's breaking map. The draw path mirrors malilib's
+ * renderBlockTargetingOverlay for this game line: during the world-last event
+ * the global model-view stack already carries the camera rotation, so each
+ * indicator only translates the stack to its camera-relative block center and
+ * writes raw local-space vertices with the position-color shader.
  */
 public final class BlockBreakIndicator {
-    private static final Matrix4f IDENTITY_MATRIX = new Matrix4f();
     private static final int[][] EDGE_PAIRS = {
             {0, 1}, {0, 2}, {0, 4}, {1, 3}, {1, 5}, {2, 3},
             {2, 6}, {3, 7}, {4, 5}, {4, 6}, {5, 7}, {6, 7}
@@ -50,7 +47,7 @@ public final class BlockBreakIndicator {
     private BlockBreakIndicator() {
     }
 
-    public static void render(Matrix4f positionMatrix) {
+    public static void render() {
         if (!FastMasaConfigs.Generic.BLOCK_BREAK_INDICATOR.getBooleanValue()) {
             return;
         }
@@ -94,29 +91,18 @@ public final class BlockBreakIndicator {
             return;
         }
 
-        Vec3d cameraPosition = client.gameRenderer.getCamera().getPos();
-        double projectionScale = projectionScale(client);
-
-        Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
-        modelViewStack.pushMatrix();
-        modelViewStack.mul(positionMatrix);
-        modelViewStack.translate((float) -cameraPosition.x, (float) -cameraPosition.y,
-                (float) -cameraPosition.z);
-        RenderSystem.applyModelViewMatrix();
         RenderSystem.setShader(GameRenderer::getPositionColorProgram);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableDepthTest();
         RenderSystem.depthMask(false);
         RenderSystem.disableCull();
+
         try {
-            Tessellator tessellator = Tessellator.getInstance();
-            BufferBuilder buffer = tessellator.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+            Vec3d cameraPosition = client.gameRenderer.getCamera().getPos();
             for (Indicator indicator : indicators) {
-                addIndicator(client.world, indicator.position(), indicator.progress(), projectionScale, style,
-                        buffer);
+                addIndicator(client.world, indicator, cameraPosition, style);
             }
-            BufferRenderer.drawWithGlobalProgram(buffer.end());
         } catch (RuntimeException exception) {
             FastMasaConfig.LOGGER.warn("Failed to render block break indicator", exception);
         } finally {
@@ -124,84 +110,98 @@ public final class BlockBreakIndicator {
             RenderSystem.depthMask(true);
             RenderSystem.enableDepthTest();
             RenderSystem.disableBlend();
-            modelViewStack.popMatrix();
-            RenderSystem.applyModelViewMatrix();
         }
     }
 
-    private static void addIndicator(World world, BlockPos position, float progress, double projectionScale,
-            RenderStyle style, BufferBuilder buffer) {
+    private static void addIndicator(World world, Indicator indicator, Vec3d cameraPosition, RenderStyle style) {
+        BlockPos position = indicator.position();
         BlockState state = world.getBlockState(position);
         VoxelShape shape = state.getOutlineShape(world, position);
         if (shape.isEmpty()) {
             return;
         }
 
-        float normalized = MathHelper.clamp(progress, 0.0F, 1.0F);
+        float normalized = MathHelper.clamp(indicator.progress(), 0.0F, 1.0F);
         Box bounds = shape.getBoundingBox();
         // Keep a small stable core near completion so the cuboid does not
         // collapse into a degenerate, flickering line on the final frames.
         double scale = Math.max(0.08, 1.0 - normalized * 0.92);
-        double cx = position.getX() + (bounds.minX + bounds.maxX) / 2.0;
-        double cy = position.getY() + (bounds.minY + bounds.maxY) / 2.0;
-        double cz = position.getZ() + (bounds.minZ + bounds.maxZ) / 2.0;
         double hx = (bounds.maxX - bounds.minX) * scale / 2.0;
         double hy = (bounds.maxY - bounds.minY) * scale / 2.0;
         double hz = (bounds.maxZ - bounds.minZ) * scale / 2.0;
-        Box box = new Box(cx - hx, cy - hy, cz - hz, cx + hx, cy + hy, cz + hz);
+        // Block center in camera-relative space; the model-view stack already
+        // carries the camera rotation, so this translation positions the box.
+        double cx = position.getX() + (bounds.minX + bounds.maxX) / 2.0 - cameraPosition.x;
+        double cy = position.getY() + (bounds.minY + bounds.maxY) / 2.0 - cameraPosition.y;
+        double cz = position.getZ() + (bounds.minZ + bounds.maxZ) / 2.0 - cameraPosition.z;
+        // The camera sits at the local-space origin negated; use the center
+        // distance to scale line width the same way the vanilla overlay does.
+        double centerDistance = Math.sqrt(cx * cx + cy * cy + cz * cz);
+        double widthScale = centerDistance * projectionScale() / 2.0;
+        // Local camera position relative to the block center, for edge glow that
+        // faces the viewer.
+        double camLocalX = -cx;
+        double camLocalY = -cy;
+        double camLocalZ = -cz;
 
         int line = style.lines ? lerpColor(normalized, style.startLine, style.endLine) : 0;
         int fill = style.sides ? lerpColor(normalized, style.startSide, style.endSide) : 0;
 
-        if (fill != 0) {
-            addBoxSides(buffer, box, fill);
-        }
-        if (line != 0) {
-            int lineWidth = style.lineWidth;
-            int glowAlpha = (line >>> 24) / 4;
-            if (glowAlpha > 0) {
-                addBoxEdges(buffer, box, withAlpha(line, glowAlpha),
-                        Math.max(lineWidth + 1, lineWidth * 3), projectionScale);
+        Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+        modelViewStack.pushMatrix();
+        modelViewStack.translate((float) cx, (float) cy, (float) cz);
+        RenderSystem.applyModelViewMatrix();
+        try {
+            Tessellator tessellator = Tessellator.getInstance();
+            BufferBuilder buffer = tessellator.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+            if (fill != 0) {
+                addBoxSides(buffer, hx, hy, hz, fill);
             }
-            addBoxEdges(buffer, box, line, lineWidth, projectionScale);
+            if (line != 0) {
+                int lineWidth = style.lineWidth;
+                int glowAlpha = (line >>> 24) / 4;
+                if (glowAlpha > 0) {
+                    addBoxEdges(buffer, hx, hy, hz, camLocalX, camLocalY, camLocalZ, withAlpha(line, glowAlpha),
+                            Math.max(lineWidth + 1, lineWidth * 3) * widthScale);
+                }
+                addBoxEdges(buffer, hx, hy, hz, camLocalX, camLocalY, camLocalZ, line,
+                        lineWidth * widthScale);
+            }
+            BufferRenderer.drawWithGlobalProgram(buffer.end());
+        } finally {
+            modelViewStack.popMatrix();
+            RenderSystem.applyModelViewMatrix();
         }
     }
 
-    private static void addBoxSides(BufferBuilder buffer, Box box, int color) {
-        double x1 = box.minX;
-        double y1 = box.minY;
-        double z1 = box.minZ;
-        double x2 = box.maxX;
-        double y2 = box.maxY;
-        double z2 = box.maxZ;
-
-        quad(buffer, x1, y1, z1, x1, y1, z2, x1, y2, z2, x1, y2, z1, color);
-        quad(buffer, x2, y1, z1, x2, y2, z1, x2, y2, z2, x2, y1, z2, color);
-        quad(buffer, x1, y1, z1, x1, y2, z1, x2, y2, z1, x2, y1, z1, color);
-        quad(buffer, x1, y1, z2, x2, y1, z2, x2, y2, z2, x1, y2, z2, color);
-        quad(buffer, x1, y1, z1, x2, y1, z1, x2, y1, z2, x1, y1, z2, color);
-        quad(buffer, x1, y2, z1, x1, y2, z2, x2, y2, z2, x2, y2, z1, color);
+    private static void addBoxSides(BufferBuilder buffer, double hx, double hy, double hz, int color) {
+        quad(buffer, -hx, -hy, -hz, -hx, -hy, hz, -hx, hy, hz, -hx, hy, -hz, color);
+        quad(buffer, hx, -hy, -hz, hx, hy, -hz, hx, hy, hz, hx, -hy, hz, color);
+        quad(buffer, -hx, -hy, -hz, -hx, hy, -hz, hx, hy, -hz, hx, -hy, -hz, color);
+        quad(buffer, -hx, -hy, hz, hx, -hy, hz, hx, hy, hz, -hx, hy, hz, color);
+        quad(buffer, -hx, -hy, -hz, hx, -hy, -hz, hx, -hy, hz, -hx, -hy, hz, color);
+        quad(buffer, -hx, hy, -hz, -hx, hy, hz, hx, hy, hz, hx, hy, -hz, color);
     }
 
-    private static void addBoxEdges(BufferBuilder buffer, Box box, int color, int lineWidth,
-            double projectionScale) {
+    private static void addBoxEdges(BufferBuilder buffer, double hx, double hy, double hz, double camX,
+            double camY, double camZ, int color, double halfWidth) {
         for (int[] edge : EDGE_PAIRS) {
             addLineQuad(buffer,
-                    cornerX(box, edge[0]), cornerY(box, edge[0]), cornerZ(box, edge[0]),
-                    cornerX(box, edge[1]), cornerY(box, edge[1]), cornerZ(box, edge[1]),
-                    color, lineWidth, projectionScale);
+                    cornerX(hx, edge[0]), cornerY(hy, edge[0]), cornerZ(hz, edge[0]),
+                    cornerX(hx, edge[1]), cornerY(hy, edge[1]), cornerZ(hz, edge[1]),
+                    camX, camY, camZ, color, halfWidth);
         }
     }
 
-    private static void addLineQuad(BufferBuilder buffer, double startX, double startY,
-            double startZ, double endX, double endY, double endZ, int color, int lineWidth,
-            double projectionScale) {
+    private static void addLineQuad(BufferBuilder buffer, double startX, double startY, double startZ,
+            double endX, double endY, double endZ, double camX, double camY, double camZ, int color,
+            double halfWidth) {
         double directionX = endX - startX;
         double directionY = endY - startY;
         double directionZ = endZ - startZ;
         double directionLength = Math.sqrt(directionX * directionX + directionY * directionY
                 + directionZ * directionZ);
-        if (directionLength < 1.0E-8) {
+        if (directionLength < 1.0E-8 || halfWidth < 1.0E-8) {
             return;
         }
         directionX /= directionLength;
@@ -211,11 +211,26 @@ public final class BlockBreakIndicator {
         double midpointX = (startX + endX) * 0.5;
         double midpointY = (startY + endY) * 0.5;
         double midpointZ = (startZ + endZ) * 0.5;
-        double midpointLength = Math.max(0.1,
-                Math.sqrt(midpointX * midpointX + midpointY * midpointY + midpointZ * midpointZ));
-        double towardCameraX = -midpointX / midpointLength;
-        double towardCameraY = -midpointY / midpointLength;
-        double towardCameraZ = -midpointZ / midpointLength;
+        // Face the camera: the camera is at (camX, camY, camZ) in this local
+        // space, so widen the edge quad along the perpendicular towards it.
+        double towardCameraX = camX - midpointX;
+        double towardCameraY = camY - midpointY;
+        double towardCameraZ = camZ - midpointZ;
+        double towardCameraLength = Math.sqrt(towardCameraX * towardCameraX + towardCameraY * towardCameraY
+                + towardCameraZ * towardCameraZ);
+        if (towardCameraLength < 1.0E-8) {
+            towardCameraX = -midpointX;
+            towardCameraY = -midpointY;
+            towardCameraZ = -midpointZ;
+            towardCameraLength = Math.sqrt(towardCameraX * towardCameraX + towardCameraY * towardCameraY
+                    + towardCameraZ * towardCameraZ);
+            if (towardCameraLength < 1.0E-8) {
+                return;
+            }
+        }
+        towardCameraX /= towardCameraLength;
+        towardCameraY /= towardCameraLength;
+        towardCameraZ /= towardCameraLength;
 
         double offsetX = directionY * towardCameraZ - directionZ * towardCameraY;
         double offsetY = directionZ * towardCameraX - directionX * towardCameraZ;
@@ -227,15 +242,10 @@ public final class BlockBreakIndicator {
             offsetZ = 0.0;
             offsetLength = Math.sqrt(offsetX * offsetX + offsetY * offsetY);
             if (offsetLength < 1.0E-8) {
-                offsetX = 0.0;
-                offsetY = directionZ;
-                offsetZ = -directionY;
-                offsetLength = Math.sqrt(offsetY * offsetY + offsetZ * offsetZ);
+                return;
             }
         }
 
-        double halfWidth = Math.max(0.0005,
-                midpointLength * projectionScale * Math.max(1, lineWidth) / 2.0);
         offsetX = offsetX / offsetLength * halfWidth;
         offsetY = offsetY / offsetLength * halfWidth;
         offsetZ = offsetZ / offsetLength * halfWidth;
@@ -246,7 +256,8 @@ public final class BlockBreakIndicator {
                 endX + offsetX, endY + offsetY, endZ + offsetZ, color);
     }
 
-    private static double projectionScale(MinecraftClient client) {
+    private static double projectionScale() {
+        MinecraftClient client = MinecraftClient.getInstance();
         int framebufferHeight = Math.max(1, client.getWindow().getHeight());
         double fovRadians = Math.toRadians(client.options.getFov().getValue());
         return 2.0 * Math.tan(fovRadians / 2.0) / framebufferHeight;
@@ -291,7 +302,7 @@ public final class BlockBreakIndicator {
     }
 
     private static void vertex(BufferBuilder buffer, double x, double y, double z, int color) {
-        buffer.vertex(IDENTITY_MATRIX, (float) x, (float) y, (float) z)
+        buffer.vertex((float) x, (float) y, (float) z)
                 .color((color >>> 16) & 0xFF, (color >>> 8) & 0xFF, color & 0xFF, (color >>> 24) & 0xFF);
     }
 
@@ -300,16 +311,16 @@ public final class BlockBreakIndicator {
         return (clamped << 24) | (color & 0x00FFFFFF);
     }
 
-    private static double cornerX(Box box, int index) {
-        return (index & 4) == 0 ? box.minX : box.maxX;
+    private static double cornerX(double halfExtent, int index) {
+        return (index & 4) == 0 ? -halfExtent : halfExtent;
     }
 
-    private static double cornerY(Box box, int index) {
-        return (index & 2) == 0 ? box.minY : box.maxY;
+    private static double cornerY(double halfExtent, int index) {
+        return (index & 2) == 0 ? -halfExtent : halfExtent;
     }
 
-    private static double cornerZ(Box box, int index) {
-        return (index & 1) == 0 ? box.minZ : box.maxZ;
+    private static double cornerZ(double halfExtent, int index) {
+        return (index & 1) == 0 ? -halfExtent : halfExtent;
     }
 
     private record Indicator(BlockPos position, float progress) {

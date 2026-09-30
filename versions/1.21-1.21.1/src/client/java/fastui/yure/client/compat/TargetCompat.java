@@ -35,12 +35,6 @@ public final class TargetCompat
                 new fi.dy.masa.malilib.interfaces.IRenderer()
                 {
                     @Override
-                    public void onRenderWorldLast(org.joml.Matrix4f positionMatrix, org.joml.Matrix4f projectionMatrix)
-                    {
-                        fastui.yure.client.render.BlockBreakIndicator.render(positionMatrix);
-                    }
-
-                    @Override
                     public java.util.function.Supplier<String> getProfilerSectionSupplier()
                     {
                         return () -> "fast-masa-config:block_break_indicator";
