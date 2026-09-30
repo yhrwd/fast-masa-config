@@ -31,14 +31,7 @@ public final class TargetCompat
 
     public static void registerBlockBreakIndicatorRenderHook()
     {
-        fi.dy.masa.malilib.event.RenderEventHandler.getInstance().registerWorldLastRenderer(
-                new fi.dy.masa.malilib.interfaces.IRenderer()
-                {
-                    @Override
-                    public java.util.function.Supplier<String> getProfilerSectionSupplier()
-                    {
-                        return () -> "fast-masa-config:block_break_indicator";
-                    }
-                });
+        // The 1.21.1 hook lives in GameRendererMixin (meteor-style injection
+        // after the world pass); nothing to register here.
     }
 }

@@ -23,7 +23,9 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.World;
+import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
+import org.joml.Quaternionf;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,6 +48,8 @@ public final class BlockBreakIndicator {
 
     private BlockBreakIndicator() {
     }
+
+    private static long lastDiagnosticLog;
 
     public static void render() {
         if (!FastMasaConfigs.Generic.BLOCK_BREAK_INDICATOR.getBooleanValue()) {
@@ -91,6 +95,23 @@ public final class BlockBreakIndicator {
             return;
         }
 
+        long now = System.currentTimeMillis();
+        if (now - lastDiagnosticLog > 10_000L) {
+            lastDiagnosticLog = now;
+            FastMasaConfig.LOGGER.info("[block-break-indicator] drawing {} indicator(s), own pos {}, progress {}",
+                    indicators.size(), ownPosition, ownProgress);
+        }
+
+        // The clean camera rotation, built exactly like GameRenderer.renderWorld
+        // does for the world pass: conjugated camera rotation as a matrix.
+        Quaternionf conjugate = client.gameRenderer.getCamera().getRotation().conjugate(new Quaternionf());
+        Matrix4f rotation = new Matrix4f().rotation(conjugate);
+
+        Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+        modelViewStack.pushMatrix();
+        modelViewStack.mul(rotation);
+        RenderSystem.applyModelViewMatrix();
+
         RenderSystem.setShader(GameRenderer::getPositionColorProgram);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
@@ -110,6 +131,8 @@ public final class BlockBreakIndicator {
             RenderSystem.depthMask(true);
             RenderSystem.enableDepthTest();
             RenderSystem.disableBlend();
+            modelViewStack.popMatrix();
+            RenderSystem.applyModelViewMatrix();
         }
     }
 

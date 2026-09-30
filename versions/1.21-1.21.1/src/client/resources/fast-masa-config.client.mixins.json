@@ -5,6 +5,7 @@
   "client": [
     "ClientPlayerInteractionManagerAccessor",
     "EntityRendererMixin",
+    "GameRendererMixin",
     "LevelRendererBlockBreakOverlayMixin",
     "WorldRendererBlockBreakingAccessor"
   ],
