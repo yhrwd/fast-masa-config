@@ -14,7 +14,7 @@
 - `versions/<target>/gradle.properties` declares one build target (minecraft/loader/fabric api/malilib/mod versions, `loom_pipeline`, `java_release`, `game_versions`). Build it with `./gradlew -Ptarget=<target> ...`; no `-Ptarget` means `26.3`.
 - Target folders that ship one jar across a compatible line use range names matching the shared group (`1.21-1.21.1`, `1.21.6-1.21.8`); their `fabric.mod.json` declares the full depends range (`">=1.21.6 <=1.21.8"`). 26.x targets are single-version (`26.2`, `26.3`) because the API churns every release. `game_versions` lists the Modrinth game versions a release covers; release tags follow `mc<target>-v<feature>`, e.g. `mc1.21.6-1.21.8-v5.4.0`.
 - Version-specific API surface (MaLiLib signatures, key-code names, screen access, render hooks) is reached only through `fastui.yure.client.compat.TargetCompat`; each target overrides that class when its MaLiLib/vanilla line differs. Extend TargetCompat instead of duplicating whole GUI files per target.
-- To add a new version target: copy the nearest `versions/<target>/`, update its properties (`loom_pipeline`, `java_release`, deps, `mod_version`, `game_versions`) and `fabric.mod.json` depends range, then add same-path override files in its `src/` only where the API differs. The step-by-step recipe is in README 本地开发.
+- To add a new version target: copy the nearest `versions/<target>/`, update its properties (`loom_pipeline`, `java_release`, deps, `mod_version`, `game_versions`) and `fabric.mod.json` depends range, then add same-path override files in its `src/` only where the API differs. The step-by-step recipe is in README 本地开发. The CI build matrix is derived from the `versions/` directory listing, so new and retired targets never require CI edits.
 - `versions/<target>/src/{main,client,test}/...` holds version-specific overrides: a file there replaces the same-path file in `src/`. `versions/<target>/common-excluded.txt` lists `src/`-relative paths of common files that do not exist for that target's feature generation. Overrides shrink as common code is made version-agnostic — prefer deleting an override over editing both copies.
 - `src/main/java` contains environment-independent configuration models, stores, and MaLiLib config editing.
 - `src/client/java` contains all Minecraft client entrypoints, scanning, input handling, and custom GUI code; do not move client-only imports into `src/main`.
@@ -29,7 +29,19 @@
 - Client compilation: `./gradlew compileClientJava`.
 - Build every target from a shell (no helper script): PowerShell `gci versions -Directory | % { ./gradlew.bat "-Ptarget=$($_.Name)" build }`; bash `for t in versions/*/; do ./gradlew "-Ptarget=$(basename $t)" build; done`. Jars accumulate in `build/libs/` (filenames embed the target version, so nothing clobbers).
 - CI-equivalent verification: `./gradlew build --no-daemon`.
-- Release tags are `v*` or `mc*-v*`; CI builds the jar and excludes `*-sources.jar` and `*-dev.jar` from the GitHub release.
+- Release tags are `mc*-v*` only (e.g. `mc1.21.6-1.21.8-v5.4.0`); they trigger the `release` workflow, which reuses the Build workflow and publishes the jar to GitHub Releases and Modrinth. Plain `v*` tags trigger nothing.
+- Building the `1.21.4` target needs the MaLiLib alias `com.github.sakura-ryoko:malilib:<commit>` (jitpack cannot build that commit): locally keep a `malilib-*.jar` in the gitignored `libs/`, or replicate the Maven Local alias from `.github/actions/build-malilib/action.yml`.
+
+## CI
+
+- `.github/workflows/build.yml` derives its build matrix from the `versions/` directory listing (a `targets` job emits the JSON matrix); adding or retiring a version target never requires CI edits. It also accepts a single-target input via `workflow_dispatch` (manual) and `workflow_call` (used by the release workflow). Artifacts exclude `-sources`/`-dev` jars.
+- `.github/workflows/release.yml` triggers on `mc*-v*` tags: it resolves the target from the tag, delegates the jar build to the Build workflow via `workflow_call`, then publishes the downloaded artifact to GitHub Releases and Modrinth. Tag notes (annotated tag messages) become the release notes/changelog.
+- `.github/actions/build-malilib` builds the MaLiLib commit pinned in `versions/1.21.4/gradle.properties` from source, publishes it to Maven Local as `com.github.sakura-ryoko:malilib:<commit>`, and caches the alias by commit (cache hits skip the source build). Bump 1.21.4 MaLiLib by changing only `malilib_version` there.
+
+## Version Target Lifecycle
+
+- Add a target: copy the nearest `versions/<target>/` and update its properties; the CI matrix picks it up automatically (recipe in README 本地开发).
+- Retire a target (e.g. a whole 1.21.x line): `git rm -r versions/<target>`; the CI matrix shrinks automatically. Update the support tables in README/MODRINTH.md (or mark the row as unmaintained). Published GitHub Releases and Modrinth files are never touched. Consider shipping a final tagged release for the line before deleting. Restore later with `git checkout <commit> -- versions/<target>`.
 
 ## Architecture Constraints
 
