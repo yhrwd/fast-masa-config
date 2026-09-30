@@ -9,12 +9,14 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  resolve:
     runs-on: ubuntu-24.04
-
+    outputs:
+      target: ${{ steps.resolve.outputs.target }}
+      game_versions: ${{ steps.resolve.outputs.game_versions }}
     steps:
       - name: checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: resolve version target from tag
         id: resolve
@@ -22,36 +24,36 @@ jobs:
           # mc1.21.6-1.21.8-v5.4.0 -> target 1.21.6-1.21.8, feat version 5.4.0
           target="${GITHUB_REF_NAME#mc}"
           target="${target%%-v*}"
-          if [[ "$target" == 1.* ]]; then java_version=21; else java_version=25; fi
+          if [ ! -f "versions/${target}/gradle.properties" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME}: no build target at versions/${target}"
+            exit 1
+          fi
           # Modrinth game versions for the target (comma-separated in its properties)
           game_versions="$(grep '^game_versions=' "versions/${target}/gradle.properties" | cut -d= -f2-)"
           if [ -z "${game_versions}" ]; then game_versions="${target}"; fi
           echo "target=${target}" >> "$GITHUB_OUTPUT"
-          echo "java=${java_version}" >> "$GITHUB_OUTPUT"
           echo "game_versions=${game_versions}" >> "$GITHUB_OUTPUT"
 
-      - name: validate gradle wrapper
-        uses: gradle/actions/wrapper-validation@v6
+  # Reuses the same build workflow CI runs on every push:
+  # JDK setup, MaLiLib alias build (1.21.4), gradle build, jar artifact.
+  build:
+    needs: resolve
+    uses: ./.github/workflows/build.yml
+    with:
+      target: ${{ needs.resolve.outputs.target }}
 
-      - name: setup jdk
-        uses: actions/setup-java@v5
+  publish:
+    needs: [resolve, build]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: download release jar
+        uses: actions/download-artifact@v4
         with:
-          java-version: '${{ steps.resolve.outputs.java }}'
-          distribution: 'microsoft'
-
-      - name: make gradle wrapper executable
-        run: chmod +x ./gradlew
-
-      - name: build
-        run: ./gradlew -Ptarget=${{ steps.resolve.outputs.target }} build --no-daemon
-
-      - name: collect release jars
-        run: |
-          mkdir -p release
-          find build/libs -type f -name '*.jar' \
-            ! -name '*-sources.jar' \
-            ! -name '*-dev.jar' \
-            -exec cp {} release/ \;
+          name: fast-masa-config-${{ needs.resolve.outputs.target }}
+          path: release
 
       - name: create github release
         env:
@@ -78,7 +80,7 @@ jobs:
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_PROJECT_ID: 4Qx0KEY6
-          GAME_VERSIONS: ${{ steps.resolve.outputs.game_versions }}
+          GAME_VERSIONS: ${{ needs.resolve.outputs.game_versions }}
         run: |
           set -euo pipefail
           jar_file="$(find release -maxdepth 1 -type f -name '*.jar' | head -n 1)"

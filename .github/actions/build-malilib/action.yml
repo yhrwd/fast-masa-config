@@ -1,0 +1,165 @@
+name: 'Build MaLiLib (1.21.4)'
+description: >
+  Builds the MaLiLib commit pinned in versions/1.21.4/gradle.properties from
+  source and publishes it to Maven Local under the coordinates the 1.21.4
+  target resolves:
+
+    com.github.sakura-ryoko:malilib:<commit>
+
+  jitpack cannot build this commit (its build workflow predates the tag),
+  so CI builds it itself. The alias keeps the jitpack-style groupId so the
+  Gradle dependency declaration never changes. A complete alias is cached;
+  cache hits skip the source build entirely.
+
+runs:
+  using: composite
+  steps:
+    - name: Read pinned MaLiLib commit
+      id: pin
+      shell: bash
+      run: |
+        set -euo pipefail
+        commit="$(sed -n 's/^malilib_version=//p' versions/1.21.4/gradle.properties | tr -d '\r')"
+        if ! [[ "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "::error::versions/1.21.4/gradle.properties must pin malilib_version to a full 40-character commit hash; found: '$commit'"
+          exit 1
+        fi
+        echo "commit=$commit" >> "$GITHUB_OUTPUT"
+        echo "Pinned MaLiLib commit: $commit"
+
+    - name: Cache MaLiLib Maven alias
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository/com/github/sakura-ryoko
+        key: malilib-alias-${{ steps.pin.outputs.commit }}
+
+    - name: Checkout MaLiLib source
+      uses: actions/checkout@v4
+      with:
+        repository: sakura-ryoko/malilib
+        ref: ${{ steps.pin.outputs.commit }}
+        path: malilib-src
+
+    - name: Build MaLiLib and create Maven Local alias
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        COMMIT="${{ steps.pin.outputs.commit }}"
+        DST="$HOME/.m2/repository/com/github/sakura-ryoko/malilib/$COMMIT"
+
+        # --------------------------------------------------------
+        # Reuse a complete alias (cache hit or job re-run).
+        # --------------------------------------------------------
+        if [ -f "$DST/malilib-$COMMIT.jar" ] && [ -f "$DST/malilib-$COMMIT.pom" ]; then
+          echo "MaLiLib alias already present in Maven Local; skipping build."
+          exit 0
+        fi
+
+        echo "Building MaLiLib $COMMIT from source..."
+        java -version
+
+        # --------------------------------------------------------
+        # Publish MaLiLib to Maven Local, then inspect what was
+        # actually published instead of assuming coordinates.
+        # --------------------------------------------------------
+        cd malilib-src
+        ./gradlew publishToMavenLocal --no-daemon
+
+        echo
+        echo "MaLiLib artifacts found in Maven Local:"
+        find "$HOME/.m2/repository" \
+          -type f \( -name '*.jar' -o -name '*.pom' -o -name '*.module' \) \
+          | grep -i 'malilib' | sort || true
+
+        # --------------------------------------------------------
+        # Find the actual MAIN JAR (exclude sources/javadoc/dev)
+        # and derive the upstream version from its filename.
+        # --------------------------------------------------------
+        mapfile -t jars < <(
+          find "$HOME/.m2/repository" \
+            -type f \
+            -name 'malilib-fabric-1.21.4-*.jar' \
+            ! -name '*-sources.jar' \
+            ! -name '*-javadoc.jar' \
+            ! -name '*-dev.jar'
+        )
+
+        if [ "${#jars[@]}" -ne 1 ]; then
+          echo "::error::Expected exactly one MaLiLib main JAR, found ${#jars[@]}"
+          printf '%s\n' "${jars[@]:-<none>}"
+          exit 1
+        fi
+
+        jar_file="${jars[0]}"
+        jar_dir="$(dirname "$jar_file")"
+        version="$(basename "$jar_file")"
+        version="${version#malilib-fabric-1.21.4-}"
+        version="${version%.jar}"
+
+        echo
+        echo "Main JAR: $jar_file"
+        echo "Upstream version: $version"
+
+        # --------------------------------------------------------
+        # The matching POM lives in the SAME directory.
+        # --------------------------------------------------------
+        pom_file="$jar_dir/malilib-fabric-1.21.4-$version.pom"
+        if [ ! -f "$pom_file" ]; then
+          echo "::error::Expected POM next to the main JAR, missing: $pom_file"
+          find "$jar_dir" -maxdepth 1 -type f -print | sort
+          exit 1
+        fi
+
+        sources_jar="$jar_dir/malilib-fabric-1.21.4-$version-sources.jar"
+
+        # --------------------------------------------------------
+        # Build the alias POM: rewrite groupId, artifactId AND
+        # version. The published POM is
+        #
+        #   fi.dy.masa.malilib:malilib-fabric-1.21.4:$version
+        #
+        # The artifactId MUST be rewritten too: if it stays
+        # malilib-fabric-1.21.4, Gradle rejects the alias with
+        # "inconsistent module metadata".
+        # --------------------------------------------------------
+        sed \
+          -e 's#<groupId>fi\.dy\.masa\.malilib</groupId>#<groupId>com.github.sakura-ryoko</groupId>#' \
+          -e 's#<groupId>fi\.dy\.masa</groupId>#<groupId>com.github.sakura-ryoko</groupId>#' \
+          -e 's#<artifactId>malilib-fabric-1\.21\.4</artifactId>#<artifactId>malilib</artifactId>#' \
+          -e "s#<version>$version</version>#<version>$COMMIT</version>#" \
+          "$pom_file" \
+          > "$DST/malilib-$COMMIT.pom"
+
+        cp "$jar_file" "$DST/malilib-$COMMIT.jar"
+
+        if [ -f "$sources_jar" ]; then
+          cp "$sources_jar" "$DST/malilib-$COMMIT-sources.jar"
+        fi
+
+        # --------------------------------------------------------
+        # NEVER copy Gradle Module Metadata (.module): it carries the
+        # original group fi.dy.masa.malilib, which triggers Gradle's
+        # "inconsistent module metadata" error. Delete any stray copy.
+        # --------------------------------------------------------
+        find "$DST" -maxdepth 1 -type f \
+          \( -name '*.module' -o -name '*.module.json' \) -delete
+
+        # --------------------------------------------------------
+        # Validate the alias before handing it to the build.
+        # --------------------------------------------------------
+        grep -q '<groupId>com.github.sakura-ryoko</groupId>' "$DST/malilib-$COMMIT.pom"
+        grep -q '<artifactId>malilib</artifactId>' "$DST/malilib-$COMMIT.pom"
+        grep -q "<version>$COMMIT</version>" "$DST/malilib-$COMMIT.pom"
+
+        if grep -q '<groupId>fi\.dy\.masa\.malilib</groupId>' "$DST/malilib-$COMMIT.pom"; then
+          echo "::error::Original MaLiLib groupId still present in the alias POM."
+          exit 1
+        fi
+
+        test -f "$DST/malilib-$COMMIT.jar"
+        test -f "$DST/malilib-$COMMIT.pom"
+
+        echo
+        echo "MaLiLib Maven alias ready: com.github.sakura-ryoko:malilib:$COMMIT"
+        find "$DST" -maxdepth 1 -type f -print | sort
