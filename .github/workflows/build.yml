@@ -10,13 +10,13 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: 'Build a single target from versions/ (empty = full matrix)'
+        description: 'Build a single target from versions/ (empty = all targets)'
         required: false
         type: string
   workflow_call:
     inputs:
       target:
-        description: 'Build a single target from versions/ (empty = full matrix)'
+        description: 'Build a single target from versions/ (empty = all targets)'
         required: false
         type: string
 
@@ -24,20 +24,42 @@ permissions:
   contents: read
 
 jobs:
+  # The build matrix is derived from the versions/ directory listing, so
+  # adding or retiring a version target never requires touching CI.
+  targets:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: List build targets
+        id: list
+        env:
+          SINGLE_TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          if [ -n "$SINGLE_TARGET" ]; then
+            if [ ! -d "versions/$SINGLE_TARGET" ]; then
+              echo "::error::Unknown build target '$SINGLE_TARGET' (no versions/$SINGLE_TARGET directory)"
+              exit 1
+            fi
+            matrix="$(jq -cn --arg t "$SINGLE_TARGET" '[$t]')"
+          else
+            matrix="$(find versions -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | jq -R . | jq -sc .)"
+          fi
+          echo "Build matrix: $matrix"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: targets
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        # A caller-provided target builds just that one target;
-        # otherwise every supported target from versions/ is built.
-        target: >-
-          ${{
-            (inputs.target || '') != ''
-              && fromJSON(format('["{0}"]', inputs.target))
-              || fromJSON('["26.3","26.2","26.1.2","1.21.11","1.21.9-1.21.10","1.21.6-1.21.8","1.21.5","1.21.4","1.21.2-1.21.3","1.21-1.21.1"]')
-          }}
+        target: ${{ fromJSON(needs.targets.outputs.matrix) }}
 
     steps:
       - name: Checkout
