@@ -183,10 +183,10 @@ public final class FloatingGroupPanel {
 
         int accent = FastMasaMenuPalette.accent();
         int backgroundAlpha = FastMasaConfigs.Generic.FLOATING_BACKGROUND_ALPHA.getIntegerValue();
-        RenderUtils.drawRect(this.layout.x(), this.layout.y() + this.layout.headerHeight(), this.layout.width(),
+        RenderUtils.drawRect(context, this.layout.x(), this.layout.y() + this.layout.headerHeight(), this.layout.width(),
                 Math.max(0, this.layout.height() - this.layout.headerHeight()),
                 HoloPanelVisuals.withAlpha(BASE, backgroundAlpha));
-        RenderUtils.drawRect(this.layout.x(), this.layout.y(), this.layout.width(), this.layout.headerHeight(),
+        RenderUtils.drawRect(context, this.layout.x(), this.layout.y(), this.layout.width(), this.layout.headerHeight(),
                 HoloPanelVisuals.withAlpha(accent, backgroundAlpha));
         HoloPanelVisuals.drawBorder(context, this.layout.x(), this.layout.y(), this.layout.width(), this.layout.height(),
                 HoloPanelVisuals.withAlpha(FastMasaMenuPalette.NEUTRAL, backgroundAlpha));
@@ -228,8 +228,8 @@ public final class FloatingGroupPanel {
             int thumbHeight = Math.max(12, trackHeight * this.layout.height() / Math.max(trackHeight, this.layout.contentHeight()));
             int travel = Math.max(1, trackHeight - thumbHeight);
             int thumbY = trackY + (int) Math.round(travel * (this.scrollOffset / (double) this.layout.maxScrollOffset()));
-            RenderUtils.drawRect(this.layout.x() + this.layout.width() - 4, trackY, 2, trackHeight, 0x661A1A1D);
-            RenderUtils.drawRect(this.layout.x() + this.layout.width() - 5, thumbY, 4, thumbHeight, accent);
+            RenderUtils.drawRect(context, this.layout.x() + this.layout.width() - 4, trackY, 2, trackHeight, 0x661A1A1D);
+            RenderUtils.drawRect(context, this.layout.x() + this.layout.width() - 5, thumbY, 4, thumbHeight, accent);
         }
     }
 
@@ -408,11 +408,11 @@ public final class FloatingGroupPanel {
                 drawUnavailableRow(context, row, rowIndex, x, y, width);
                 return;
             }
-            RenderUtils.drawRect(x, y, width, row.height(),
+            RenderUtils.drawRect(context, x, y, width, row.height(),
                     HoloPanelVisuals.withAlpha(FastMasaMenuPalette.SYSTEM_ROW, backgroundAlpha));
             drawMarqueeLabel(context, StringUtils.translate("fast-masa-config.gui.system.open_full_config"), x, y,
                     width, ROW_HEIGHT, width - 12, 0, TEXT);
-            RenderUtils.drawRect(x, y, 2, ROW_HEIGHT, accent);
+            RenderUtils.drawRect(context, x, y, 2, ROW_HEIGHT, accent);
             return;
         }
         boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, width, row.height());
@@ -421,13 +421,13 @@ public final class FloatingGroupPanel {
         int rowColor = enabled ? FastMasaMenuPalette.MODULE_BACKGROUND
                 : (hovered ? FastMasaMenuPalette.ROW_HOVER : FastMasaMenuPalette.ROW);
         // 非激活行也保留极轻的底色，避免文字与窗口背景融为一体；激活行再使用更强的模块色。
-        RenderUtils.drawRect(x, y, width, row.height(),
+        RenderUtils.drawRect(context, x, y, width, row.height(),
                 HoloPanelVisuals.withAlpha(rowColor, backgroundAlpha));
         String label = row.shortcut().configEntry().displayName();
         drawMarqueeLabel(context, label, x, y, width, ROW_HEIGHT, row.numeric() ? width - 28 : width - 8,
                 rowIndex, TEXT);
         if (enabled) {
-            RenderUtils.drawRect(x, y, 2, row.height(), accent);
+            RenderUtils.drawRect(context, x, y, 2, row.height(), accent);
         }
         if (!row.numeric()) {
             return;
@@ -437,8 +437,8 @@ public final class FloatingGroupPanel {
             GroupWindowHitTest.Bounds slider = sliderBounds(new GroupWindowLayout.Row(0, x, y, width, row.height()));
             int fillWidth = (int) Math.round(slider.width() * ratio);
             int trackY = slider.y() + Math.max(0, (slider.height() - 3) / 2);
-            RenderUtils.drawRect(slider.x(), trackY, slider.width(), 3, TRACK);
-            RenderUtils.drawRect(slider.x(), trackY, fillWidth, 3, accent);
+            RenderUtils.drawRect(context, slider.x(), trackY, slider.width(), 3, TRACK);
+            RenderUtils.drawRect(context, slider.x(), trackY, fillWidth, 3, accent);
             int handleY = slider.y() + Math.max(0, (slider.height() - 4) / 2);
             drawSliderHandle(context, slider.x() + fillWidth - 2, handleY, TEXT);
             GroupWindowLayout.Row expandedRow = new GroupWindowLayout.Row(0, x, y, width, row.height());
@@ -447,10 +447,10 @@ public final class FloatingGroupPanel {
             String rawValue = editing ? this.editingValue : ShortcutControl.getValueText(row.shortcut().configEntry().config());
             boolean showCursor = editing && (System.currentTimeMillis() / 500L) % 2L == 0L;
             String valueText = fitText(rawValue + (showCursor ? "|" : ""), value.width() - 4);
-            RenderUtils.drawRect(value.x(), value.y(), value.width(), value.height(),
+            RenderUtils.drawRect(context, value.x(), value.y(), value.width(), value.height(),
                     editing ? FastMasaMenuPalette.ROW_HOVER : FastMasaMenuPalette.TRACK);
             if (editing && this.editingValueSelected) {
-                RenderUtils.drawRect(value.x() + 2, value.y() + 2,
+                RenderUtils.drawRect(context, value.x() + 2, value.y() + 2,
                         Math.max(0, Math.min(value.width() - 4, this.font.getWidth(rawValue))),
                         Math.max(0, value.height() - 4), accent);
             }
@@ -461,7 +461,7 @@ public final class FloatingGroupPanel {
                     FloatingTextLayout.centeredTextY(value.y(), value.height(), this.font.fontHeight),
                     editing ? TEXT : MUTED, false);
             GroupWindowHitTest.Bounds reset = resetBounds(expandedRow);
-            RenderUtils.drawRect(reset.x(), reset.y(), reset.width(), reset.height(), FastMasaMenuPalette.TRACK);
+            RenderUtils.drawRect(context, reset.x(), reset.y(), reset.width(), reset.height(), FastMasaMenuPalette.TRACK);
             HoloPanelVisuals.drawBorder(context, reset.x(), reset.y(), reset.width(), reset.height(),
                     FastMasaMenuPalette.NEUTRAL);
             String resetLabel = "R";
@@ -478,7 +478,7 @@ public final class FloatingGroupPanel {
 
     private void drawUnavailableRow(DrawContext context, RowModel row, int rowIndex, int x, int y, int width) {
         int backgroundAlpha = FastMasaConfigs.Generic.FLOATING_BACKGROUND_ALPHA.getIntegerValue();
-        RenderUtils.drawRect(x, y, width, row.height(),
+        RenderUtils.drawRect(context, x, y, width, row.height(),
                 HoloPanelVisuals.withAlpha(FastMasaMenuPalette.ROW, backgroundAlpha));
         drawMarqueeLabel(context, row.item().configName(), x, y, width, ROW_HEIGHT, width - 8, rowIndex,
                 FastMasaMenuPalette.UNAVAILABLE_TEXT);
@@ -572,9 +572,9 @@ public final class FloatingGroupPanel {
 
     /** 4x4px 菱形滑块把手。改尺寸时也要同步调整 drawRow() 中的 handleY 和横向 -2px 偏移。 */
     private void drawSliderHandle(DrawContext context, int x, int y, int color) {
-        RenderUtils.drawRect(x + 1, y, 2, 1, color);
-        RenderUtils.drawRect(x, y + 1, 4, 2, color);
-        RenderUtils.drawRect(x + 1, y + 3, 2, 1, color);
+        RenderUtils.drawRect(context, x + 1, y, 2, 1, color);
+        RenderUtils.drawRect(context, x, y + 1, 4, 2, color);
+        RenderUtils.drawRect(context, x + 1, y + 3, 2, 1, color);
     }
 
     /**

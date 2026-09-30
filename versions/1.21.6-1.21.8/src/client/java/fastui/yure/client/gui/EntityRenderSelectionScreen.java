@@ -69,9 +69,9 @@ final class EntityRenderSelectionScreen extends GuiBase {
             float partialTicks) {
         DrawContext context = drawContext;
         super.drawScreenBackground(context, mouseX, mouseY);
-        RenderUtils.drawRect(0, 0, this.width, this.height, FullConfigPalette.SCREEN_BACKGROUND);
-        RenderUtils.drawRect(0, 0, this.width, 26, FullConfigPalette.SCREEN_HEADER);
-        RenderUtils.drawRect(0, 25, this.width, 1, FullConfigPalette.BORDER);
+        RenderUtils.drawRect(context, 0, 0, this.width, this.height, FullConfigPalette.SCREEN_BACKGROUND);
+        RenderUtils.drawRect(context, 0, 0, this.width, 26, FullConfigPalette.SCREEN_HEADER);
+        RenderUtils.drawRect(context, 0, 25, this.width, 1, FullConfigPalette.BORDER);
         this.drawString(context, StringUtils.translate("fast-masa-config.gui.tools.entities_title"), MARGIN, 9,
                 FullConfigPalette.TEXT);
         this.drawString(context, this.visibleEntries.size() + " / " + this.allEntries.size(),
@@ -140,10 +140,10 @@ final class EntityRenderSelectionScreen extends GuiBase {
             int y = LIST_Y + (index - this.scrollOffset) * (ROW_HEIGHT + ROW_GAP);
             boolean active = selected.contains(entry.id().toString());
             boolean hovered = GuiHitTest.isInside(mouseX, mouseY, MARGIN, y, this.width - MARGIN * 2, ROW_HEIGHT);
-            RenderUtils.drawRect(MARGIN, y, this.width - MARGIN * 2, ROW_HEIGHT,
+            RenderUtils.drawRect(context, MARGIN, y, this.width - MARGIN * 2, ROW_HEIGHT,
                     active ? FullConfigPalette.MODULE_BACKGROUND
                             : (hovered ? FullConfigPalette.ROW_HOVER : FullConfigPalette.ROW));
-            RenderUtils.drawRect(MARGIN, y, 3, ROW_HEIGHT,
+            RenderUtils.drawRect(context, MARGIN, y, 3, ROW_HEIGHT,
                     active ? FullConfigPalette.ACCENT : FullConfigPalette.BORDER);
             this.drawString(context, fit(entry.displayName(), this.width - MARGIN * 2 - 94), MARGIN + 8, y + 6,
                     FullConfigPalette.TEXT);
@@ -154,13 +154,13 @@ final class EntityRenderSelectionScreen extends GuiBase {
             int buttonX = this.width - MARGIN - buttonWidth - 6;
             boolean buttonHovered = GuiHitTest.isInside(mouseX, mouseY, buttonX, y + 5, buttonWidth, BUTTON_HEIGHT);
             int buttonColor = active ? FullConfigPalette.ACTION_REMOVE : FullConfigPalette.ACTION_ADD;
-            RenderUtils.drawRect(buttonX, y + 5, buttonWidth, BUTTON_HEIGHT,
+            RenderUtils.drawRect(context, buttonX, y + 5, buttonWidth, BUTTON_HEIGHT,
                     buttonHovered ? lighten(buttonColor) : buttonColor);
             int buttonBorder = buttonHovered ? FullConfigPalette.BORDER_HOVER : FullConfigPalette.BORDER;
-            RenderUtils.drawRect(buttonX, y + 5, buttonWidth, 1, buttonBorder);
-            RenderUtils.drawRect(buttonX, y + BUTTON_HEIGHT + 4, buttonWidth, 1, buttonBorder);
-            RenderUtils.drawRect(buttonX, y + 5, 1, BUTTON_HEIGHT, buttonBorder);
-            RenderUtils.drawRect(buttonX + buttonWidth - 1, y + 5, 1, BUTTON_HEIGHT,
+            RenderUtils.drawRect(context, buttonX, y + 5, buttonWidth, 1, buttonBorder);
+            RenderUtils.drawRect(context, buttonX, y + BUTTON_HEIGHT + 4, buttonWidth, 1, buttonBorder);
+            RenderUtils.drawRect(context, buttonX, y + 5, 1, BUTTON_HEIGHT, buttonBorder);
+            RenderUtils.drawRect(context, buttonX + buttonWidth - 1, y + 5, 1, BUTTON_HEIGHT,
                     buttonBorder);
             this.drawString(context, toggle, buttonX + (buttonWidth - this.getStringWidth(toggle)) / 2, y + 11,
                     0xFFFFFFFF);
