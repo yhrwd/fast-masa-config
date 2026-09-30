@@ -679,7 +679,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                     ? "fast-masa-config.gui.boolean.on" : "fast-masa-config.gui.boolean.off"), bg,
                     GuiHitTest.isInside(mouseX, mouseY, x, y, 64, BUTTON_HEIGHT));
             this.drawResetButton(context, config, x + 70, y, 54, mouseX, mouseY);
-        } else if (config instanceof IConfigInteger integerConfig) {
+        } else if (config instanceof IConfigInteger integerConfig && !(config instanceof ConfigColor)) {
             this.drawNumericControl(context, config, NumericControlLayout.calculate(this.width), y, mouseX, mouseY,
                     integerConfig.getStringValue(),
                     this.getIntegerRatio(integerConfig));
@@ -982,7 +982,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             if (this.handleResetClick(config, mouseX, mouseY, controlX + 70, y, 54)) {
                 return true;
             }
-        } else if (config instanceof IConfigInteger || config instanceof IConfigDouble) {
+        } else if ((config instanceof IConfigInteger && !(config instanceof ConfigColor))
+                || config instanceof IConfigDouble) {
             NumericControlLayout layout = NumericControlLayout.calculate(this.width);
             boolean clickedValueBox = GuiHitTest.isInside(mouseX, mouseY, layout.valueX(), y, layout.valueWidth(),
                     BUTTON_HEIGHT);

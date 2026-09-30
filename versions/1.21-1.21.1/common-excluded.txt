@@ -1,7 +1,5 @@
-# 1.21.1 keeps the new common GUI/model code. Block-break rendering remains disabled because this target has no compatible hook.
-client/java/fastui/yure/client/mixin/ClientPlayerInteractionManagerAccessor.java
-client/java/fastui/yure/client/mixin/LevelRendererBlockBreakOverlayMixin.java
-client/java/fastui/yure/client/render/BlockBreakIndicator.java
+# 1.21.1 keeps the new common GUI/model code. Block-break rendering uses
+# target-local yarn overrides of the same paths (no LevelRenderState here).
 
 test/java/fastui/yure/client/gui/FloatingGroupInteractionTest.java
 test/java/fastui/yure/client/gui/FullConfigPageLayoutTest.java

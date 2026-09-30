@@ -3,7 +3,10 @@
   "package": "fastui.yure.client.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "EntityRendererMixin"
+    "ClientPlayerInteractionManagerAccessor",
+    "EntityRendererMixin",
+    "LevelRendererBlockBreakOverlayMixin",
+    "WorldRendererBlockBreakingAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

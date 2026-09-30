@@ -31,6 +31,7 @@ public final class TargetCompat
 
     public static void registerBlockBreakIndicatorRenderHook()
     {
-        // This target has no break-progress indicator; nothing to register.
+        net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents.AFTER_ENTITIES.register(
+                context -> fastui.yure.client.render.BlockBreakIndicator.render(context));
     }
 }

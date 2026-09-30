@@ -13,6 +13,9 @@
 	"license": "GPL-3.0-or-later",
 	"icon": "assets/fast-masa-config/icon.png",
 	"environment": "client",
+	"mixins": [
+		"fast-masa-config.client.mixins.json"
+	],
 	"entrypoints": {
 		"client": [
 			"fastui.yure.client.FastMasaConfigClient"
