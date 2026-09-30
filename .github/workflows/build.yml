@@ -262,15 +262,21 @@ jobs:
           #
           # Actual MaLiLib POM uses:
           #
-          # fi.dy.masa.malilib:malilib:0.23.5
+          # fi.dy.masa.malilib:malilib-fabric-1.21.4:0.23.5
           #
           # We need:
           #
           # com.github.sakura-ryoko:malilib:<commit>
+          #
+          # The artifactId MUST be rewritten too: the published POM
+          # keeps <artifactId>malilib-fabric-1.21.4</artifactId>,
+          # which fails the validation below and makes Gradle reject
+          # the alias with inconsistent module metadata.
           # --------------------------------------------------------
           sed \
             -e 's#<groupId>fi\.dy\.masa\.malilib</groupId>#<groupId>com.github.sakura-ryoko</groupId>#' \
             -e 's#<groupId>fi\.dy\.masa</groupId>#<groupId>com.github.sakura-ryoko</groupId>#' \
+            -e 's#<artifactId>malilib-fabric-1\.21\.4</artifactId>#<artifactId>malilib</artifactId>#' \
             -e "s#<version>${MALILIB_VERSION}</version>#<version>${MALILIB_COMMIT}</version>#" \
             "$pom_file" \
             > "$DST/malilib-${MALILIB_COMMIT}.pom"
