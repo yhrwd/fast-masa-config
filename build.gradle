@@ -222,8 +222,14 @@ publishing {
 }
 
 // ===================== Multi-version build tasks 多版本批量构建任务 =====================
-// Scan versions directory and collect valid build targets
-// 扫描versions目录，收集合法的构建目标
+// Each target needs its own Gradle invocation (the Loom plugin is selected per
+// target), so these tasks spawn the wrapper as sequential child processes.
+// CI builds the same versions/ listing in parallel via its build matrix.
+// 每个目标需要独立的 Gradle 进程（Loom 插件按目标选择），因此这些任务通过
+// wrapper 串行拉起子进程完成构建；CI 的构建矩阵是对目录列表的并行等价实现。
+
+// Scan versions directory and collect valid build targets, sorted for a stable order
+// 扫描versions目录，收集合法的构建目标，排序保证构建顺序稳定
 def getAllTargets() {
     def targets = []
     def versionsDir = file("versions")
@@ -234,7 +240,7 @@ def getAllTargets() {
             targets << dir.name
         }
     }
-    return targets
+    return targets.sort()
 }
 
 def allTargets = getAllTargets()
@@ -249,13 +255,14 @@ allTargets.each { t ->
         classpath = files(rootProject.file("gradle/wrapper/gradle-wrapper.jar"))
         mainClass = "org.gradle.wrapper.GradleWrapperMain"
         args "build", "-Ptarget=$t"
-        // 继承JVM参数，可选
-        standardInput = System.in
+        doFirst {
+            logger.lifecycle("== Building target {} ==", t)
+        }
     }
 }
 
-// Serial all-version build task
-// 串行构建全部版本任务
+// Serial all-version build task; a failing target aborts the remaining ones
+// 串行构建全部版本任务；某个目标失败后停止后续构建
 tasks.register("buildAll") {
     group = "MultiVersion"
     description = "Build all Minecraft targets sequentially | 串行构建所有MC版本"

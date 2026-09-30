@@ -52,8 +52,9 @@ Requires Fabric Loader, Fabric API, and MaLiLib; Mod Menu is optional. Hold `Rig
 ```bash
 ./gradlew build                              # default target 26.3
 ./gradlew -Ptarget=1.21.6-1.21.8 build       # any target = a versions/ directory name
+./gradlew buildAll                           # build every target sequentially
+./gradlew build_26.2 build_1.21.5            # or pick targets via build_<name> tasks
 ./gradlew -Ptarget=26.2 runClient            # dev client in run/<target>/
-for t in versions/*/; do ./gradlew "-Ptarget=$(basename $t)" build; done
 ```
 
 CI builds the whole matrix on every push to `main`; the matrix is derived automatically from the `versions/` directory listing, so adding or retiring a version target never touches CI. Releases are triggered by `mc<target>-v<version>` tags, which build the jar and publish it to GitHub Releases and Modrinth.
@@ -243,15 +244,16 @@ jar 统一输出到 `build/libs/`，文件名自带目标版本号（例如 `fas
 
 #### 构建全部目标
 
-```powershell
-gci versions -Directory | % { .\gradlew.bat "-Ptarget=$($_.Name)" build }   # PowerShell
-```
+`buildAll` 任务会串行构建 `versions/` 下的全部目标（每个目标一个独立的 Gradle 子进程，含测试）：
 
 ```bash
-for t in versions/*/; do ./gradlew "-Ptarget=$(basename $t)" build; done     # bash
+./gradlew buildAll
 ```
 
-CI 在每次 push 到 main 时对所有目标执行同样的构建矩阵；矩阵由 `versions/` 目录自动生成，增删版本目标不需要改 CI。
+- 顺序由 `versions/` 目录决定，某个目标失败后停止后续构建。
+- 只想构建其中几个目标时，直接点名对应任务：`./gradlew build_26.2 build_1.21.5`。
+- 可用任务用 `./gradlew tasks --group MultiVersion` 查看。
+- CI 不走 `buildAll`，而是用 `versions/` 目录生成的构建矩阵并行构建，二者等价。
 
 #### 运行开发客户端
 

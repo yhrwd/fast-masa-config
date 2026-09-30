@@ -27,7 +27,7 @@
 - Another version target: prefix any task with `-Ptarget=<target>`, e.g. `./gradlew -Ptarget=1.21.6-1.21.8 build`; valid targets are the directory names under `versions/` (no flag = `26.3`). Dev clients run in `run/<target>/`; jars accumulate in `build/libs/` with the target version in the filename.
 - Focused test: `./gradlew test --tests fully.qualified.TestClass`.
 - Client compilation: `./gradlew compileClientJava`.
-- Build every target from a shell (no helper script): PowerShell `gci versions -Directory | % { ./gradlew.bat "-Ptarget=$($_.Name)" build }`; bash `for t in versions/*/; do ./gradlew "-Ptarget=$(basename $t)" build; done`. Jars accumulate in `build/libs/` (filenames embed the target version, so nothing clobbers).
+- Build every target locally: `./gradlew buildAll` (sequential wrapper child builds; a failing target aborts the rest), or cherry-pick with `./gradlew build_26.2 build_1.21.5`. Task list: `./gradlew tasks --group MultiVersion`. Jars accumulate in `build/libs/` (filenames embed the target version, so nothing clobbers). CI uses its parallel matrix over the same `versions/` listing instead of `buildAll`.
 - CI-equivalent verification: `./gradlew build --no-daemon`.
 - Release tags are `mc*-v*` only (e.g. `mc1.21.6-1.21.8-v5.4.0`); they trigger the `release` workflow, which reuses the Build workflow and publishes the jar to GitHub Releases and Modrinth. Plain `v*` tags trigger nothing.
 - Building the `1.21.4` target needs the MaLiLib alias `com.github.sakura-ryoko:malilib:<commit>` (jitpack cannot build that commit): locally keep a `malilib-*.jar` in the gitignored `libs/`, or replicate the Maven Local alias from `.github/actions/build-malilib/action.yml`.
