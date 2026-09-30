@@ -31,6 +31,6 @@ public final class TargetCompat
 
     public static void registerBlockBreakIndicatorRenderHook()
     {
-        // This target's BlockBreakIndicator registers its WorldRenderEvents hook itself.
+        fastui.yure.client.render.BlockBreakIndicator.register();
     }
 }
