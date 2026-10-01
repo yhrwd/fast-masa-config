@@ -6,7 +6,7 @@ import fastui.yure.config.ConfigGroup;
 import fastui.yure.config.ConfigGroupStore;
 import fastui.yure.config.QuickMessageGroup;
 import fastui.yure.config.QuickMessageStore;
-import net.minecraft.client.gui.DrawContext;
+import fi.dy.masa.malilib.render.GuiContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 
@@ -38,7 +38,7 @@ public final class QuickConfigPanel {
         this.font = client.textRenderer;
     }
 
-    public void render(DrawContext context, int screenWidth, int screenHeight, int mouseX, int mouseY) {
+    public void render(GuiContext context, int screenWidth, int screenHeight, int mouseX, int mouseY) {
         this.refreshConfigIndex();
         this.syncFloatingPanels();
         this.syncFloatingMessagePanels();

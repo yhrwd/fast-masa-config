@@ -98,7 +98,7 @@ public final class QuickConfigScreen extends Screen {
 
     @Override
     public void render(net.minecraft.client.gui.DrawContext gfx, int mouseX, int mouseY, float delta) {
-        this.panel.render(gfx, this.width, this.height, mouseX, mouseY);
+        this.panel.render(fi.dy.masa.malilib.render.GuiContext.fromGuiGraphics(gfx), this.width, this.height, mouseX, mouseY);
     }
 
     @Override

@@ -31,6 +31,7 @@ public final class TargetCompat
 
     public static void registerBlockBreakIndicatorRenderHook()
     {
-        fastui.yure.client.render.BlockBreakIndicator.register();
+        // The 1.21.9-1.21.10 hook lives in GameRendererMixin (meteor-style
+        // injection after the world pass); nothing to register here.
     }
 }

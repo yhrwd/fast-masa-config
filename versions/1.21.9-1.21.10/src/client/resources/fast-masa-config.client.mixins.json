@@ -3,8 +3,10 @@
   "package": "fastui.yure.client.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "CameraAccessor",
     "ClientPlayerInteractionManagerAccessor",
     "EntityRendererMixin",
+    "GameRendererMixin",
     "WorldRendererAccessor",
     "WorldRendererBlockBreakOverlayMixin"
   ],

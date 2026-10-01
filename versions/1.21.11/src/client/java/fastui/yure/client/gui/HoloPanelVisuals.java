@@ -1,6 +1,6 @@
 package fastui.yure.client.gui;
 
-import net.minecraft.client.gui.DrawContext;
+import fi.dy.masa.malilib.render.GuiContext;
 import fi.dy.masa.malilib.render.RenderUtils;
 
 /**
@@ -19,17 +19,17 @@ public final class HoloPanelVisuals {
         return ((alpha & 0xFF) << 24) | (color & 0x00FFFFFF);
     }
 
-    public static void drawBorder(DrawContext context, int x, int y, int width, int height, int color) {
+    public static void drawBorder(GuiContext context, int x, int y, int width, int height, int color) {
         if (width <= 0 || height <= 0) {
             return;
         }
-        RenderUtils.drawRect(x, y, width, 1, color);
+        RenderUtils.drawRect(context, x, y, width, 1, color);
         if (height > 1) {
-            RenderUtils.drawRect(x, y + height - 1, width, 1, color);
+            RenderUtils.drawRect(context, x, y + height - 1, width, 1, color);
         }
-        RenderUtils.drawRect(x, y, 1, height, color);
+        RenderUtils.drawRect(context, x, y, 1, height, color);
         if (width > 1) {
-            RenderUtils.drawRect(x + width - 1, y, 1, height, color);
+            RenderUtils.drawRect(context, x + width - 1, y, 1, height, color);
         }
     }
 

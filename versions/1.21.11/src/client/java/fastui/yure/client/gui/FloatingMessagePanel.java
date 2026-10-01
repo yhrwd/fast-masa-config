@@ -4,7 +4,7 @@ import fastui.yure.config.FastMasaConfigs;
 import fastui.yure.config.QuickMessage;
 import fastui.yure.config.QuickMessageGroup;
 import fastui.yure.config.QuickMessageStore;
-import net.minecraft.client.gui.DrawContext;
+import fi.dy.masa.malilib.render.GuiContext;
 import fi.dy.masa.malilib.render.RenderUtils;
 import net.minecraft.client.font.TextRenderer;
 
@@ -76,7 +76,7 @@ public final class FloatingMessagePanel {
                 position[0] != this.layout.x() || position[1] != this.layout.y()).orElse(false);
     }
 
-    public void render(DrawContext context, int screenWidth, int screenHeight, int mouseX, int mouseY) {
+    public void render(GuiContext context, int screenWidth, int screenHeight, int mouseX, int mouseY) {
         QuickMessageGroup group = QuickMessageStore.get(this.groupId).orElse(null);
         if (group == null) {
             this.layout = null;
@@ -92,10 +92,10 @@ public final class FloatingMessagePanel {
 
         int alpha = FastMasaConfigs.Generic.FLOATING_BACKGROUND_ALPHA.getIntegerValue();
         int headerControlsWidth = this.font.getWidth("+") + ROW_PADDING * 2;
-        RenderUtils.drawRect(this.layout.x(), this.layout.y() + this.layout.headerHeight(), this.layout.width(),
+        RenderUtils.drawRect(context, this.layout.x(), this.layout.y() + this.layout.headerHeight(), this.layout.width(),
                 Math.max(0, this.layout.height() - this.layout.headerHeight()),
                 HoloPanelVisuals.withAlpha(FastMasaMenuPalette.WINDOW_BACKGROUND, alpha));
-        RenderUtils.drawRect(this.layout.x(), this.layout.y(), this.layout.width(), this.layout.headerHeight(),
+        RenderUtils.drawRect(context, this.layout.x(), this.layout.y(), this.layout.width(), this.layout.headerHeight(),
                 HoloPanelVisuals.withAlpha(FastMasaMenuPalette.accent(), alpha));
         HoloPanelVisuals.drawBorder(context, this.layout.x(), this.layout.y(), this.layout.width(), this.layout.height(),
                 HoloPanelVisuals.withAlpha(FastMasaMenuPalette.NEUTRAL, alpha));
@@ -126,8 +126,8 @@ public final class FloatingMessagePanel {
             boolean hovered = GuiHitTest.isInside(mouseX, mouseY, row.x(), y, row.width(), row.height());
             QuickMessage message = messages.get(row.itemIndex());
             int color = hovered ? FastMasaMenuPalette.ROW_HOVER : FastMasaMenuPalette.ROW;
-            RenderUtils.drawRect(row.x(), y, row.width(), row.height(), HoloPanelVisuals.withAlpha(color, alpha));
-            RenderUtils.drawRect(row.x(), y, 2, row.height(), message.isCommand()
+            RenderUtils.drawRect(context, row.x(), y, row.width(), row.height(), HoloPanelVisuals.withAlpha(color, alpha));
+            RenderUtils.drawRect(context, row.x(), y, 2, row.height(), message.isCommand()
                     ? FastMasaMenuPalette.accent() : FastMasaMenuPalette.NEUTRAL);
             context.drawText(this.font, this.renderedNames.get(row.itemIndex()),
                     row.x() + ROW_PADDING,
@@ -143,9 +143,9 @@ public final class FloatingMessagePanel {
             int travel = Math.max(1, trackHeight - thumbHeight);
             int thumbY = trackY + (int) Math.round(
                     travel * (this.scrollOffset / (double) this.layout.maxScrollOffset()));
-            RenderUtils.drawRect(this.layout.x() + this.layout.width() - 4, trackY, 2, trackHeight,
+            RenderUtils.drawRect(context, this.layout.x() + this.layout.width() - 4, trackY, 2, trackHeight,
                     0x661A1A1D);
-            RenderUtils.drawRect(this.layout.x() + this.layout.width() - 4, thumbY, 2, thumbHeight,
+            RenderUtils.drawRect(context, this.layout.x() + this.layout.width() - 4, thumbY, 2, thumbHeight,
                     FastMasaMenuPalette.accent());
         }
     }
