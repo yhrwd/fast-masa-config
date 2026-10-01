@@ -33,4 +33,10 @@ public final class TargetCompat
         net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.END_MAIN
                 .register(context -> fastui.yure.client.render.BlockBreakIndicator.render(context.levelState()));
     }
+
+    /** 当前语言代码；26.x 使用 Mojang 映射的 LanguageManager.getSelected()。 */
+    public static String currentLanguageCode()
+    {
+        return Minecraft.getInstance().getLanguageManager().getSelected();
+    }
 }

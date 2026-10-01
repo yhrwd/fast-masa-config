@@ -34,4 +34,10 @@ public final class TargetCompat
         // The 1.21.11 hook lives in GameRendererMixin (meteor-style
         // injection after the world pass); nothing to register here.
     }
+
+    /** 当前语言代码；yarn 侧为 LanguageManager.getLanguage()。 */
+    public static String currentLanguageCode()
+    {
+        return MinecraftClient.getInstance().getLanguageManager().getLanguage();
+    }
 }

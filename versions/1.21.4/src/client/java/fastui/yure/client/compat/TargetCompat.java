@@ -33,4 +33,10 @@ public final class TargetCompat
     {
         // This target's BlockBreakIndicator registers its WorldRenderEvents hook itself.
     }
+
+    /** 当前语言代码；yarn 侧为 LanguageManager.getLanguage()。 */
+    public static String currentLanguageCode()
+    {
+        return MinecraftClient.getInstance().getLanguageManager().getLanguage();
+    }
 }

@@ -1,6 +1,7 @@
 package fastui.yure.client.index;
 
 import fastui.yure.FastMasaConfig;
+import fastui.yure.client.compat.TargetCompat;
 import fastui.yure.client.scan.ConfigGuiGroupScanner;
 import fastui.yure.client.scan.ConfigScreenSourceService;
 import fastui.yure.config.FastMasaConfigs;
@@ -18,12 +19,19 @@ import java.util.Set;
 public final class ConfigIndexService {
     private static List<ConfigIndexEntry> cachedEntries;
     private static Map<Target, ConfigIndexEntry> cachedEntriesByTarget = Map.of();
+    private static String cachedLanguage;
     private static volatile long generation;
 
     private ConfigIndexService() {
     }
 
     public static synchronized List<ConfigIndexEntry> scanSupportedConfigs() {
+        // 索引里缓存了带翻译的显示名；语言切换后必须丢弃缓存，让下一次访问按新语言重建。
+        String language = TargetCompat.currentLanguageCode();
+        if (cachedEntries != null && !language.equals(cachedLanguage)) {
+            invalidate();
+        }
+
         if (cachedEntries != null) {
             return cachedEntries;
         }
@@ -46,6 +54,7 @@ public final class ConfigIndexService {
         }
 
         cachedEntries = List.copyOf(result);
+        cachedLanguage = language;
         Map<Target, ConfigIndexEntry> entriesByTarget = new HashMap<>(result.size());
         for (ConfigIndexEntry entry : result) {
             entriesByTarget.put(new Target(entry.modId(), entry.groupId(), entry.configName()), entry);
