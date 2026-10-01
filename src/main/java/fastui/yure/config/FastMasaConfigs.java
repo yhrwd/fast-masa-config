@@ -26,7 +26,7 @@ public final class FastMasaConfigs {
                 public static final ConfigHotkey OPEN_QUICK_CONFIG = new ConfigHotkey("openQuickConfig", "RIGHT_SHIFT",
                                 QUICK_CONFIG_KEY_SETTINGS,
                                 "按住时显示 Fast Masa Config 快捷配置面板。", "Open Quick Config").apply(GENERIC_KEY);
-                public static final ConfigBoolean RELEASE_TO_CLOSE = new ConfigBoolean("releaseToClose", true,
+                public static final ConfigBoolean RELEASE_TO_CLOSE = new ConfigBoolean("releaseToClose", false,
                                 "松开快捷配置热键时自动关闭面板。", "Release To Close").apply(GENERIC_KEY);
                 public static final ConfigBoolean CLOSE_ON_INVENTORY_KEY = new ConfigBoolean("closeOnInventoryKey",
                                 true,
