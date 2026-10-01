@@ -1,5 +1,6 @@
 package fastui.yure.client.input;
 
+import fastui.yure.FastMasaConfig;
 import fastui.yure.client.gui.QuickConfigScreen;
 import fastui.yure.config.FastMasaConfigs;
 import fi.dy.masa.malilib.hotkeys.IHotkey;
@@ -38,7 +39,7 @@ public final class FastMasaInputHandler implements IKeybindProvider {
 
     @Override
     public void addHotkeys(IKeybindManager manager) {
-        manager.addHotkeysForCategory("Fast Masa Config", "fast-masa-config.hotkeys.category.quick",
+        manager.addHotkeysForCategory(FastMasaConfig.MOD_NAME, "fast-masa-config.hotkeys.category.quick",
                 FastMasaConfigs.Generic.HOTKEY_LIST);
     }
 

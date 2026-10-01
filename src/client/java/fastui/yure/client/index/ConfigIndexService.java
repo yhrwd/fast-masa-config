@@ -99,8 +99,8 @@ public final class ConfigIndexService {
         for (IConfigBase config : FastMasaConfigs.QuickPanel.TAGGED_OPTIONS) {
             Target target = new Target(FastMasaConfig.MOD_ID, "Generic", config.getName());
             if (isSupported(config) && indexedTargets.add(target)) {
-                result.add(new ConfigIndexEntry(FastMasaConfig.MOD_ID, "Fast Masa Config",
-                        "Generic", "Fast Masa Config",
+                result.add(new ConfigIndexEntry(FastMasaConfig.MOD_ID, FastMasaConfig.MOD_NAME,
+                        "Generic", FastMasaConfig.MOD_NAME,
                         config.getName(), getDisplayName(config), config));
             }
         }

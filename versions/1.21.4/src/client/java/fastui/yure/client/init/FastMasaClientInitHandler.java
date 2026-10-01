@@ -14,7 +14,7 @@ public final class FastMasaClientInitHandler implements IInitializationHandler {
     @Override
     public void registerModHandlers() {
         ConfigManager.getInstance().registerConfigHandler(FastMasaConfig.MOD_ID, new FastMasaConfigHandler());
-        Registry.CONFIG_SCREEN.registerConfigScreenFactory(new ModInfo(FastMasaConfig.MOD_ID, "Fast Masa Config", FastMasaConfigGui::new));
+        Registry.CONFIG_SCREEN.registerConfigScreenFactory(new ModInfo(FastMasaConfig.MOD_ID, FastMasaConfig.MOD_NAME, FastMasaConfigGui::new));
         InputEventHandler.getKeybindManager().registerKeybindProvider(FastMasaInputHandler.getInstance());
         FastMasaInputHandler.getInstance().initCallbacks();
     }

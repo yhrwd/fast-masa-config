@@ -1,5 +1,6 @@
 package fastui.yure.client.input;
 
+import fastui.yure.FastMasaConfig;
 import com.google.common.collect.ImmutableList;
 import fastui.yure.client.gui.QuickConfigScreen;
 import fastui.yure.config.FastMasaConfigs;
@@ -36,7 +37,7 @@ public final class FastMasaInputHandler implements IKeybindProvider {
 
     @Override
     public void addHotkeys(IKeybindManager manager) {
-        manager.addHotkeysForCategory("Fast Masa Config", "fast-masa-config.hotkeys.category.quick", ImmutableList.copyOf(FastMasaConfigs.Generic.HOTKEY_LIST));
+        manager.addHotkeysForCategory(FastMasaConfig.MOD_NAME, "fast-masa-config.hotkeys.category.quick", ImmutableList.copyOf(FastMasaConfigs.Generic.HOTKEY_LIST));
     }
 
     public List<IHotkey> getHotkeys() {
