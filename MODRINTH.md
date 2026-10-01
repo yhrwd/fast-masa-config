@@ -65,6 +65,16 @@ The screenshots below show an older UI version. They demonstrate the general fea
 
 Fast Masa Config is licensed under `GPL-3.0-or-later`. Some floating-window visual behavior was adapted from public Meteor Client implementations; the relevant source files retain their attribution and GPL-3.0 notices. Fast Masa Config is an independent project and is not affiliated with or endorsed by Meteor Client or its developers.
 
+### Changelog
+
+#### 5.3.1
+
+- Fixed the startup crash on Minecraft 1.21.9 / 1.21.10 / 1.21.11.
+- Fixed the block-break indicator not rendering on Minecraft 1.21.1 through 1.21.11; when enabled it still replaces the vanilla block-breaking cracks with an expanding outline and translucent fill.
+- Restored quick panel backgrounds, sliders, and borders on Minecraft 1.21.6 and newer.
+- "Release to close" now defaults to off: the quick panel stays open after you release the open hotkey, and closes with `Esc`, the inventory key, or the hotkey again.
+- The scanned config list now rebuilds after switching the game language instead of keeping the old translations until restart.
+
 ---
 
 ## 中文
@@ -129,6 +139,14 @@ MaLiLib 的具体版本要求会随 Minecraft 版本变化，以下载文件对�
 ![旧版配置界面](https://cdn.modrinth.com/data/cached_images/089d26ffc01f85774d5e6c6c92c73d22a8ce5045.png)
 
 ### 最近更新
+
+#### 5.3.1
+
+- 修复 Minecraft 1.21.9 / 1.21.10 / 1.21.11 进游戏崩溃的问题。
+- 修复挖掘指示动画在 1.21.1 ~ 1.21.11 全线不渲染的问题；开启后仍会以扩展轮廓加半透明填充替代原版挖掘裂纹。
+- 恢复 1.21.6 及以上版本快捷面板的背景、滑条和边框显示。
+- "松开关闭"默认改为关闭：松开打开热键后面板保持打开，用 `Esc`、背包键或再次按热键关闭。
+- 切换游戏语言后，已扫描的配置列表会用新语言重建，不再停留在旧翻译直到重启。
 
 #### 5.3.0
 
