@@ -67,12 +67,12 @@ jobs:
           fi
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release edit "${GITHUB_REF_NAME}" \
-              --title "Fast Masa Config UI ${GITHUB_REF_NAME}" \
+              --title "${GITHUB_REF_NAME}" \
               --notes-file release-notes.md
             gh release upload "${GITHUB_REF_NAME}" release/*.jar --clobber
           else
             gh release create "${GITHUB_REF_NAME}" release/*.jar \
-              --title "Fast Masa Config UI ${GITHUB_REF_NAME}" \
+              --title "${GITHUB_REF_NAME}" \
               --notes-file release-notes.md
           fi
 
@@ -91,7 +91,7 @@ jobs:
           jq -n \
             --arg project_id "${MODRINTH_PROJECT_ID}" \
             --arg version_number "${version_number}" \
-            --arg version_title "Fast Masa Config UI ${version_number}" \
+            --arg version_title "${version_number}" \
             --arg changelog "${changelog}" \
             --arg jar_name "${jar_name}" \
             --arg game_versions "${GAME_VERSIONS}" \
@@ -110,23 +110,15 @@ jobs:
             "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}/version" \
             | jq -r --arg version_number "${version_number}" \
               '.[] | select(.version_number == $version_number) | .id' | head -n 1)"
+          # Re-releasing an existing version number replaces it entirely, so the
+          # uploaded jar is never stale (PATCH alone would keep the old file).
           if [ -n "${existing_version_id}" ] && [ "${existing_version_id}" != "null" ]; then
-            update_metadata="$(jq -n \
-              --arg version_title "Fast Masa Config UI ${version_number}" \
-              --arg changelog "${changelog}" \
-              --arg game_versions "${GAME_VERSIONS}" \
-              '{name: $version_title, changelog: $changelog,
-                version_type: "release", loaders: ["fabric"],
-                game_versions: ($game_versions | split(",")), featured: false}')"
-            curl --fail-with-body --request PATCH \
+            curl --fail-with-body --request DELETE \
               --header "Authorization: ${MODRINTH_TOKEN}" \
-              --header 'Content-Type: application/json' \
-              --data "${update_metadata}" \
               "https://api.modrinth.com/v2/version/${existing_version_id}"
-          else
-            curl --fail-with-body --request POST \
-              --header "Authorization: ${MODRINTH_TOKEN}" \
-              --form "data=@release/metadata.json;type=application/json" \
-              --form "${jar_name}=@${jar_file}" \
-              https://api.modrinth.com/v2/version
           fi
+          curl --fail-with-body --request POST \
+            --header "Authorization: ${MODRINTH_TOKEN}" \
+            --form "data=@release/metadata.json;type=application/json" \
+            --form "${jar_name}=@${jar_file}" \
+            https://api.modrinth.com/v2/version
