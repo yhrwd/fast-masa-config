@@ -48,6 +48,9 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v4
+        with:
+          # Preserve annotated tag contents for the release changelog.
+          fetch-depth: 0
 
       - name: download release jar
         uses: actions/download-artifact@v4

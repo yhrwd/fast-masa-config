@@ -1,0 +1,72 @@
+name: Update release notes
+
+on:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: 'Existing annotated release tags, comma-separated'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update GitHub and Modrinth changelogs
+        env:
+          RELEASE_TAGS: ${{ inputs.tags }}
+          GH_TOKEN: ${{ github.token }}
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+        shell: python
+        run: |
+          import json
+          import os
+          import re
+          import subprocess
+          import urllib.request
+
+          def api(url, token, data=None):
+              request = urllib.request.Request(
+                  url,
+                  data=json.dumps(data).encode() if data is not None else None,
+                  headers={"Authorization": token, "Content-Type": "application/json",
+                           "User-Agent": "fast-masa-config-release"},
+                  method="PATCH" if data is not None else "GET")
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response) if response.status != 204 else None
+
+          github = f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}"
+          modrinth = "https://api.modrinth.com/v2"
+          gh_token = f"Bearer {os.environ['GH_TOKEN']}"
+          mr_token = os.environ["MODRINTH_TOKEN"]
+          versions = api(f"{modrinth}/project/4Qx0KEY6/version", mr_token)
+          updates = []
+          for tag in os.environ["RELEASE_TAGS"].split(","):
+              tag = tag.strip()
+              if not re.fullmatch(r"mc[0-9.]+(?:-[0-9.]+)?-v[0-9.]+", tag):
+                  raise ValueError(f"Invalid release tag: {tag}")
+              ref = f"refs/tags/{tag}"
+              kind = subprocess.check_output(["git", "cat-file", "-t", ref], text=True).strip()
+              if kind != "tag":
+                  raise ValueError(f"Expected an annotated tag: {tag}")
+              notes = subprocess.check_output(
+                  ["git", "for-each-ref", "--format=%(contents)", ref], text=True).strip()
+              if not notes:
+                  raise ValueError(f"Empty release notes: {tag}")
+              number = tag.removeprefix("mc").replace("-v", "-", 1)
+              matches = [v for v in versions if v["version_number"] == number]
+              if len(matches) != 1:
+                  raise ValueError(f"Expected one published Modrinth version: {number}")
+              release = api(f"{github}/releases/tags/{tag}", gh_token)
+              updates.append((tag, notes, release["id"], matches[0]["id"]))
+          for tag, notes, release_id, version_id in updates:
+              api(f"{github}/releases/{release_id}", gh_token, {"body": notes})
+              api(f"{modrinth}/version/{version_id}", mr_token, {"changelog": notes})
+              print(f"Updated GitHub and Modrinth release notes: {tag}")

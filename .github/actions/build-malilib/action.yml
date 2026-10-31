@@ -123,6 +123,7 @@ runs:
         # malilib-fabric-1.21.4, Gradle rejects the alias with
         # "inconsistent module metadata".
         # --------------------------------------------------------
+        mkdir -p "$DST"
         sed \
           -e 's#<groupId>fi\.dy\.masa\.malilib</groupId>#<groupId>com.github.sakura-ryoko</groupId>#' \
           -e 's#<groupId>fi\.dy\.masa</groupId>#<groupId>com.github.sakura-ryoko</groupId>#' \
