@@ -4,7 +4,7 @@ import fastui.yure.config.FastMasaConfigs;
 
 /** 旧版 MaLiLib 0.23 的颜色值通过 Color4f.intValue 暴露。 */
 final class FastMasaMenuPalette {
-    static final int DEFAULT_ACCENT = 0xFF913DE2;
+    static final int DEFAULT_ACCENT = 0xFF488796;
     static final int SCREEN_BACKGROUND = 0xF0141414;
     static final int SCREEN_HEADER = 0xEE1E1E1E;
     static final int SURFACE = 0xFF1C1C22;

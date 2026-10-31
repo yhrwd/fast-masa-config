@@ -60,6 +60,38 @@ public final class FloatingMessagePanel {
                 this.layout.y(), 20, this.layout.headerHeight());
     }
 
+    public boolean contains(int mouseX, int mouseY) {
+        return GroupWindowResize.contains(this.layout, mouseX, mouseY);
+    }
+
+    public int width() {
+        return this.layout == null ? 0 : this.layout.width();
+    }
+
+    public GroupWindowResize.Edge resizeEdgeAt(int mouseX, int mouseY) {
+        return GroupWindowResize.edgeAt(this.layout, mouseX, mouseY);
+    }
+
+    public void renderResizeHandle(GuiContext context, GroupWindowResize.Edge edge) {
+        if (this.layout == null || edge == GroupWindowResize.Edge.NONE) {
+            return;
+        }
+        GroupWindowHitTest.Bounds bounds = GroupWindowResize.edgeBounds(this.layout, edge);
+        RenderUtils.drawRect(context, bounds.x(), bounds.y(), bounds.width(), bounds.height(),
+                HoloPanelVisuals.withAlpha(FastMasaMenuPalette.accent(), 160));
+    }
+
+    public boolean resizeFrom(int startX, int startWidth, int deltaX, GroupWindowResize.Edge edge,
+            int screenWidth, int screenHeight) {
+        if (this.layout == null) {
+            return false;
+        }
+        GroupWindowResize.Bounds bounds = GroupWindowResize.resize(startX, startWidth, deltaX, edge, screenWidth);
+        boolean changed = QuickMessageStore.setWindowBounds(this.groupId, bounds.x(), this.layout.y(), bounds.width());
+        QuickMessageStore.get(this.groupId).ifPresent(group -> refreshLayout(group, screenWidth, screenHeight));
+        return changed;
+    }
+
     public void toggleCollapsed() {
         QuickMessageStore.get(this.groupId).ifPresent(group -> QuickMessageStore.setWindowState(group.id(),
                 !group.collapsed(), group.x(), group.y()));
@@ -188,19 +220,22 @@ public final class FloatingMessagePanel {
     }
 
     private void refreshLayout(QuickMessageGroup group, int screenWidth, int screenHeight) {
+        int effectiveContentWidth = group.width() > 0
+                ? Math.max(0, Math.min(group.width(), Math.max(0, screenWidth)) - GroupWindowLayout.WINDOW_PADDING * 2)
+                : this.contentWidth;
         if (this.layout != null && this.layoutScreenWidth == screenWidth && this.layoutScreenHeight == screenHeight
                 && this.layoutRequestedX == group.x() && this.layoutRequestedY == group.y()
-                && this.layoutCollapsed == group.collapsed() && this.layoutContentWidth == this.contentWidth) {
+                && this.layoutCollapsed == group.collapsed() && this.layoutContentWidth == effectiveContentWidth) {
             return;
         }
         this.layout = GroupWindowLayout.calculate(screenWidth, screenHeight, group.x(), group.y(), group.collapsed(),
-                group.collapsed() ? EMPTY_ROW_HEIGHTS : this.rowHeights, this.contentWidth);
+                group.collapsed() ? EMPTY_ROW_HEIGHTS : this.rowHeights, effectiveContentWidth);
         this.layoutScreenWidth = screenWidth;
         this.layoutScreenHeight = screenHeight;
         this.layoutRequestedX = group.x();
         this.layoutRequestedY = group.y();
         this.layoutCollapsed = group.collapsed();
-        this.layoutContentWidth = this.contentWidth;
+        this.layoutContentWidth = effectiveContentWidth;
     }
 
     private void refreshText(QuickMessageGroup group) {

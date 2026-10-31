@@ -34,7 +34,7 @@ public final class FastMasaConfigs {
                 public static final ConfigInteger FLOATING_BACKGROUND_ALPHA = new ConfigInteger(
                                 "floatingBackgroundAlpha", 216, 0, 255, true,
                                 "悬浮菜单背景透明度。", "Floating Menu Background Opacity").apply(GENERIC_KEY);
-                public static final ConfigColor FLOATING_ACCENT = new ConfigColor("floatingAccent", "#FF913DE2",
+                public static final ConfigColor FLOATING_ACCENT = new ConfigColor("floatingAccent", "#FF488796",
                                 "悬浮菜单主题色。", "Floating Menu Theme Color").apply(GENERIC_KEY);
                 public static final ConfigBoolean BLOCK_BREAK_INDICATOR = new ConfigBoolean("blockBreakIndicator", true,
                                 "用动态方块描边替换原版挖掘裂纹动画。", "Replace Block Break Animation").apply(GENERIC_KEY);

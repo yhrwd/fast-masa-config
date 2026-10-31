@@ -17,6 +17,13 @@ public final class TargetCompat
     public static final int KEY_KP_ENTER = KeyCodes.KEY_KP_ENTER;
     public static final int KEY_RETURN2 = KeyCodes.KEY_RETURN2;
     public static final int KEY_ESCAPE = KeyCodes.KEY_ESCAPE;
+    public static final int KEY_BACKSPACE = KeyCodes.KEY_BACKSPACE;
+    public static final int KEY_DELETE = KeyCodes.KEY_DELETE;
+
+    public static int scanCode(net.minecraft.client.input.KeyEvent event)
+    {
+        return event.keycode();
+    }
 
     public static void startTextInput(Minecraft minecraft, Object owner)
     {
@@ -38,5 +45,15 @@ public final class TargetCompat
     public static String currentLanguageCode()
     {
         return Minecraft.getInstance().getLanguageManager().getSelected();
+    }
+
+    public static void requestHorizontalResizeCursor(net.minecraft.client.gui.GuiGraphicsExtractor graphics)
+    {
+        graphics.requestCursor(com.mojang.blaze3d.platform.cursor.CursorTypes.RESIZE_EW);
+    }
+
+    public static boolean isPrimaryMouseButton(int button)
+    {
+        return button == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT;
     }
 }

@@ -14,6 +14,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConfigGroupStoreTest {
     @Test
+    void persistsIndependentWidthsAndPreservesThemWhenMovingOrCollapsing() {
+        ConfigGroupStore.clear();
+        ConfigGroup first = ConfigGroupStore.create("First");
+        ConfigGroup second = ConfigGroupStore.create("Second");
+        assertTrue(ConfigGroupStore.setWindowBounds(first.id(), 40, 60, 240));
+        assertTrue(ConfigGroupStore.setWindowBounds(second.id(), 300, 60, 180));
+        assertFalse(ConfigGroupStore.setWindowBounds(first.id(), 40, 60, 240));
+        assertFalse(ConfigGroupStore.setWindowBounds("missing", 40, 60, 240));
+        ConfigGroupStore.setWindowState(first.id(), true, 50, 70);
+
+        ConfigGroupStore.fromJson(ConfigGroupStore.toJson());
+        ConfigGroup loaded = ConfigGroupStore.get(first.id()).orElseThrow();
+        assertEquals(240, loaded.width());
+        assertEquals(50, loaded.x());
+        assertEquals(70, loaded.y());
+        assertTrue(loaded.collapsed());
+        assertEquals(180, ConfigGroupStore.get(second.id()).orElseThrow().width());
+    }
+
+    @Test
     void managesGroupMetadataAndOrder() {
         ConfigGroupStore.clear();
         ConfigGroup first = ConfigGroupStore.create("建筑");
@@ -92,6 +112,7 @@ class ConfigGroupStoreTest {
         assertFalse(saved.has("floating"));
         assertFalse(saved.has("color"));
         assertEquals("FastUI", loaded.name());
+        assertEquals(0, loaded.width());
         assertTrue(loaded.collapsed());
         assertEquals(40, loaded.x());
         assertEquals(60, loaded.y());

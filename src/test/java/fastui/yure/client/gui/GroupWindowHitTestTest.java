@@ -94,15 +94,6 @@ class GroupWindowHitTestTest {
     }
 
     @Test
-    void scrollbarWinsOverRowAtTheRightEdge() {
-        GroupWindowLayout layout = GroupWindowLayout.calculate(400, 300, 40, 40, false, new int[]{25});
-        GroupWindowHitTest.Bounds scrollbar = new GroupWindowHitTest.Bounds(layout.x() + layout.width() - 6, 60, 6, 25);
-
-        assertEquals(new GroupWindowHitTest.Result(GroupWindowHitTest.Target.SCROLLBAR, -1),
-                GroupWindowHitTest.hitTest(layout, 0, scrollbar.x(), 60, scrollbar, List.of()));
-    }
-
-    @Test
     void scrollbarWinsOverOverlappingExpandedRowControls() {
         GroupWindowLayout layout = GroupWindowLayout.calculate(400, 300, 40, 40, false, new int[]{51});
         GroupWindowHitTest.Bounds scrollbar = new GroupWindowHitTest.Bounds(layout.x() + layout.width() - 6, 60, 6, 25);

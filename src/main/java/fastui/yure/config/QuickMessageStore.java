@@ -173,6 +173,17 @@ public final class QuickMessageStore {
         return true;
     }
 
+    public static boolean setWindowBounds(String groupId, int x, int y, int width) {
+        QuickMessageGroup group = GROUPS_BY_ID.get(groupId);
+        int normalizedWidth = Math.max(0, width);
+        if (group == null || group.x() == x && group.y() == y && group.width() == normalizedWidth) {
+            return false;
+        }
+        group.setWindowState(group.collapsed(), x, y);
+        group.setWidth(normalizedWidth);
+        return true;
+    }
+
     public static void clear() {
         if (GROUPS.isEmpty() && GROUPS_BY_ID.isEmpty()) {
             return;
@@ -193,6 +204,7 @@ public final class QuickMessageStore {
             object.addProperty("collapsed", group.collapsed());
             object.addProperty("x", group.x());
             object.addProperty("y", group.y());
+            object.addProperty("width", group.width());
             JsonArray messages = new JsonArray();
             for (QuickMessage message : group.messages()) {
                 JsonObject messageObject = new JsonObject();
@@ -226,6 +238,7 @@ public final class QuickMessageStore {
             group.setHidden(booleanValue(object, "hidden", false));
             group.setWindowState(booleanValue(object, "collapsed", false), intValue(object, "x", 0),
                     intValue(object, "y", 0));
+            group.setWidth(intValue(object, "width", 0));
             GROUPS.add(group);
             GROUPS_BY_ID.put(id, group);
             JsonElement messages = object.get("messages");

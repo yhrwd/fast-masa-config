@@ -4,7 +4,7 @@ import fastui.yure.config.FastMasaConfigs;
 
 /** 快捷面板与完整配置页共用的颜色 token。 */
 final class FastMasaMenuPalette {
-    static final int DEFAULT_ACCENT = 0xFF913DE2;
+    static final int DEFAULT_ACCENT = 0xFF488796;
     static final int SCREEN_BACKGROUND = 0xF0141414;
     static final int SCREEN_HEADER = 0xEE1E1E1E;
     static final int SURFACE = 0xFF1C1C22;

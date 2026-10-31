@@ -13,9 +13,10 @@ One codebase ships a separate jar per supported Minecraft version, currently 1.2
 ### Features
 
 - Automatically scans MaLiLib config screens and organizes entries by mod and config group.
-- Quick panel opens by holding `Right Shift` (rebindable); it never pauses the game and keeps movement keys working.
+- Quick panel opens with `Right Shift` (rebindable); it never pauses the game and keeps movement keys working.
 - Closes on key release, the inventory key, or `Esc`.
 - Floating group windows: drag, collapse, hide; positions and states are persisted.
+- On Minecraft 26.1.2 / 26.2 / 26.3, drag either window edge to resize configuration and quick-message windows; each group saves its width.
 - Booleans toggle directly; integer/float/double entries expand into sliders.
 - Full config screen with search and filtering by mod, group, and added/missing state.
 - Quick messages: send chat messages or `/` commands with variables like `${player}`, `${x}`, `${y}`, `${z}`, `${dimension}`, plus overworld/Nether coordinate variables.
@@ -24,18 +25,18 @@ One codebase ships a separate jar per supported Minecraft version, currently 1.2
 
 ### Supported versions
 
-| Build target | Minecraft versions | MaLiLib |
-|---|---|---|
-| `26.3` (default) | 26.3 | 0.30.x |
-| `26.2` | 26.2 | 0.29.x |
-| `26.1.2` | 26.1.2 | 0.28.x |
-| `1.21.11` | 1.21.11 | 0.27.x |
-| `1.21.9-1.21.10` | 1.21.9 – 1.21.10 (one jar) | 0.26.x |
-| `1.21.6-1.21.8` | 1.21.6 – 1.21.8 (one jar) | 0.25.x |
-| `1.21.5` | 1.21.5 | 0.24.x |
-| `1.21.4` | 1.21.4 | 0.23.x |
-| `1.21.2-1.21.3` | 1.21.2 – 1.21.3 (one jar) | 0.22.x |
-| `1.21-1.21.1` | 1.21 – 1.21.1 (one jar) | 0.21.x |
+| Build target     | Minecraft versions         | MaLiLib |
+| ---------------- | -------------------------- | ------- |
+| `26.3` (default) | 26.3                       | 0.30.x  |
+| `26.2`           | 26.2                       | 0.29.x  |
+| `26.1.2`         | 26.1.2                     | 0.28.x  |
+| `1.21.11`        | 1.21.11                    | 0.27.x  |
+| `1.21.9-1.21.10` | 1.21.9 – 1.21.10 (one jar) | 0.26.x  |
+| `1.21.6-1.21.8`  | 1.21.6 – 1.21.8 (one jar)  | 0.25.x  |
+| `1.21.5`         | 1.21.5                     | 0.24.x  |
+| `1.21.4`         | 1.21.4                     | 0.23.x  |
+| `1.21.2-1.21.3`  | 1.21.2 – 1.21.3 (one jar)  | 0.22.x  |
+| `1.21-1.21.1`    | 1.21 – 1.21.1 (one jar)    | 0.21.x  |
 
 Exact Fabric API / MaLiLib / Mod Menu versions per target live in `versions/<target>/gradle.properties` and the matching `fabric.mod.json`. Java: 25 for 26.x targets, 21 for 1.21.x targets.
 
@@ -76,18 +77,6 @@ Licensed under `GPL-3.0-or-later`. Some floating-window visual behavior was adap
 Fast Masa Config 的设计初衷很直接：Minecraft 中便于使用的按键数量有限，而不常用的快捷键也很容易遗忘。该 Mod 会扫描基于 MaLiLib 的 Mod（如 Litematica、MiniHUD、Tweakeroo 等）所公开的配置项，并将常用设置整理到悬浮快捷分组中。这样无需反复打开完整配置界面，即可快速调整开关、模式以及受支持的数值滑条。
 
 一套代码为每个受支持的 Minecraft 版本分别构建 jar，目前覆盖 1.21 到 26.3。安装与自己游戏版本一致的文件，其 Modrinth 版本页会列出所需的 MaLiLib 和 Fabric API 版本。
-
-### 截图说明
-
-以下截图展示的是旧版用户界面，仅用于说明功能和交互方式；当前版本的界面布局与视觉样式可能有所不同。
-
-![旧版快捷面板](https://cdn.modrinth.com/data/cached_images/f0539a0eb95e5877f503e5cf3af1f2d63f23362f.png)
-
-![旧版快捷面板](https://cdn.modrinth.com/data/cached_images/2fcc46a9a05af551c4221e2f52e53923a2cb2aea.png)
-
-![旧版配置界面](https://cdn.modrinth.com/data/cached_images/d4c389f366599a8d2ac70d5c2aa2738312a25590.png)
-
-![旧版配置界面](https://cdn.modrinth.com/data/cached_images/089d26ffc01f85774d5e6c6c92c73d22a8ce5045.png)
 
 ### 主要功能
 
@@ -139,18 +128,18 @@ Fast Masa Config 的设计初衷很直接：Minecraft 中便于使用的按键�
 
 本仓库在单一 main 分支上同时维护多个 Minecraft 版本目标，每个目标产出一个独立 jar：
 
-| 构建目标 | 覆盖的 Minecraft 版本 | MaLiLib |
-|---|---|---|
-| `26.3`（默认） | 26.3 | 0.30.x |
-| `26.2` | 26.2 | 0.29.x |
-| `26.1.2` | 26.1.2 | 0.28.x |
-| `1.21.11` | 1.21.11 | 0.27.x |
-| `1.21.9-1.21.10` | 1.21.9 ~ 1.21.10（单 jar 覆盖） | 0.26.x |
-| `1.21.6-1.21.8` | 1.21.6 ~ 1.21.8（单 jar 覆盖） | 0.25.x |
-| `1.21.5` | 1.21.5 | 0.24.x |
-| `1.21.4` | 1.21.4 | 0.23.x |
-| `1.21.2-1.21.3` | 1.21.2 ~ 1.21.3（单 jar 覆盖） | 0.22.x |
-| `1.21-1.21.1` | 1.21 ~ 1.21.1（单 jar 覆盖） | 0.21.x |
+| 构建目标             | 覆盖的 Minecraft 版本           | MaLiLib |
+| ---------------- | -------------------------- | ------- |
+| `26.3`（默认）       | 26.3                       | 0.30.x  |
+| `26.2`           | 26.2                       | 0.29.x  |
+| `26.1.2`         | 26.1.2                     | 0.28.x  |
+| `1.21.11`        | 1.21.11                    | 0.27.x  |
+| `1.21.9-1.21.10` | 1.21.9 ~ 1.21.10（单 jar 覆盖） | 0.26.x  |
+| `1.21.6-1.21.8`  | 1.21.6 ~ 1.21.8（单 jar 覆盖）  | 0.25.x  |
+| `1.21.5`         | 1.21.5                     | 0.24.x  |
+| `1.21.4`         | 1.21.4                     | 0.23.x  |
+| `1.21.2-1.21.3`  | 1.21.2 ~ 1.21.3（单 jar 覆盖）  | 0.22.x  |
+| `1.21-1.21.1`    | 1.21 ~ 1.21.1（单 jar 覆盖）    | 0.21.x  |
 
 各目标依赖的 Fabric API、MaLiLib、Mod Menu 和 mappings 版本，以 `versions/<目标>/gradle.properties` 与对应 `fabric.mod.json` 为准。Java 要求：26.x 目标为 25，1.21.x 目标为 21。
 
@@ -289,7 +278,7 @@ jar 统一输出到 `build/libs/`，文件名自带目标版本号（例如 `fas
 - `versions/<目标>/src/`：版本覆盖源码与资源（含 `fabric.mod.json`）。
 - `src/main/resources/fabric.mod.json`：默认目标的 Mod 元数据和依赖范围。
 
-更新日志见 [MODRINTH.md](MODRINTH.md)。
+更新日志见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### 项目结构
 

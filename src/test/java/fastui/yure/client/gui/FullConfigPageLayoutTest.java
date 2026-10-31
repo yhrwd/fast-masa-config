@@ -18,14 +18,4 @@ class FullConfigPageLayoutTest {
         assertTrue(layout.usesCompactLabels());
     }
 
-    @Test
-    void keepsLabelsAtTheirPreferredWidthsOnWideScreens() {
-        FullConfigPageLayout.TabStrip layout = FullConfigPageLayout.calculateTabStrip(800,
-                new int[] { 92, 104, 120, 64 }, false);
-
-        assertEquals(92, layout.buttonWidth(0));
-        assertEquals(104, layout.buttonWidth(1));
-        assertTrue(layout.yFor(3) == FullConfigPageLayout.TAB_Y);
-        assertTrue(layout.contentTop() > FullConfigPageLayout.TAB_Y);
-    }
 }

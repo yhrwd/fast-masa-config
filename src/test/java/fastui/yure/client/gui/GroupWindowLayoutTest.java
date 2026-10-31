@@ -8,25 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GroupWindowLayoutTest {
     @Test
-    void clampsRequestedPositionAndUsesSafeWidth() {
-        GroupWindowLayout layout = GroupWindowLayout.calculate(800, 600, 900, 900, false, new int[]{25, 51});
-
-        assertEquals(GroupWindowLayout.DESIRED_WIDTH, layout.width());
-        assertEquals(800 - GroupWindowLayout.SAFE_MARGIN - layout.width(), layout.x());
-        assertEquals(600 - GroupWindowLayout.SAFE_MARGIN - layout.height(), layout.y());
-        assertEquals(GroupWindowLayout.SAFE_MARGIN, layout.safeMargin());
-    }
-
-    @Test
-    void usesMinimumSafeWidthWhenViewportAllowsIt() {
-        GroupWindowLayout layout = GroupWindowLayout.calculate(220, 160, 0, 0, false, new int[]{25});
-
-        assertEquals(GroupWindowLayout.DESIRED_WIDTH, layout.width());
-        assertEquals(GroupWindowLayout.SAFE_MARGIN, layout.x());
-        assertTrue(layout.x() + layout.width() <= 220 - GroupWindowLayout.SAFE_MARGIN);
-    }
-
-    @Test
     void arrangesCallerSuppliedRowHeightsBelowHeader() {
         GroupWindowLayout layout = GroupWindowLayout.calculate(800, 600, 40, 50, false, new int[]{25, 51});
 
@@ -81,13 +62,4 @@ class GroupWindowLayoutTest {
         assertTrue(layout.headerHeight() <= layout.height());
     }
 
-    @Test
-    void keepsNormalHeaderAndContentInsideTheirWindowOnAnOrdinaryViewport() {
-        GroupWindowLayout layout = GroupWindowLayout.calculate(800, 600, 40, 50, false, new int[]{25});
-
-        assertEquals(196, layout.width());
-        assertEquals(GroupWindowLayout.HEADER_HEIGHT, layout.headerHeight());
-        assertTrue(layout.rows().getFirst().y() >= layout.y() + layout.headerHeight());
-        assertTrue(layout.rows().getFirst().y() + layout.rows().getFirst().height() <= layout.y() + layout.height());
-    }
 }

@@ -2,6 +2,7 @@ package fastui.yure.client.gui;
 
 import fastui.yure.FastMasaConfig;
 import fastui.yure.client.input.BoundKeyReader;
+import fastui.yure.client.compat.TargetCompat;
 import fastui.yure.client.message.QuickMessageSender;
 import fastui.yure.client.shortcut.ResolvedShortcut;
 import fastui.yure.client.shortcut.ShortcutControl;
@@ -14,7 +15,6 @@ import fastui.yure.config.QuickMessageStore;
 import fastui.yure.config.ShortcutControlType;
 import fi.dy.masa.malilib.config.ConfigManager;
 import fi.dy.masa.malilib.hotkeys.KeybindMulti;
-import fi.dy.masa.malilib.util.input.KeyCodes;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -42,6 +42,11 @@ public final class QuickConfigScreen extends Screen {
     private boolean replaceNumericInputOnType;
     private boolean floatingDragDirty;
     private boolean redirectToFullConfig;
+    private ResizeDrag activeResize;
+
+    private record ResizeDrag(String groupId, boolean message, GroupWindowResize.Edge edge,
+            int startX, int startWidth, int mouseX) {
+    }
 
     public QuickConfigScreen() {
         super(CommonComponents.EMPTY);
@@ -77,10 +82,9 @@ public final class QuickConfigScreen extends Screen {
             return;
         }
         syncHeldMovementKeys();
-        // 26.3 的 SDL 输入下，字符事件只在文本输入启用时送达；vanilla 会在没有焦点文本框时关闭它，
-        // 数值输入框不是真实文本框，所以手动输入期间需要持续开启。
+        // Vanilla may stop text input without a focused widget; our numeric field is drawn manually.
         if (this.activeNumericInputGroupId != null) {
-            Minecraft.getInstance().textInputManager().startTextInput(this);
+            TargetCompat.startTextInput(Minecraft.getInstance(), this);
         }
         if (FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() && this.activeNumericInputGroupId == null
                 && !isOpenHotkeyPhysicallyHeld()) {
@@ -90,6 +94,7 @@ public final class QuickConfigScreen extends Screen {
 
     @Override
     public void removed() {
+        this.activeResize = null;
         clearNumericInput();
         Minecraft.getInstance().textInputManager().stopTextInput();
         syncHeldMovementKeys();
@@ -102,6 +107,60 @@ public final class QuickConfigScreen extends Screen {
             float delta) {
         this.panel.render(fi.dy.masa.malilib.render.GuiContext.fromGuiGraphics(gfx), this.width, this.height, mouseX,
                 mouseY);
+        renderResizeFeedback(gfx, mouseX, mouseY);
+    }
+
+    private void renderResizeFeedback(net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY) {
+        if (this.activeResize != null) {
+            if (this.activeResize.message()) {
+                for (FloatingMessagePanel floating : this.panel.floatingMessagePanels()) {
+                    if (floating.groupId().equals(this.activeResize.groupId())) {
+                        floating.renderResizeHandle(fi.dy.masa.malilib.render.GuiContext.fromGuiGraphics(gfx),
+                                this.activeResize.edge());
+                        TargetCompat.requestHorizontalResizeCursor(gfx);
+                        return;
+                    }
+                }
+                return;
+            }
+            for (FloatingGroupPanel floating : this.panel.floatingPanels()) {
+                if (floating.groupId().equals(this.activeResize.groupId())) {
+                    floating.renderResizeHandle(fi.dy.masa.malilib.render.GuiContext.fromGuiGraphics(gfx),
+                            this.activeResize.edge());
+                    TargetCompat.requestHorizontalResizeCursor(gfx);
+                    return;
+                }
+            }
+            return;
+        }
+        if (this.activeFloatingGroupId != null || this.activeFloatingMessageGroupId != null
+                || this.activeFloatingSliderGroupId != null) {
+            return;
+        }
+        for (QuickConfigPanel.FloatingWindow window : this.panel.floatingWindows().reversed()) {
+            if (window instanceof QuickConfigPanel.MessageWindow messageWindow) {
+                GroupWindowResize.Edge edge = messageWindow.panel().resizeEdgeAt(mouseX, mouseY);
+                if (edge != GroupWindowResize.Edge.NONE) {
+                    messageWindow.panel().renderResizeHandle(fi.dy.masa.malilib.render.GuiContext.fromGuiGraphics(gfx), edge);
+                    TargetCompat.requestHorizontalResizeCursor(gfx);
+                    return;
+                }
+                if (messageWindow.panel().contains(mouseX, mouseY)) {
+                    return;
+                }
+                continue;
+            }
+            FloatingGroupPanel floating = ((QuickConfigPanel.ConfigWindow) window).panel();
+            GroupWindowResize.Edge edge = floating.resizeEdgeAt(mouseX, mouseY);
+            if (edge != GroupWindowResize.Edge.NONE) {
+                floating.renderResizeHandle(fi.dy.masa.malilib.render.GuiContext.fromGuiGraphics(gfx), edge);
+                TargetCompat.requestHorizontalResizeCursor(gfx);
+                return;
+            }
+            if (floating.contains(mouseX, mouseY)) {
+                return;
+            }
+        }
     }
 
     @Override
@@ -131,17 +190,22 @@ public final class QuickConfigScreen extends Screen {
     }
 
     public boolean handleMouseClicked(double mouseX, double mouseY, int button) {
+        if (this.activeResize != null) {
+            return true;
+        }
         int x = (int) mouseX;
         int y = (int) mouseY;
         for (QuickConfigPanel.FloatingWindow window : this.panel.floatingWindows().reversed()) {
             if (window instanceof QuickConfigPanel.MessageWindow messageWindow) {
-                if (this.handleMessageWindowClick(messageWindow.panel(), x, y)) {
+                if (this.handleMessageWindowClick(messageWindow.panel(), x, y, button)
+                        || messageWindow.panel().contains(x, y)) {
                     return true;
                 }
                 continue;
             }
 
-            if (this.handleConfigWindowClick(((QuickConfigPanel.ConfigWindow) window).panel(), x, y)) {
+            FloatingGroupPanel floating = ((QuickConfigPanel.ConfigWindow) window).panel();
+            if (this.handleConfigWindowClick(floating, x, y, button) || floating.contains(x, y)) {
                 return true;
             }
         }
@@ -149,7 +213,14 @@ public final class QuickConfigScreen extends Screen {
         return false;
     }
 
-    private boolean handleMessageWindowClick(FloatingMessagePanel floating, int x, int y) {
+    private boolean handleMessageWindowClick(FloatingMessagePanel floating, int x, int y, int button) {
+        GroupWindowResize.Edge edge = floating.resizeEdgeAt(x, y);
+        if (TargetCompat.isPrimaryMouseButton(button) && edge != GroupWindowResize.Edge.NONE) {
+            commitNumericInput();
+            this.panel.raiseFloatingMessageGroup(floating.groupId());
+            this.activeResize = new ResizeDrag(floating.groupId(), true, edge, floating.x(), floating.width(), x);
+            return true;
+        }
         GroupWindowHitTest.Result hit = floating.hitTest(x, y);
         if (hit.target() == GroupWindowHitTest.Target.NONE) {
             return false;
@@ -175,7 +246,14 @@ public final class QuickConfigScreen extends Screen {
         return true;
     }
 
-    private boolean handleConfigWindowClick(FloatingGroupPanel floating, int x, int y) {
+    private boolean handleConfigWindowClick(FloatingGroupPanel floating, int x, int y, int button) {
+        GroupWindowResize.Edge edge = floating.resizeEdgeAt(x, y);
+        if (TargetCompat.isPrimaryMouseButton(button) && edge != GroupWindowResize.Edge.NONE) {
+            commitNumericInput();
+            this.panel.raiseFloatingGroup(floating.groupId());
+            this.activeResize = new ResizeDrag(floating.groupId(), false, edge, floating.x(), floating.width(), x);
+            return true;
+        }
         GroupWindowHitTest.Result hit = floating.hitTest(x, y);
         if (hit.target() == GroupWindowHitTest.Target.NONE) {
             return false;
@@ -232,6 +310,30 @@ public final class QuickConfigScreen extends Screen {
     }
 
     public boolean handleMouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+        if (this.activeResize != null) {
+            if (TargetCompat.isPrimaryMouseButton(button)) {
+                if (this.activeResize.message()) {
+                    for (FloatingMessagePanel floating : this.panel.floatingMessagePanels()) {
+                        if (floating.groupId().equals(this.activeResize.groupId())) {
+                            this.floatingDragDirty |= floating.resizeFrom(this.activeResize.startX(),
+                                    this.activeResize.startWidth(), (int) mouseX - this.activeResize.mouseX(),
+                                    this.activeResize.edge(), this.width, this.height);
+                            break;
+                        }
+                    }
+                    return true;
+                }
+                for (FloatingGroupPanel floating : this.panel.floatingPanels()) {
+                    if (floating.groupId().equals(this.activeResize.groupId())) {
+                        this.floatingDragDirty |= floating.resizeFrom(this.activeResize.startX(),
+                                this.activeResize.startWidth(), (int) mouseX - this.activeResize.mouseX(),
+                                this.activeResize.edge(), this.width, this.height);
+                        break;
+                    }
+                }
+            }
+            return true;
+        }
         if (this.activeFloatingMessageGroupId != null) {
             this.floatingDragDirty |= this.panel.moveFloatingMessageGroup(this.activeFloatingMessageGroupId,
                     (int) mouseX - this.floatingDragOffsetX, (int) mouseY - this.floatingDragOffsetY,
@@ -280,6 +382,10 @@ public final class QuickConfigScreen extends Screen {
     }
 
     public boolean handleMouseReleased(double mouseX, double mouseY, int button) {
+        if (this.activeResize != null && !TargetCompat.isPrimaryMouseButton(button)) {
+            return true;
+        }
+        this.activeResize = null;
         this.activeFloatingGroupId = null;
         this.activeFloatingMessageGroupId = null;
         this.activeFloatingSliderGroupId = null;
@@ -294,7 +400,7 @@ public final class QuickConfigScreen extends Screen {
             return handleNumericInputKey(event);
         }
         int keyCode = event.key();
-        int scanCode = event.keycode();
+        int scanCode = TargetCompat.scanCode(event);
         Minecraft mc = Minecraft.getInstance();
         if (!FastMasaConfigs.Generic.RELEASE_TO_CLOSE.getBooleanValue() && isOpenHotkeyPressedAgain(keyCode)) {
             this.onClose();
@@ -309,7 +415,7 @@ public final class QuickConfigScreen extends Screen {
             this.onClose();
             return true;
         }
-        if (keyCode == KeyCodes.KEY_ESCAPE) {
+        if (keyCode == TargetCompat.KEY_ESCAPE) {
             this.onClose();
             return true;
         }
@@ -363,16 +469,16 @@ public final class QuickConfigScreen extends Screen {
 
     private boolean handleNumericInputKey(net.minecraft.client.input.KeyEvent event) {
         int keyCode = event.key();
-        if (keyCode == KeyCodes.KEY_RETURN || keyCode == KeyCodes.KEY_KP_ENTER
-                || keyCode == KeyCodes.KEY_RETURN2) { // Enter and keypad Enter
+        if (keyCode == TargetCompat.KEY_RETURN || keyCode == TargetCompat.KEY_KP_ENTER
+                || keyCode == TargetCompat.KEY_RETURN2) { // Enter and keypad Enter
             commitNumericInput();
             return true;
         }
-        if (keyCode == KeyCodes.KEY_ESCAPE) {
+        if (keyCode == TargetCompat.KEY_ESCAPE) {
             clearNumericInput();
             return true;
         }
-        if (keyCode == KeyCodes.KEY_BACKSPACE || keyCode == KeyCodes.KEY_DELETE) {
+        if (keyCode == TargetCompat.KEY_BACKSPACE || keyCode == TargetCompat.KEY_DELETE) {
             if (this.replaceNumericInputOnType) {
                 this.numericInputText = "";
                 this.replaceNumericInputOnType = false;

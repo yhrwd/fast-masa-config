@@ -12,6 +12,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class QuickMessageStoreTest {
     @Test
+    void persistsIndependentMessageWindowWidthsAcrossMovesAndCollapse() {
+        QuickMessageStore.clear();
+        QuickMessageGroup first = QuickMessageStore.createGroup("First");
+        QuickMessageGroup second = QuickMessageStore.createGroup("Second");
+        QuickMessageStore.addMessage(first.id(), "Greeting", "Hello");
+        assertTrue(QuickMessageStore.setWindowBounds(first.id(), 40, 60, 240));
+        assertTrue(QuickMessageStore.setWindowBounds(second.id(), 300, 60, 180));
+        assertFalse(QuickMessageStore.setWindowBounds(first.id(), 40, 60, 240));
+        assertFalse(QuickMessageStore.setWindowBounds("missing", 40, 60, 240));
+        QuickMessageStore.setWindowState(first.id(), true, 50, 70);
+
+        QuickMessageStore.fromJson(QuickMessageStore.toJson());
+        QuickMessageGroup loaded = QuickMessageStore.get(first.id()).orElseThrow();
+        assertEquals(240, loaded.width());
+        assertEquals(50, loaded.x());
+        assertEquals(70, loaded.y());
+        assertTrue(loaded.collapsed());
+        assertEquals("Hello", loaded.messages().getFirst().content());
+        assertEquals(180, QuickMessageStore.get(second.id()).orElseThrow().width());
+    }
+
+    @Test
     void startsEmptyAndManagesGroupsAndMessages() {
         QuickMessageStore.clear();
         assertTrue(QuickMessageStore.getGroups().isEmpty());
@@ -86,6 +108,7 @@ class QuickMessageStoreTest {
         assertEquals(1, QuickMessageStore.getGroups().size());
         QuickMessageGroup group = QuickMessageStore.getGroups().getFirst();
         assertEquals(30, group.x());
+        assertEquals(0, group.width());
         assertEquals("你好", group.messages().getFirst().displayName());
 
         JsonArray saved = QuickMessageStore.toJson();

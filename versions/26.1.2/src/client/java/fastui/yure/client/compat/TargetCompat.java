@@ -19,6 +19,23 @@ public final class TargetCompat
     // extra equality check, so a never-matching value is equivalent.
     public static final int KEY_RETURN2 = -1;
     public static final int KEY_ESCAPE = KeyCodes.KEY_ESCAPE;
+    public static final int KEY_BACKSPACE = KeyCodes.KEY_BACKSPACE;
+    public static final int KEY_DELETE = KeyCodes.KEY_DELETE;
+
+    public static int scanCode(net.minecraft.client.input.KeyEvent event)
+    {
+        return event.scancode();
+    }
+
+    public static void requestHorizontalResizeCursor(net.minecraft.client.gui.GuiGraphicsExtractor graphics)
+    {
+        graphics.requestCursor(com.mojang.blaze3d.platform.cursor.CursorTypes.RESIZE_EW);
+    }
+
+    public static boolean isPrimaryMouseButton(int button)
+    {
+        return button == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT;
+    }
 
     public static void startTextInput(Minecraft minecraft, Object owner)
     {

@@ -12,6 +12,7 @@ public final class ConfigGroup {
     private boolean collapsed;
     private int x;
     private int y;
+    private int width;
     private final List<GroupItem> items = new ArrayList<>();
 
     ConfigGroup(String id, String name, boolean system) {
@@ -46,6 +47,15 @@ public final class ConfigGroup {
 
     public int y() {
         return this.y;
+    }
+
+    /** Zero keeps the automatic width used by older configuration files. */
+    public int width() {
+        return this.width;
+    }
+
+    void setWidth(int width) {
+        this.width = Math.max(0, width);
     }
 
     public List<GroupItem> items() {

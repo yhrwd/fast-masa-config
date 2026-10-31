@@ -12,6 +12,7 @@ public final class QuickMessageGroup {
     private boolean collapsed;
     private int x;
     private int y;
+    private int width;
     private final List<QuickMessage> messages = new ArrayList<>();
 
     QuickMessageGroup(String id, String name) {
@@ -41,6 +42,15 @@ public final class QuickMessageGroup {
 
     public int y() {
         return this.y;
+    }
+
+    /** Zero retains automatic sizing for existing groups. */
+    public int width() {
+        return this.width;
+    }
+
+    void setWidth(int width) {
+        this.width = Math.max(0, width);
     }
 
     public List<QuickMessage> messages() {
