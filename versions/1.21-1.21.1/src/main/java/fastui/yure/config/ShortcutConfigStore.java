@@ -25,51 +25,12 @@ public final class ShortcutConfigStore {
         ENTRIES.add(entry);
     }
 
-    public static void remove(int index) {
-        if (index >= 0 && index < ENTRIES.size()) {
-            ENTRIES.remove(index);
-        }
-    }
-
-    public static boolean move(int index, int offset) {
-        int targetIndex = index + offset;
-
-        if (index < 0 || index >= ENTRIES.size() || targetIndex < 0 || targetIndex >= ENTRIES.size()) {
-            return false;
-        }
-
-        Collections.swap(ENTRIES, index, targetIndex);
-        return true;
-    }
-
     public static boolean containsTarget(String modId, String groupId, String configName) {
         return ENTRIES.stream().anyMatch(entry -> entry.isSameTarget(modId, groupId, configName));
     }
 
     public static void removeTarget(String modId, String groupId, String configName) {
         ENTRIES.removeIf(entry -> entry.isSameTarget(modId, groupId, configName));
-    }
-
-    public static List<String> toManualIds() {
-        List<String> ids = new ArrayList<>();
-
-        for (ShortcutEntry entry : ENTRIES) {
-            ids.add(entry.manualId());
-        }
-
-        return ids;
-    }
-
-    public static void replaceWithManualIds(List<String> manualIds) {
-        ENTRIES.clear();
-
-        for (String manualId : manualIds) {
-            if (manualId == null || manualId.isBlank()) {
-                continue;
-            }
-
-            add(ShortcutEntry.fromManualId(manualId));
-        }
     }
 
     public static void clear() {

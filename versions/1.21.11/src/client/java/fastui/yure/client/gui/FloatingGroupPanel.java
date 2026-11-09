@@ -305,10 +305,6 @@ public final class FloatingGroupPanel {
         return shortcut != null;
     }
 
-    static boolean isInteractiveRow(GroupItem item, ResolvedShortcut shortcut) {
-        return item != null && shortcut != null;
-    }
-
     /**
      * 将持久化的 GroupItem 解析为当前帧可绘制的行。
      * 系统行的 item 允许为 null，失效的外部配置则 shortcut 为 null；后续代码必须区分这两种情况。

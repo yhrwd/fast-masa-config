@@ -39,26 +39,6 @@ public record ShortcutEntry(
                 : this.modId + "/" + this.groupId + "/" + this.configName;
     }
 
-    /** Legacy manual-id parser retained for old shortcut migration. */
-    public static ShortcutEntry fromManualId(String rawId) {
-        String value = rawId == null ? "" : rawId.trim();
-        if (value.contains("/")) {
-            String[] parts = value.split("/", 3);
-            if (parts.length == 3) {
-                return new ShortcutEntry(parts[0], parts[1], parts[2], "", ShortcutControlType.TOGGLE, 1.0,
-                        null, null);
-            }
-        }
-        if (value.contains(":")) {
-            String[] parts = value.split(":", 2);
-            if (parts.length == 2) {
-                return new ShortcutEntry(parts[0], "", parts[1], "", ShortcutControlType.TOGGLE, 1.0, null,
-                        null);
-            }
-        }
-        throw new IllegalArgumentException("快捷方式 ID 必须是 modId/groupId/configName 或 modId:configName");
-    }
-
     public JsonObject toJson() {
         JsonObject object = new JsonObject();
         object.addProperty("modId", this.modId);

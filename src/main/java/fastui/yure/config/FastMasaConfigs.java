@@ -129,9 +129,5 @@ public final class FastMasaConfigs {
 
                 private QuickPanel() {
                 }
-
-                public static boolean isTagged(String configName) {
-                        return QuickPanelConfigTags.contains(configName);
-                }
         }
 }

@@ -125,10 +125,6 @@ public final class ConfigIndexService {
                 || config instanceof fi.dy.masa.malilib.config.IConfigDouble;
     }
 
-    static boolean hasSameConfigIdentity(ConfigIndexEntry entry, String modId, String groupId, String configName) {
-        return entry.modId().equals(modId) && entry.groupId().equals(groupId) && entry.configName().equals(configName);
-    }
-
     private static String getDisplayName(IConfigBase config) {
         String displayName = config.getConfigGuiDisplayName();
         return displayName == null || displayName.isBlank() ? config.getName() : displayName;
