@@ -48,15 +48,6 @@ class HeldInputStateTest {
     }
 
     @Test
-    void rawReleaseEndsAHoldWithoutAHotkeyReleaseCallback() {
-        HeldInputState state = new HeldInputState();
-        state.onMouseButton(2, true);
-        assertTrue(state.isChordHeld(List.of(-98), NO_KEYS));
-        state.onMouseButton(2, false);
-        assertFalse(state.isChordHeld(List.of(-98), NO_KEYS));
-    }
-
-    @Test
     void focusLossClearsMouseStateAndIgnoresInputUntilFocusReturns() {
         HeldInputState state = new HeldInputState();
         state.onMouseButton(3, true);

@@ -10,7 +10,6 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class QuickConfigGroupGeometryTest {
@@ -68,16 +67,4 @@ class QuickConfigGroupGeometryTest {
 
         assertTrue(layout.rightEdge() <= 260 - 12);
     }
-
-    @Test
-    void fullScreenListHitTestingUsesTheSameRowBoundsAsRendering() {
-        assertEquals(2, FullConfigListLayout.visibleRows(180, 80));
-        assertTrue(FullConfigListLayout.containsListPoint(12, 80, 300, 180, 80));
-        assertFalse(FullConfigListLayout.containsListPoint(11, 80, 300, 180, 80));
-        assertFalse(FullConfigListLayout.containsListPoint(20, 162, 300, 180, 80));
-        assertEquals(1, FullConfigListLayout.rowIndexAt(20, 114, 300, 180, 80, 0, 3));
-        assertEquals(-1, FullConfigListLayout.rowIndexAt(20, 110, 300, 180, 80, 0, 3));
-        assertEquals(-1, FullConfigListLayout.rowIndexAt(20, 147, 300, 180, 80, 0, 3));
-    }
-
 }

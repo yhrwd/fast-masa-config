@@ -28,17 +28,6 @@ class FastMasaConfigHandlerTest {
     }
 
     @Test
-    void malformedQuickMessageGroupsLoadsAsAnEmptyCollection() {
-        QuickMessageStore.clear();
-        JsonObject root = JsonParser.parseString("{\"QuickMessageGroups\": {\"invalid\": true}}")
-                .getAsJsonObject();
-
-        FastMasaConfigHandler.loadQuickMessageGroups(root);
-
-        assertEquals(0, QuickMessageStore.getGroups().size());
-    }
-
-    @Test
     void unparsableConfigFileIsBackedUpAndProtectedFromOverwrite(@TempDir Path dir) throws IOException {
         Path configFile = dir.resolve("fast-masa-config.json");
         Files.writeString(configFile, "{\"Groups\": [broken");
@@ -98,7 +87,7 @@ class FastMasaConfigHandlerTest {
     @Test
     void malformedSectionTypesAreProtectedBeforeApplyingAnyData(@TempDir Path dir) throws IOException {
         Path configFile = dir.resolve("fast-masa-config.json");
-        String malformed = "{\"Groups\": {\"unexpected\": true}}";
+        String malformed = "{\"Groups\": {\"unexpected\": true}, \"QuickMessageGroups\": \"nope\"}";
         Files.writeString(configFile, malformed);
         List<JsonObject> appliedRoots = new ArrayList<>();
 

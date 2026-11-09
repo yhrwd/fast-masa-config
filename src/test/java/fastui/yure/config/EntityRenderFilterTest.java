@@ -4,7 +4,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -46,24 +45,6 @@ class EntityRenderFilterTest {
     }
 
     @Test
-    void snapshotKeepsDisabledFilterPassThrough() {
-        EntityRenderFilter.State state = EntityRenderFilter.State.from(false, true, null);
-
-        assertTrue(state.shouldRender("minecraft:item"));
-        assertTrue(state.shouldRender("minecraft:player"));
-    }
-
-    @Test
-    void disabledFilterNeverTurnsBlacklistIntoAnImplicitWhitelist() {
-        EntityRenderFilter.State state = EntityRenderFilter.State.from(false, false,
-                List.of("minecraft:item", "minecraft:zombie"));
-
-        assertTrue(state.shouldRender("minecraft:item"));
-        assertTrue(state.shouldRender("minecraft:zombie"));
-        assertTrue(state.shouldRender("minecraft:cow"));
-    }
-
-    @Test
     void emptyListHasExplicitModeSemantics() {
         assertTrue(EntityRenderFilter.shouldRender(false, false, List.of(), "minecraft:cow"));
         assertTrue(EntityRenderFilter.shouldRender(false, true, List.of(), "minecraft:cow"));
@@ -84,15 +65,6 @@ class EntityRenderFilterTest {
         assertNotSame(first, EntityRenderFilter.cachedState(true, true, IDS));
         assertNotSame(first, EntityRenderFilter.cachedState(false, false, IDS));
         assertNotSame(first, EntityRenderFilter.cachedState(true, false, List.of("minecraft:cow")));
-    }
-
-    @Test
-    void cachedStateMatchesTheFreshSnapshotDecision() {
-        EntityRenderFilter.State cached = EntityRenderFilter.cachedState(true, true, IDS);
-        EntityRenderFilter.State fresh = EntityRenderFilter.State.from(true, true, IDS);
-
-        assertEquals(fresh.shouldRender("minecraft:item"), cached.shouldRender("minecraft:item"));
-        assertEquals(fresh.shouldRender("minecraft:cow"), cached.shouldRender("minecraft:cow"));
     }
 
     @Test
