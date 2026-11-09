@@ -148,6 +148,18 @@ class ConfigGroupStoreTest {
     }
 
     @Test
+    void refusesToRenameTheSystemGroup() {
+        ConfigGroupStore.clear();
+        ConfigGroup defaultGroup = ConfigGroupStore.ensureDefaultGroup();
+        ConfigGroup userGroup = ConfigGroupStore.create("建筑");
+
+        assertFalse(ConfigGroupStore.rename(defaultGroup.id(), "我的分组"));
+        assertEquals("FastUI", defaultGroup.name());
+        assertTrue(ConfigGroupStore.rename(userGroup.id(), "渲染"));
+        assertEquals("渲染", userGroup.name());
+    }
+
+    @Test
     void normalizesNullItemGroupIdBeforeJsonRoundTrip() {
         ConfigGroupStore.clear();
         ConfigGroup group = ConfigGroupStore.create("建筑");

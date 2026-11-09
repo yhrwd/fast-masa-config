@@ -20,7 +20,7 @@ abstract class EntityRendererMixin<T extends Entity> {
         if (!Boolean.TRUE.equals(cir.getReturnValue())) {
             return;
         }
-        EntityRenderFilter.State filter = EntityRenderFilter.State.from(
+        EntityRenderFilter.State filter = EntityRenderFilter.cachedState(
                 FastMasaConfigs.Tools.ENTITY_RENDER_FILTER.getBooleanValue(),
                 FastMasaConfigs.Tools.ENTITY_RENDER_WHITELIST.getBooleanValue(),
                 FastMasaConfigs.Tools.ENTITY_RENDER_ENTITIES.getStrings());

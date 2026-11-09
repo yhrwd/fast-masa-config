@@ -31,6 +31,7 @@ public final class QuickConfigPanel {
     private List<FloatingWindow> visibleWindows = List.of();
     private Map<ConfigIndexService.Target, ConfigIndexEntry> configIndexByTarget = Map.of();
     private long indexedConfigGeneration = -1;
+    private String indexedLanguage;
     private long synchronizedGroupRevision = -1;
     private long synchronizedMessageGroupRevision = -1;
 
@@ -39,7 +40,6 @@ public final class QuickConfigPanel {
     }
 
     public void render(GuiContext context, int screenWidth, int screenHeight, int mouseX, int mouseY) {
-        this.refreshConfigIndex();
         this.syncFloatingPanels();
         this.syncFloatingMessagePanels();
         for (FloatingWindow window : this.visibleWindows) {
@@ -86,13 +86,16 @@ public final class QuickConfigPanel {
         }
     }
 
-    private void refreshConfigIndex() {
-        if (this.indexedConfigGeneration == ConfigIndexService.generation()) {
+    public void refreshConfigIndex() {
+        String language = fastui.yure.client.compat.TargetCompat.currentLanguageCode();
+        if (this.indexedConfigGeneration == ConfigIndexService.generation()
+                && language.equals(this.indexedLanguage)) {
             return;
         }
         ConfigIndexService.scanSupportedConfigs();
         this.configIndexByTarget = ConfigIndexService.indexByTarget();
         this.indexedConfigGeneration = ConfigIndexService.generation();
+        this.indexedLanguage = language;
     }
 
     private void syncFloatingPanels() {

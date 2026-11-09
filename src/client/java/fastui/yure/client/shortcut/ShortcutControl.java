@@ -52,18 +52,35 @@ public final class ShortcutControl {
     }
 
     public static void setSliderValue(ResolvedShortcut shortcut, double ratio) {
+        persistOwnConfigIfChanged(shortcut, applySliderValue(shortcut, ratio));
+    }
+
+    /**
+     * 只把步进后的值写进内存中的 IConfigBase，不触发 ConfigManager 通知。
+     * 拖动期间每个鼠标事件都会调用；持久化由调用方在松开时统一做，
+     * 避免一次拖动写几十次 fast-masa-config.json。返回本次调用是否真的改变了数值。
+     */
+    public static boolean applySliderValue(ResolvedShortcut shortcut, double ratio) {
         IConfigBase config = shortcut.configEntry().config();
-        if (!isNumeric(config)) {
-            return;
+        if (!isNumeric(config) || !Double.isFinite(ratio)) {
+            return false;
         }
 
         NumericRange range = rangeFor(shortcut, config);
         double step = config instanceof IConfigInteger ? Math.max(1.0, shortcut.shortcut().sliderStep()) : 0.1;
         double rawValue = range.min() + (clampRatio(ratio) * range.width());
         double steppedValue = Math.round(rawValue / step) * step;
+        double before = getValue(config);
+        String value = formatValue(config, range.clamp(steppedValue));
+        double next = config instanceof IConfigFloat ? Float.parseFloat(value) : Double.parseDouble(value);
+        if (next == before) {
+            return false;
+        }
 
-        // Avoid ConfigManager.onConfigsChanged(): its default handler saves and reloads the target mod's config.
-        persistOwnConfigIfChanged(shortcut, EDITOR.apply(config, formatValue(config, range.clamp(steppedValue))).success());
+        // 外部模组的配置同样只改内存：它们自己的保存机制不受影响，
+        // 也不触发 onConfigsChanged 的整档保存与热键重载。
+        EDITOR.apply(config, value);
+        return getValue(config) != before;
     }
 
     public static boolean setTypedValue(ResolvedShortcut shortcut, String rawValue) {
@@ -151,7 +168,9 @@ public final class ShortcutControl {
     }
 
     private static String formatValue(IConfigBase config, double value) {
-        return config instanceof IConfigInteger ? Integer.toString((int) Math.round(value)) : Double.toString(value);
+        if (config instanceof IConfigInteger) return Integer.toString((int) Math.round(value));
+        if (config instanceof IConfigFloat) return Float.toString((float) value);
+        return Double.toString(value);
     }
 
     private static void persistOwnConfigIfChanged(ResolvedShortcut shortcut, boolean changed) {

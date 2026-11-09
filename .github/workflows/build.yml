@@ -41,13 +41,14 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "$SINGLE_TARGET" ]; then
-            if [ ! -d "versions/$SINGLE_TARGET" ]; then
-              echo "::error::Unknown build target '$SINGLE_TARGET' (no versions/$SINGLE_TARGET directory)"
+            if [ ! -f "versions/$SINGLE_TARGET/gradle.properties" ]; then
+              echo "::error::Unknown build target '$SINGLE_TARGET' (no versions/$SINGLE_TARGET/gradle.properties)"
               exit 1
             fi
             matrix="$(jq -cn --arg t "$SINGLE_TARGET" '[$t]')"
           else
-            matrix="$(find versions -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | jq -R . | jq -sc .)"
+            # 与 build.gradle 的目标校验保持一致：只接受含 gradle.properties 的目录。
+            matrix="$(find versions -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/gradle.properties' ';' -printf '%f\n' | sort | jq -R . | jq -sc .)"
           fi
           echo "Build matrix: $matrix"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"

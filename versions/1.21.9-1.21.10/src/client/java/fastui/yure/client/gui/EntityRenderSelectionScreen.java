@@ -182,14 +182,8 @@ final class EntityRenderSelectionScreen extends GuiBase {
     }
 
     private int rowIndexAt(int mouseX, int mouseY) {
-        if (!GuiHitTest.isInside(mouseX, mouseY, MARGIN, LIST_Y, this.width - MARGIN * 2,
-                this.height - 18 - LIST_Y)) {
-            return -1;
-        }
-        int visibleIndex = (mouseY - LIST_Y) / (ROW_HEIGHT + ROW_GAP);
-        int rowY = LIST_Y + visibleIndex * (ROW_HEIGHT + ROW_GAP);
-        int index = this.scrollOffset + visibleIndex;
-        return mouseY >= rowY + ROW_HEIGHT || index >= this.visibleEntries.size() ? -1 : index;
+        return FullConfigListLayout.rowIndexAt(mouseX, mouseY, this.width, this.height, LIST_Y,
+                this.scrollOffset, this.visibleEntries.size());
     }
 
     private String fit(String text, int maxWidth) {

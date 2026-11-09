@@ -101,7 +101,11 @@ jobs:
             '{project_id: $project_id, version_number: $version_number,
               version_title: $version_title, changelog: $changelog,
               version_type: "release", loaders: ["fabric"],
-              game_versions: ($game_versions | split(",")), dependencies: [], featured: false,
+              game_versions: ($game_versions | split(",")),
+              dependencies: [
+                {project_id: "GcWjdA9I", dependency_type: "required"},
+                {project_id: "P7dR8mSH", dependency_type: "required"}
+              ], featured: false,
               file_parts: [$jar_name]}' > release/metadata.json
           curl --fail-with-body --request PATCH \
             --header "Authorization: ${MODRINTH_TOKEN}" \

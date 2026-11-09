@@ -1,5 +1,7 @@
 package fastui.yure.client.scan;
 
+import fastui.yure.FastMasaConfig;
+
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.gui.GuiConfigsBase;
 import fi.dy.masa.malilib.gui.interfaces.IConfigGui;
@@ -309,9 +311,15 @@ public final class ConfigGuiGroupScanner {
                     groups.add(new GroupData(value.groupValue(), configs, configNames(configs)));
                 }
             } finally {
-                candidate.access().set(originalValue);
+                try {
+                    candidate.access().set(originalValue);
+                } catch (ReflectiveOperationException | RuntimeException restoreFailure) {
+                    FastMasaConfig.LOGGER.warn("Failed to restore config group selector {}", candidate.path(), restoreFailure);
+                    throw restoreFailure;
+                }
             }
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            FastMasaConfig.LOGGER.debug("Config group scan failed for {}: {}", candidate.path(), e.toString());
             return Optional.empty();
         }
 

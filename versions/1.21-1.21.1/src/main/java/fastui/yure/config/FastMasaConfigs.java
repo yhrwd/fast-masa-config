@@ -25,35 +25,35 @@ public final class FastMasaConfigs {
 
                 public static final ConfigHotkey OPEN_QUICK_CONFIG = new ConfigHotkey("openQuickConfig", "RIGHT_SHIFT",
                                 QUICK_CONFIG_KEY_SETTINGS,
-                                "按住时显示 Fast Masa Config 快捷配置面板。", "Open Quick Config").apply(GENERIC_KEY);
+                                "Hold this hotkey to show the quick config panel.", "Open Quick Config").apply(GENERIC_KEY);
                 public static final ConfigBoolean RELEASE_TO_CLOSE = new ConfigBoolean("releaseToClose", true,
-                                "松开快捷配置热键时自动关闭面板。", "Release To Close").apply(GENERIC_KEY);
+                                "Close the quick panel when the open hotkey is released.", "Release To Close").apply(GENERIC_KEY);
                 public static final ConfigBoolean CLOSE_ON_INVENTORY_KEY = new ConfigBoolean("closeOnInventoryKey",
                                 true,
-                                "按背包键或 ESC 时关闭快捷配置面板。", "Close On Inventory Key").apply(GENERIC_KEY);
+                                "Close the quick panel when the inventory key or Escape is pressed.", "Close On Inventory Key").apply(GENERIC_KEY);
                 public static final ConfigInteger FLOATING_BACKGROUND_ALPHA = new ConfigInteger(
                                 "floatingBackgroundAlpha", 216, 0, 255, true,
-                                "悬浮菜单背景透明度。", "Floating Menu Background Opacity").apply(GENERIC_KEY);
+                                "Adjusts the opacity of the floating menu background.", "Floating Menu Opacity").apply(GENERIC_KEY);
                 public static final ConfigColor FLOATING_ACCENT = new ConfigColor("floatingAccent", "#FF488796",
-                                "悬浮菜单主题色。", "Floating Menu Theme Color").apply(GENERIC_KEY);
+                                "Customize the floating menu accent color.", "Floating Menu Theme Color").apply(GENERIC_KEY);
                 public static final ConfigBoolean BLOCK_BREAK_INDICATOR = new ConfigBoolean("blockBreakIndicator", true,
-                                "用动态方块描边替换原版挖掘裂纹动画。", "Replace Block Break Animation").apply(GENERIC_KEY);
+                                "Replaces the vanilla block break overlay with a dynamic outline.", "Replace Block Break Animation").apply(GENERIC_KEY);
                 public static final ConfigBoolean BLOCK_BREAK_LINES = new ConfigBoolean("blockBreakLines", true,
-                                "显示挖掘动画的方块描边。", "Render Break Outline").apply(GENERIC_KEY);
+                                "Render the block outline during breaking.", "Break Outline").apply(GENERIC_KEY);
                 public static final ConfigBoolean BLOCK_BREAK_SIDES = new ConfigBoolean("blockBreakSides", true,
-                                "显示挖掘动画的半透明填充面。", "Render Break Sides").apply(GENERIC_KEY);
+                                "Render translucent faces during breaking.", "Break Fill").apply(GENERIC_KEY);
                 public static final ConfigBoolean BLOCK_BREAK_REMOTE = new ConfigBoolean("blockBreakRemote", true,
-                                "显示多人游戏中服务器同步的其它玩家挖掘进度。", "Render Remote Break Progress").apply(GENERIC_KEY);
+                                "Render server-synchronised breaking progress from other players.", "Remote Break Progress").apply(GENERIC_KEY);
                 public static final ConfigInteger BLOCK_BREAK_LINE_WIDTH = new ConfigInteger("blockBreakLineWidth", 3, 1,
-                                8, true, "挖掘动画描边宽度。", "Break Outline Width").apply(GENERIC_KEY);
+                                8, true, "Width of the breaking outline.", "Break Outline Width").apply(GENERIC_KEY);
                 public static final ConfigColor BLOCK_BREAK_START_LINE = new ConfigColor("blockBreakStartLine", "#9619FC19",
-                                "挖掘开始时的描边颜色。", "Start Outline Color").apply(GENERIC_KEY);
+                                "Outline color at the start of breaking.", "Start Outline Color").apply(GENERIC_KEY);
                 public static final ConfigColor BLOCK_BREAK_END_LINE = new ConfigColor("blockBreakEndLine", "#96FF1919",
-                                "挖掘完成时的描边颜色。", "End Outline Color").apply(GENERIC_KEY);
+                                "Outline color at the end of breaking.", "End Outline Color").apply(GENERIC_KEY);
                 public static final ConfigColor BLOCK_BREAK_START_SIDE = new ConfigColor("blockBreakStartSide", "#9619FC19",
-                                "挖掘开始时的填充颜色。", "Start Fill Color").apply(GENERIC_KEY);
+                                "Fill color at the start of breaking.", "Start Fill Color").apply(GENERIC_KEY);
                 public static final ConfigColor BLOCK_BREAK_END_SIDE = new ConfigColor("blockBreakEndSide", "#96FF1919",
-                                "挖掘完成时的填充颜色。", "End Fill Color").apply(GENERIC_KEY);
+                                "Fill color at the end of breaking.", "End Fill Color").apply(GENERIC_KEY);
 
                 @SuppressWarnings("nullness")
                 private static final @org.jetbrains.annotations.NotNull IConfigBase[] OPTION_ARRAY = createOptionArray();
@@ -96,10 +96,10 @@ public final class FastMasaConfigs {
                 public static final ConfigBoolean ENTITY_RENDER_FILTER = new ConfigBoolean("entityRenderFilter", false,
                                 "Enable entity rendering filtering.", "Entity Render Filter").apply(TOOLS_KEY);
                 public static final ConfigBoolean ENTITY_RENDER_WHITELIST = new ConfigBoolean("entityRenderWhitelist", false,
-                                "When enabled, only entities in the list are rendered. Otherwise list entries are hidden.",
+                                "When enabled, only listed entity IDs are rendered. When disabled, listed IDs are hidden.",
                                 "Use Whitelist").apply(TOOLS_KEY);
                 public static final ConfigStringList ENTITY_RENDER_ENTITIES = new ConfigStringList("entityRenderEntities",
-                                ImmutableList.of(), "Choose entity types from the entity selector.",
+                                ImmutableList.of(), "Open the selector to choose entity types for the render filter.",
                                 "Entity IDs").apply(TOOLS_KEY);
 
                 @SuppressWarnings("nullness")

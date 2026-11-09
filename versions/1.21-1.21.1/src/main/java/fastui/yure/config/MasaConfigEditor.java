@@ -20,6 +20,11 @@ public final class MasaConfigEditor {
     private static final Pattern COLOR_PATTERN = Pattern.compile("#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})");
 
     public ConfigEditResult apply(IConfigBase config, String rawValue) {
+        if (config instanceof IConfigBoolean) return applyBoolean(config, rawValue);
+        if (config instanceof IConfigInteger) return applyInteger(config, rawValue);
+        if (config instanceof IConfigDouble) return applyDouble(config, rawValue);
+        if (config instanceof IConfigFloat) return applyFloat(config, rawValue);
+
         return switch (config.getType()) {
             case BOOLEAN -> applyBoolean(config, rawValue);
             case INTEGER -> applyInteger(config, rawValue);
@@ -30,7 +35,7 @@ public final class MasaConfigEditor {
             case OPTION_LIST -> applyOptionList(config, rawValue);
             case HOTKEY -> applyHotkey(config, rawValue);
             case STRING_LIST -> applyStringList(config, rawValue);
-            default -> ConfigEditResult.failure(config, "暂不支持修改该配置类型: " + config.getType().name());
+            default -> ConfigEditResult.failure(config, "fast-masa-config.edit.error.unsupported_type", config.getType().name());
         };
     }
 
@@ -45,12 +50,12 @@ public final class MasaConfigEditor {
             return ConfigEditResult.success(config);
         }
 
-        return ConfigEditResult.failure(config, "该配置不支持重置");
+        return ConfigEditResult.failure(config, "fast-masa-config.edit.error.reset_unsupported");
     }
 
     public ConfigEditResult commit(String modId, ConfigCommitter committer) {
         if (modId == null || modId.isBlank()) {
-            return ConfigEditResult.failure("<commit>", "modId 不能为空");
+            return ConfigEditResult.failure("<commit>", "fast-masa-config.edit.error.mod_id_missing");
         }
 
         committer.commit(modId);
@@ -61,7 +66,7 @@ public final class MasaConfigEditor {
         String normalized = rawValue.trim().toLowerCase(Locale.ROOT);
 
         if ("true".equals(normalized) == false && "false".equals(normalized) == false) {
-            return ConfigEditResult.failure(config, "布尔值只能是 true 或 false");
+            return ConfigEditResult.failure(config, "fast-masa-config.edit.error.boolean_invalid");
         }
 
         ((IConfigBoolean) config).setBooleanValue(Boolean.parseBoolean(normalized));
@@ -75,11 +80,12 @@ public final class MasaConfigEditor {
         try {
             value = Integer.parseInt(rawValue.trim());
         } catch (NumberFormatException e) {
-            return ConfigEditResult.failure(config, "请输入整数");
+            return ConfigEditResult.failure(config, "fast-masa-config.edit.error.integer_invalid");
         }
 
         if (value < integerConfig.getMinIntegerValue() || value > integerConfig.getMaxIntegerValue()) {
-            return ConfigEditResult.failure(config, "整数超出范围: " + integerConfig.getMinIntegerValue() + " ~ " + integerConfig.getMaxIntegerValue());
+            return ConfigEditResult.failure(config, "fast-masa-config.edit.error.integer_range",
+                    integerConfig.getMinIntegerValue(), integerConfig.getMaxIntegerValue());
         }
 
         integerConfig.setIntegerValue(value);
@@ -93,15 +99,16 @@ public final class MasaConfigEditor {
         try {
             value = Double.parseDouble(rawValue.trim());
         } catch (NumberFormatException e) {
-            return ConfigEditResult.failure(config, "请输入数字");
+            return ConfigEditResult.failure(config, "fast-masa-config.edit.error.number_invalid");
         }
 
         if (Double.isFinite(value) == false) {
-            return ConfigEditResult.failure(config, "数字不能是 NaN 或 Infinity");
+            return ConfigEditResult.failure(config, "fast-masa-config.edit.error.number_not_finite");
         }
 
         if (value < doubleConfig.getMinDoubleValue() || value > doubleConfig.getMaxDoubleValue()) {
-            return ConfigEditResult.failure(config, "数字超出范围: " + doubleConfig.getMinDoubleValue() + " ~ " + doubleConfig.getMaxDoubleValue());
+            return ConfigEditResult.failure(config, "fast-masa-config.edit.error.number_range",
+                    doubleConfig.getMinDoubleValue(), doubleConfig.getMaxDoubleValue());
         }
 
         doubleConfig.setDoubleValue(value);
@@ -115,15 +122,16 @@ public final class MasaConfigEditor {
         try {
             value = Float.parseFloat(rawValue.trim());
         } catch (NumberFormatException e) {
-            return ConfigEditResult.failure(config, "请输入数字");
+            return ConfigEditResult.failure(config, "fast-masa-config.edit.error.number_invalid");
         }
 
         if (Float.isFinite(value) == false) {
-            return ConfigEditResult.failure(config, "数字不能是 NaN 或 Infinity");
+            return ConfigEditResult.failure(config, "fast-masa-config.edit.error.number_not_finite");
         }
 
         if (value < floatConfig.getMinFloatValue() || value > floatConfig.getMaxFloatValue()) {
-            return ConfigEditResult.failure(config, "数字超出范围: " + floatConfig.getMinFloatValue() + " ~ " + floatConfig.getMaxFloatValue());
+            return ConfigEditResult.failure(config, "fast-masa-config.edit.error.number_range",
+                    floatConfig.getMinFloatValue(), floatConfig.getMaxFloatValue());
         }
 
         floatConfig.setFloatValue(value);
@@ -134,7 +142,7 @@ public final class MasaConfigEditor {
         String value = rawValue.trim();
 
         if (COLOR_PATTERN.matcher(value).matches() == false) {
-            return ConfigEditResult.failure(config, "颜色必须是 #RRGGBB 或 #AARRGGBB");
+            return ConfigEditResult.failure(config, "fast-masa-config.edit.error.color_invalid");
         }
 
         ((IStringRepresentable) config).setValueFromString(value);
@@ -153,7 +161,7 @@ public final class MasaConfigEditor {
         IConfigOptionListEntry nextValue = currentValue.fromString(value);
 
         if (nextValue == currentValue && currentValue.getStringValue().equals(value) == false) {
-            return ConfigEditResult.failure(config, "未知选项: " + value);
+            return ConfigEditResult.failure(config, "fast-masa-config.edit.error.option_unknown", value);
         }
 
         optionConfig.setOptionListValue(nextValue);

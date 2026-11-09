@@ -4,7 +4,10 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityRenderFilterTest {
@@ -66,5 +69,49 @@ class EntityRenderFilterTest {
         assertTrue(EntityRenderFilter.shouldRender(false, true, List.of(), "minecraft:cow"));
         assertTrue(EntityRenderFilter.shouldRender(true, false, List.of(), "minecraft:cow"));
         assertFalse(EntityRenderFilter.shouldRender(true, true, List.of(), "minecraft:cow"));
+    }
+
+    @Test
+    void cachedStateReusesTheSnapshotWhileInputsStayEqual() {
+        EntityRenderFilter.State first = EntityRenderFilter.cachedState(true, false, IDS);
+        assertSame(first, EntityRenderFilter.cachedState(true, false, List.of("minecraft:item", "minecraft:zombie")));
+        assertSame(first, EntityRenderFilter.cachedState(true, false, IDS));
+    }
+
+    @Test
+    void cachedStateRebuildsWhenAnyInputChanges() {
+        EntityRenderFilter.State first = EntityRenderFilter.cachedState(true, false, IDS);
+        assertNotSame(first, EntityRenderFilter.cachedState(true, true, IDS));
+        assertNotSame(first, EntityRenderFilter.cachedState(false, false, IDS));
+        assertNotSame(first, EntityRenderFilter.cachedState(true, false, List.of("minecraft:cow")));
+    }
+
+    @Test
+    void cachedStateMatchesTheFreshSnapshotDecision() {
+        EntityRenderFilter.State cached = EntityRenderFilter.cachedState(true, true, IDS);
+        EntityRenderFilter.State fresh = EntityRenderFilter.State.from(true, true, IDS);
+
+        assertEquals(fresh.shouldRender("minecraft:item"), cached.shouldRender("minecraft:item"));
+        assertEquals(fresh.shouldRender("minecraft:cow"), cached.shouldRender("minecraft:cow"));
+    }
+
+    @Test
+    void cachedStateDetectsInPlaceChangesToTheInputList() {
+        List<String> ids = new java.util.ArrayList<>(List.of("minecraft:item"));
+        EntityRenderFilter.State first = EntityRenderFilter.cachedState(true, false, ids);
+        ids.set(0, "minecraft:cow");
+
+        EntityRenderFilter.State updated = EntityRenderFilter.cachedState(true, false, ids);
+
+        assertNotSame(first, updated);
+        assertTrue(updated.shouldRender("minecraft:item"));
+        assertFalse(updated.shouldRender("minecraft:cow"));
+    }
+
+    @Test
+    void cachedStateTreatsNullListAsEmpty() {
+        EntityRenderFilter.State state = EntityRenderFilter.cachedState(true, false, null);
+
+        assertTrue(state.shouldRender("minecraft:cow"));
     }
 }

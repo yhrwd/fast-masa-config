@@ -3,6 +3,7 @@ package fastui.yure.client.gui;
 import fastui.yure.FastMasaConfig;
 import fastui.yure.client.compat.TargetCompat;
 import fastui.yure.client.input.BoundKeyReader;
+import fastui.yure.client.input.FastMasaInputHandler;
 import fastui.yure.client.message.QuickMessageSender;
 import fastui.yure.client.shortcut.ResolvedShortcut;
 import fastui.yure.client.shortcut.ShortcutControl;
@@ -27,7 +28,6 @@ import net.minecraft.screen.ScreenTexts;
 import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /** 按住热键时显示的非暂停浮动分组窗口。 */
 public final class QuickConfigScreen extends Screen {
@@ -45,6 +45,7 @@ public final class QuickConfigScreen extends Screen {
     private String numericInputText = "";
     private boolean replaceNumericInputOnType;
     private boolean floatingDragDirty;
+    private boolean floatingSliderDirty;
     private boolean redirectToFullConfig;
 
     public QuickConfigScreen() {
@@ -59,6 +60,7 @@ public final class QuickConfigScreen extends Screen {
     public void init() {
         super.init();
         ConfigGroupStore.ensureDefaultGroup();
+        this.panel.refreshConfigIndex();
         if (!hasVisibleFloatingWindows()) {
             // Screen.added() 仍处于 Fabric 事件初始化阶段，不能在这里直接 setScreen。
             // 延迟到首个 tick()，既保留“全隐藏时打开完整配置”的入口，也不会触发未初始化崩溃。
@@ -76,6 +78,7 @@ public final class QuickConfigScreen extends Screen {
 
     @Override
     public void tick() {
+        this.panel.refreshConfigIndex();
         if (this.redirectToFullConfig) {
             this.redirectToFullConfig = false;
             MinecraftClient.getInstance().setScreen(new FastMasaConfigGui(null, getHeldOpenHotkeyCodes()));
@@ -222,7 +225,9 @@ public final class QuickConfigScreen extends Screen {
         if (hit.target() == GroupWindowHitTest.Target.SLIDER) {
             this.activeFloatingSliderGroupId = floating.groupId();
             this.activeFloatingSliderIndex = hit.itemIndex();
-            ShortcutControl.setSliderValue(shortcut, floating.sliderRatioAt(hit.itemIndex(), x));
+            boolean changed = ShortcutControl.applySliderValue(shortcut,
+                    floating.sliderRatioAt(hit.itemIndex(), x));
+            this.floatingSliderDirty |= changed && FastMasaConfig.MOD_ID.equals(shortcut.configEntry().modId());
         }
         return true;
     }
@@ -245,8 +250,9 @@ public final class QuickConfigScreen extends Screen {
                 if (floating.groupId().equals(this.activeFloatingSliderGroupId)) {
                     ResolvedShortcut shortcut = floating.shortcutAt(this.activeFloatingSliderIndex);
                     if (shortcut != null) {
-                        ShortcutControl.setSliderValue(shortcut,
+                        boolean changed = ShortcutControl.applySliderValue(shortcut,
                                 floating.sliderRatioAt(this.activeFloatingSliderIndex, (int) mouseX));
+                        this.floatingSliderDirty |= changed && FastMasaConfig.MOD_ID.equals(shortcut.configEntry().modId());
                     }
                     return true;
                 }
@@ -450,10 +456,12 @@ public final class QuickConfigScreen extends Screen {
     }
 
     private void flushPendingDragPersistence() {
-        if (shouldFlushPendingDrag(this.floatingDragDirty)) {
+        // 滑条拖动与窗口拖动共享一次落盘：松开时才通知 ConfigManager 保存。
+        if (shouldFlushPendingDrag(this.floatingDragDirty || this.floatingSliderDirty)) {
             persistRuntimeGroupState();
-            this.floatingDragDirty = false;
         }
+        this.floatingDragDirty = false;
+        this.floatingSliderDirty = false;
     }
 
     static boolean shouldFlushPendingDrag(boolean positionChanged) {
@@ -497,30 +505,15 @@ public final class QuickConfigScreen extends Screen {
     }
 
     private boolean isOpenHotkeyPhysicallyHeld() {
-        for (int keyCode : FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys()) {
-            if (!KeybindMulti.isKeyDown(keyCode)) {
-                return false;
-            }
-        }
-        return true;
+        return FastMasaInputHandler.getInstance().isOpenHotkeyPhysicallyHeld();
     }
 
     private boolean isOpenHotkeyPressedAgain(int pressedKeyCode) {
-        List<Integer> keys = FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys();
-        if (!keys.contains(pressedKeyCode)) {
-            return false;
-        }
-        for (int keyCode : keys) {
-            if (keyCode != pressedKeyCode && !KeybindMulti.isKeyDown(keyCode)) {
-                return false;
-            }
-        }
-        return true;
+        return FastMasaInputHandler.getInstance().isOpenHotkeyPressedAgain(pressedKeyCode);
     }
 
     private static Set<Integer> getHeldOpenHotkeyCodes() {
-        return FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind().getKeys().stream()
-                .filter(KeybindMulti::isKeyDown).collect(Collectors.toSet());
+        return FastMasaInputHandler.getInstance().getHeldOpenHotkeyCodes();
     }
 
     private void setMovementKeyPressed(int keyCode, int scanCode, boolean pressed) {

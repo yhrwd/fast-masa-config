@@ -101,6 +101,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private ConfigButtonKeybind openQuickConfigButton;
     private ButtonGeneric hotkeySettingsButton;
     private IConfigBase activeNumericSliderConfig;
+    private boolean numericSliderDirty;
     private IConfigBase editingValueConfig;
     private GuiTextFieldGeneric numericValueField;
     private FilterDropdownList modFilterDropdown;
@@ -270,7 +271,10 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
 
     @Override
     public boolean onMouseReleased(int mouseX, int mouseY, int button) {
-        this.activeNumericSliderConfig = null;
+        if (this.activeNumericSliderConfig != null) {
+            this.activeNumericSliderConfig = null;
+            this.flushNumericSliderPersistence();
+        }
         return super.onMouseReleased(mouseX, mouseY, button);
     }
 
@@ -382,6 +386,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         if (this.activeKeybindButton != null) {
             this.setActiveKeybindButton(null);
         }
+
+        this.flushNumericSliderPersistence();
 
         if (this.dirtyListener.isDirty()) {
             this.notifyOwnConfigChanged(true);
@@ -599,7 +605,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
                 this.notifyOwnConfigChanged(true);
             } else {
                 GuiBase.openGui(new GuiKeybindSettings(FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getKeybind(),
-                        FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getName(), null, GuiUtils.getCurrentScreen()));
+                        FastMasaConfigs.Generic.OPEN_QUICK_CONFIG.getConfigGuiDisplayName(), null, GuiUtils.getCurrentScreen()));
             }
         });
     }
@@ -761,7 +767,9 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
             boolean hovered = GuiHitTest.isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT);
             this.drawRowBase(context, x, y, width, hovered, selectedMessage);
             this.drawString(context, fitText(message.displayName(), buttonX - x - 16), x + 8, y + 6, COLOR_TEXT);
-            String meta = (message.isCommand() ? "[CMD] " : "") + message.content();
+            String meta = (message.isCommand()
+                    ? StringUtils.translate("fast-masa-config.gui.quick_messages.command_prefix")
+                    : "") + message.content();
             this.drawString(context, fitText(meta, buttonX - x - 16), x + 8, y + 18, COLOR_MUTED);
             this.drawSmallButton(context, buttonX - 48, y + 5, 20, "↑", FullConfigPalette.CONTROL_DARK,
                     GuiHitTest.isInside(mouseX, mouseY, buttonX - 48, y + 5, 20, BUTTON_HEIGHT));
@@ -1237,6 +1245,7 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         this.selectedGroupId = group.id();
         this.groupNameField.setText("");
         this.afterGroupChanged();
+        this.initGui();
     }
 
     private void renameSelectedGroup() {
@@ -1297,8 +1306,10 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         ButtonGeneric createButton = new ButtonGeneric(MARGIN + nameWidth + 4, nameY - 1, 30, BUTTON_HEIGHT, "+");
         createButton.setHoverStrings("fast-masa-config.gui.group.create");
         this.addButton(createButton, (button, mouseButton) -> this.createGroup());
-        ButtonGeneric renameButton = new ButtonGeneric(MARGIN + nameWidth + 38, nameY - 1, 30, BUTTON_HEIGHT, "R");
+        ButtonGeneric renameButton = new ButtonGeneric(MARGIN + nameWidth + 38, nameY - 1, 30, BUTTON_HEIGHT,
+                StringUtils.translate("fast-masa-config.gui.group.rename.compact"));
         renameButton.setHoverStrings("fast-masa-config.gui.group.rename");
+        renameButton.setEnabled(selected != null && !selected.system());
         this.addButton(renameButton, (button, mouseButton) -> this.renameSelectedGroup());
     }
 
@@ -1346,7 +1357,8 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         ButtonGeneric createButton = new ButtonGeneric(MARGIN + nameWidth + 4, nameY - 1, 30, BUTTON_HEIGHT, "+");
         createButton.setHoverStrings("fast-masa-config.gui.group.create");
         this.addButton(createButton, (button, mouseButton) -> this.createQuickMessageGroup());
-        ButtonGeneric renameButton = new ButtonGeneric(MARGIN + nameWidth + 38, nameY - 1, 30, BUTTON_HEIGHT, "R");
+        ButtonGeneric renameButton = new ButtonGeneric(MARGIN + nameWidth + 38, nameY - 1, 30, BUTTON_HEIGHT,
+                StringUtils.translate("fast-masa-config.gui.group.rename.compact"));
         renameButton.setHoverStrings("fast-masa-config.gui.group.rename");
         this.addButton(renameButton, (button, mouseButton) -> this.renameSelectedQuickMessageGroup());
 
@@ -1458,6 +1470,14 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
         }
 
         return false;
+    }
+
+    /** 滑条拖动只在松开（或界面关闭）时通知一次 ConfigManager，避免每个拖动事件写一次配置文件。 */
+    private void flushNumericSliderPersistence() {
+        if (this.numericSliderDirty) {
+            this.numericSliderDirty = false;
+            this.notifyOwnConfigChanged(false);
+        }
     }
 
     private void notifyOwnConfigChanged(boolean updateHotkeys) {
@@ -1907,15 +1927,23 @@ public final class FastMasaConfigGui extends GuiBase implements IKeybindConfigGu
     private void applyNumericSliderValue(IConfigInteger config, int mouseX, NumericControlLayout layout) {
         int min = config.getMinIntegerValue();
         int max = config.getMaxIntegerValue();
-        config.setIntegerValue(min + (int) Math.round(this.getSliderRatioAt(mouseX, layout) * (max - min)));
-        this.notifyOwnConfigChanged(false);
+        int value = min + (int) Math.round(this.getSliderRatioAt(mouseX, layout) * (max - min));
+
+        if (value != config.getIntegerValue()) {
+            config.setIntegerValue(value);
+            this.numericSliderDirty = true;
+        }
     }
 
     private void applyNumericSliderValue(IConfigDouble config, int mouseX, NumericControlLayout layout) {
         double min = config.getMinDoubleValue();
         double max = config.getMaxDoubleValue();
-        config.setDoubleValue(min + this.getSliderRatioAt(mouseX, layout) * (max - min));
-        this.notifyOwnConfigChanged(false);
+        double value = min + this.getSliderRatioAt(mouseX, layout) * (max - min);
+
+        if (value != config.getDoubleValue()) {
+            config.setDoubleValue(value);
+            this.numericSliderDirty = true;
+        }
     }
 
     private double getSliderRatioAt(int mouseX, NumericControlLayout layout) {

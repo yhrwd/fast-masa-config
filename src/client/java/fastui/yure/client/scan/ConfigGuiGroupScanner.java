@@ -1,5 +1,6 @@
 package fastui.yure.client.scan;
 
+import fastui.yure.FastMasaConfig;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.gui.GuiConfigsBase;
 import fi.dy.masa.malilib.gui.interfaces.IConfigGui;
@@ -303,9 +304,17 @@ public final class ConfigGuiGroupScanner {
                     groups.add(new GroupData(value.groupValue(), configs, configNames(configs)));
                 }
             } finally {
-                candidate.access().set(originalValue);
+                try {
+                    candidate.access().set(originalValue);
+                } catch (ReflectiveOperationException | RuntimeException restoreFailure) {
+                    FastMasaConfig.LOGGER.warn("Failed to restore config group selector {}", candidate.path(), restoreFailure);
+                    throw restoreFailure;
+                }
             }
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            // 静默跳过会让“某模组分不了组”无从排查，至少留下候选路径。
+            FastMasaConfig.LOGGER.debug("config group scan failed for candidate {}: {}",
+                    candidate.path(), e.toString());
             return Optional.empty();
         }
 

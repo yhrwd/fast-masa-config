@@ -56,3 +56,5 @@ replay_*.log
 
 # local manual-test mod downloads
 manual-test/
+
+.zcodeignore

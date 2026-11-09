@@ -8,8 +8,5 @@ test/java/fastui/yure/client/gui/GroupWindowLayoutTest.java
 test/java/fastui/yure/client/gui/QuickConfigGroupGeometryTest.java
 test/java/fastui/yure/client/input/HotkeyReleaseGateTest.java
 test/java/fastui/yure/client/shortcut/ShortcutResolverTest.java
-test/java/fastui/yure/config/ConfigGroupStoreTest.java
-test/java/fastui/yure/config/EntityRenderFilterTest.java
-test/java/fastui/yure/config/FastMasaConfigHandlerTest.java
 test/java/fastui/yure/config/QuickMessageStoreTest.java
 test/java/fastui/yure/config/QuickMessageTemplateTest.java

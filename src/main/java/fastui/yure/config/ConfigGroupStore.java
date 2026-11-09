@@ -81,7 +81,9 @@ public final class ConfigGroupStore {
         }
 
         ConfigGroup group = GROUPS_BY_ID.get(id);
-        if (group == null) {
+        // 系统组（默认组）的名字固定：若允许改名，下一次 load() 的 ensureDefaultGroup 又会改回去，
+        // 用户会看到“改了名、重启就丢”的假象。
+        if (group == null || group.system()) {
             return false;
         }
         String normalized = name.trim();
@@ -288,6 +290,7 @@ public final class ConfigGroupStore {
         }
     }
 
+    /** Migrate legacy targets; the complete ShortcutEntry metadata remains in the retained Shortcuts array. */
     public static void migrateShortcutsIfEmpty(List<ShortcutEntry> shortcuts) {
         ConfigGroup group = ensureDefaultGroup();
         if (shortcuts == null || shortcuts.isEmpty()) {

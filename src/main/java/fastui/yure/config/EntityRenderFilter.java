@@ -7,11 +7,33 @@ import java.util.Set;
 
 /** Pure matching logic for the client-side entity rendering filter. */
 public final class EntityRenderFilter {
+    /** Accessed on the client/render thread; retain a snapshot to detect in-place list edits. */
+    private static List<String> cachedIds = List.of();
+    private static State cachedState;
+
     private EntityRenderFilter() {
     }
 
     public static boolean shouldRender(boolean enabled, boolean whitelist, List<String> configuredIds, String entityId) {
         return State.from(enabled, whitelist, configuredIds).shouldRender(entityId);
+    }
+
+    /**
+     * 返回与给定配置等价的 {@link State}，配置未变化时复用缓存实例。
+     * 实体渲染热路径（每实体每帧）必须走这里，而不是 {@link State#from}。
+     */
+    public static State cachedState(boolean enabled, boolean whitelist, List<String> configuredIds) {
+        List<String> ids = configuredIds == null ? List.of() : configuredIds;
+        State cached = cachedState;
+
+        if (cached != null && cached.enabled() == enabled && cached.whitelist() == whitelist && ids.equals(cachedIds)) {
+            return cached;
+        }
+
+        State fresh = State.from(enabled, whitelist, ids);
+        cachedIds = new java.util.ArrayList<>(ids);
+        cachedState = fresh;
+        return fresh;
     }
 
     public static Set<String> normalizedIds(List<String> ids) {
